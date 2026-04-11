@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './TeacherRoom.css';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
+
+const roomColorPresets = [
+    { id: 'purple', bg: 'linear-gradient(135deg, #6e45e2 0%, #8e44ad 100%)' },
+    { id: 'blue', bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
+    { id: 'green', bg: 'linear-gradient(135deg, #1dd1a1 0%, #10ac84 100%)' },
+    { id: 'orange', bg: 'linear-gradient(135deg, #ff9f43 0%, #ff6b6b 100%)' },
+    { id: 'pink', bg: 'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)' },
+    { id: 'teal', bg: 'linear-gradient(135deg, #00cec9 0%, #01a3a4 100%)' }
+];
 
 export default function TeacherRoom() {
     const { roomId } = useParams();
@@ -30,31 +39,24 @@ export default function TeacherRoom() {
             return;
         }
 
-        const fetchRoomData = async () => {
-            try {
-                const roomRef = doc(db, "teacher_rooms", roomId);
-                const roomSnap = await getDoc(roomRef);
-
-                if (roomSnap.exists()) {
-                    const roomData = roomSnap.data();
-                    setRoom({ id: roomSnap.id, ...roomData });
-                    // Load posts and classwork for this room from Firestore
-                    const roomPosts = roomData.posts || [];
-                    const roomClasswork = roomData.classwork || [];
-                    setPosts(roomPosts);
-                    setClasswork(roomClasswork);
-                } else {
-                    alert('Room not found!');
-                    navigate('/dashboard');
-                }
-            } catch (error) {
-                console.error("Error fetching room:", error);
-                alert('Error loading room data.');
+        const roomRef = doc(db, "teacher_rooms", roomId);
+        const unsubscribe = onSnapshot(roomRef, (roomSnap) => {
+            if (roomSnap.exists()) {
+                const roomData = roomSnap.data();
+                setRoom({ id: roomSnap.id, ...roomData });
+                setPosts(roomData.posts || []);
+                setClasswork(roomData.classwork || []);
+            } else {
+                alert('Room not found!');
                 navigate('/dashboard');
             }
-        };
+        }, (error) => {
+            console.error("Error fetching room:", error);
+            alert('Error loading room data.');
+            navigate('/dashboard');
+        });
 
-        fetchRoomData();
+        return () => unsubscribe();
     }, [roomId, navigate]);
 
     const handleCreatePost = async (e) => {
@@ -72,7 +74,6 @@ export default function TeacherRoom() {
         try {
             const roomRef = doc(db, "teacher_rooms", roomId);
             await updateDoc(roomRef, { posts: updatedPosts });
-            setPosts(updatedPosts);
             setPostContent('');
             setIsPostModalOpen(false);
         } catch (error) {
@@ -97,7 +98,6 @@ export default function TeacherRoom() {
         try {
             const roomRef = doc(db, "teacher_rooms", roomId);
             await updateDoc(roomRef, { classwork: updatedClasswork });
-            setClasswork(updatedClasswork);
             
             // Reset form and close modal
             setCwTitle('');
@@ -115,7 +115,6 @@ export default function TeacherRoom() {
             try {
                 const roomRef = doc(db, "teacher_rooms", roomId);
                 await updateDoc(roomRef, { classwork: updatedClasswork });
-                setClasswork(updatedClasswork);
             } catch (error) {
                 console.error("Error deleting classwork: ", error);
                 alert("Failed to delete classwork. Please try again.");
@@ -208,7 +207,7 @@ export default function TeacherRoom() {
             </nav>
 
             <main className="room-container">
-                <div className="class-banner">
+                <div className="class-banner" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
                     <h1>{room.section}</h1>
                     <p>{room.grade}</p>
                     <i className="fas fa-flask banner-icon"></i>

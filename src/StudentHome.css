@@ -339,7 +339,7 @@
         animation: fadeInBackdrop 0.3s forwards;
         pointer-events: auto !important;
     }
-    .dropdown-menu {
+    .nav-right .dropdown-menu {
         position: fixed !important;
         top: auto !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
         width: 100vw !important; min-width: 100vw !important;
@@ -364,12 +364,12 @@
     .mobile-user-info h4 { margin: 0 0 4px 0; font-size: 1.2rem; color: #1c1c1e; font-weight: 700; }
     .mobile-user-info p { margin: 0; font-size: 0.95rem; color: #8e8e93; }
     
-    .dropdown-item { background: white !important; border-radius: 20px; padding: 18px 20px !important; font-size: 1.1rem !important; font-weight: 600 !important; justify-content: flex-start !important; gap: 15px !important; }
-    .dropdown-item:active { transform: scale(0.98); background: #f9f9f9 !important; }
-    .dropdown-item.danger { color: #ff3b30 !important; }
-    .dropdown-item.danger .dropdown-icon-box { background: #ffe5e5; color: #ff3b30; }
+    .nav-right .dropdown-item { background: white !important; border-radius: 20px; padding: 18px 20px !important; font-size: 1.1rem !important; font-weight: 600 !important; justify-content: flex-start !important; gap: 15px !important; }
+    .nav-right .dropdown-item:active { transform: scale(0.98); background: #f9f9f9 !important; }
+    .nav-right .dropdown-item.danger { color: #ff3b30 !important; }
+    .nav-right .dropdown-item.danger .dropdown-icon-box { background: #ffe5e5; color: #ff3b30; }
     
-    .dropdown-icon-box { display: flex !important; width: 35px; height: 35px; background: #f0f2f5; color: #6e45e2; border-radius: 10px; justify-content: center; align-items: center; }
+    .nav-right .dropdown-icon-box { display: flex !important; width: 35px; height: 35px; background: #f0f2f5; color: #6e45e2; border-radius: 10px; justify-content: center; align-items: center; }
 
     @keyframes slideUpSheet { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
     @keyframes fadeInBackdrop { 0% { opacity: 0; } 100% { opacity: 1; } }

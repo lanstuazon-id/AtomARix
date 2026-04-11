@@ -50,12 +50,22 @@ const getCroppedImg = (imageSrc, pixelCrop) => {
     });
 };
 
+const roomColorPresets = [
+    { id: 'purple', bg: 'linear-gradient(135deg, #6e45e2 0%, #8e44ad 100%)' },
+    { id: 'blue', bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
+    { id: 'green', bg: 'linear-gradient(135deg, #1dd1a1 0%, #10ac84 100%)' },
+    { id: 'orange', bg: 'linear-gradient(135deg, #ff9f43 0%, #ff6b6b 100%)' },
+    { id: 'pink', bg: 'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)' },
+    { id: 'teal', bg: 'linear-gradient(135deg, #00cec9 0%, #01a3a4 100%)' }
+];
+
 export default function TeacherDashboard() {
     const navigate = useNavigate();
     const [rooms, setRooms] = useState([]);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newRoomSection, setNewRoomSection] = useState('');
     const [newRoomGrade, setNewRoomGrade] = useState('');
+    const [newRoomColor, setNewRoomColor] = useState('purple');
     const [isLoading, setIsLoading] = useState(true);
     
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -78,6 +88,17 @@ export default function TeacherDashboard() {
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    
+    // Room Management State
+    const [activeRoomMenu, setActiveRoomMenu] = useState(null);
+    const [selectedRoom, setSelectedRoom] = useState(null);
+    const [activeTab, setActiveTab] = useState('classrooms');
+    const [isEditRoomModalOpen, setIsEditRoomModalOpen] = useState(false);
+    const [isDeleteRoomModalOpen, setIsDeleteRoomModalOpen] = useState(false);
+    const [editRoomSection, setEditRoomSection] = useState('');
+    const [editRoomGrade, setEditRoomGrade] = useState('');
+    const [editRoomColor, setEditRoomColor] = useState('purple');
+    const [dashboardStats, setDashboardStats] = useState({ totalStudents: 0, topPerformer: '-', totalRooms: 0 });
 
     useEffect(() => {
         if (!userName) return;
@@ -96,9 +117,46 @@ export default function TeacherDashboard() {
         });
 
         const q = query(collection(db, "teacher_rooms"), where("teacher", "==", userName));
-        const unsubscribeRooms = onSnapshot(q, (querySnapshot) => {
+        const unsubscribeRooms = onSnapshot(q, async (querySnapshot) => {
             const myRooms = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setRooms(myRooms);
+            
+            // Fetch students to calculate overview stats
+            const myRoomIds = myRooms.map(r => r.id);
+            if (myRoomIds.length === 0) {
+                setDashboardStats({ totalStudents: 0, topPerformer: '-', totalRooms: 0 });
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const usersQuery = query(collection(db, "users"), where("role", "==", "student"));
+                const usersSnap = await getDocs(usersQuery);
+                let studentCount = 0;
+                let topScore = -1;
+                let topStudent = '-';
+
+                usersSnap.forEach(doc => {
+                    const data = doc.data();
+                    if (myRoomIds.includes(data.joinedRoomId)) {
+                        studentCount++;
+                        const score = data.timeAttackBestCorrect || 0;
+                        if (score > topScore) {
+                            topScore = score;
+                            topStudent = data.fullname || data.username || '-';
+                        }
+                    }
+                });
+
+                setDashboardStats({
+                    totalStudents: studentCount,
+                    topPerformer: topScore > 0 ? `${topStudent} (${topScore} pts)` : '-',
+                    totalRooms: myRooms.length
+                });
+            } catch (error) {
+                console.error("Error fetching students for stats: ", error);
+            }
+
             setIsLoading(false);
         }, (error) => {
             console.error("Error fetching rooms: ", error);
@@ -136,19 +194,24 @@ export default function TeacherDashboard() {
             grade: newRoomGrade.trim(),
             teacher: userName,
             teacherFullName: teacherFullName,
-            classCode: generateClassCode()
+            classCode: generateClassCode(),
+            colorTheme: newRoomColor
         };
 
         try {
+            setIsCreateModalOpen(false); // Close modal immediately
+            setResultModal({ show: true, title: 'Creating...', message: 'Setting up new classroom...', type: 'loading' });
+            
             // Save the room to Firestore using the generated ID as the document ID
             await setDoc(doc(db, "teacher_rooms", newRoom.id), newRoom);
             
-            setIsCreateModalOpen(false); // Close modal
             setNewRoomSection(''); // Reset inputs
             setNewRoomGrade('');
+            setNewRoomColor('purple');
+            setResultModal({ show: true, title: 'Success!', message: 'Classroom created successfully.', type: 'success' });
         } catch (error) {
             console.error("Error creating room: ", error);
-            alert("Failed to create room. Please try again.");
+            setResultModal({ show: true, title: 'Error', message: 'Failed to create room. Please try again.', type: 'error' });
         }
     };
 
@@ -156,6 +219,7 @@ export default function TeacherDashboard() {
     useEffect(() => {
         function handleClickOutside(event) {
             if (menuRef.current && !menuRef.current.contains(event.target)) setIsMenuOpen(false);
+            if (!event.target.closest('.room-menu-container')) setActiveRoomMenu(null);
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -163,10 +227,10 @@ export default function TeacherDashboard() {
 
     // Prevent background scrolling when modal or menu is open
     useEffect(() => {
-        if (isMenuOpen || isLogoutModalOpen || isCreateModalOpen || isProfileModalOpen || isSettingsModalOpen || isDeleteModalOpen || resultModal.show) document.body.style.overflow = 'hidden';
+        if (isMenuOpen || isLogoutModalOpen || isCreateModalOpen || isProfileModalOpen || isSettingsModalOpen || isDeleteModalOpen || resultModal.show || isEditRoomModalOpen || isDeleteRoomModalOpen) document.body.style.overflow = 'hidden';
         else document.body.style.overflow = '';
         return () => document.body.style.overflow = '';
-    }, [isMenuOpen, isLogoutModalOpen, isCreateModalOpen, isProfileModalOpen, isSettingsModalOpen, isDeleteModalOpen, resultModal.show]);
+    }, [isMenuOpen, isLogoutModalOpen, isCreateModalOpen, isProfileModalOpen, isSettingsModalOpen, isDeleteModalOpen, resultModal.show, isEditRoomModalOpen, isDeleteRoomModalOpen]);
 
     const handleLogout = () => {
         sessionStorage.clear();
@@ -224,81 +288,106 @@ export default function TeacherDashboard() {
 
             let nameChanged = false;
             const newFullName = editedFullName.trim();
-            if (newFullName !== '' && newFullName !== sessionStorage.getItem('userFullname')) {
+            const oldFullName = sessionStorage.getItem('userFullname') || userName;
+
+            if (newFullName !== '' && newFullName !== oldFullName) {
                 nameChanged = true;
+                updates.fullname = newFullName;
             }
 
-            if (nameChanged) {
-                const newEmail = `${newFullName.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
+            if (nameChanged || avatarChanged) {
+                // Differentiate between Email/Password accounts and Google OAuth accounts
+                const isManualAccount = (userName === oldFullName);
 
-                // 1. Check if new name is already taken
-                const newDocRef = doc(db, "users", newFullName);
-                const newDocSnap = await getDoc(newDocRef);
-                if (newDocSnap.exists() && newFullName !== userName) {
-                    setResultModal({ show: true, title: 'Error', message: 'This Full Name is already taken.', type: 'error' });
-                    return;
-                }
+                if (nameChanged && isManualAccount) {
+                    const newEmail = `${newFullName.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
 
-                // 2. Update Firebase Auth Email
-                if (auth.currentUser) {
+                    // 1. Check if new name is already taken
+                    const newDocRef = doc(db, "users", newFullName);
+                    const newDocSnap = await getDoc(newDocRef);
+                    if (newDocSnap.exists() && newFullName !== userName) {
+                        setResultModal({ show: true, title: 'Error', message: 'This Full Name is already taken.', type: 'error' });
+                        return;
+                    }
+
+                    // 2. Ensure Firebase Auth is fully loaded
+                    const currentAuthUser = auth.currentUser;
+                    if (!currentAuthUser) {
+                        setResultModal({ show: true, title: 'Syncing', message: 'Connecting to authentication server. Please wait a few seconds and try again.', type: 'error' });
+                        return;
+                    }
+
                     try {
-                        await updateEmail(auth.currentUser, newEmail);
+                        // 3. Update Firebase Auth Email
+                        await updateEmail(currentAuthUser, newEmail);
                     } catch (error) {
                         if (error.code === 'auth/requires-recent-login') {
-                            setResultModal({ show: true, title: 'Re-authentication Required', message: 'For security reasons, you must log out and log back in before changing your login name.', type: 'error' });
+                            setResultModal({ show: true, title: 'Session Expired', message: 'For security reasons, you must log out and log back in before changing your name.', type: 'error' });
                             return;
                         }
                         throw error;
                     }
-                }
 
-                // 3. Move the user document to the new ID
-                const oldUserSnap = await getDoc(userRef);
-                if (oldUserSnap.exists()) {
-                    const userData = oldUserSnap.data();
-                    userData.fullname = newFullName;
-                    userData.username = newFullName; // For teachers, username = fullname
-                    if (avatarChanged) userData.avatarUrl = editedAvatarUrl;
+                    // 4. Move the user document to the new ID
+                    const oldUserSnap = await getDoc(userRef);
+                    if (oldUserSnap.exists()) {
+                        const userData = oldUserSnap.data();
+                        userData.fullname = newFullName;
+                        userData.username = newFullName;
+                        if (avatarChanged) userData.avatarUrl = editedAvatarUrl;
+                        
+                        await setDoc(newDocRef, userData);
+                        await deleteDoc(userRef);
+
+                        // 5. Update foreign keys in teacher_rooms
+                        const q = query(collection(db, "teacher_rooms"), where("teacher", "==", userName));
+                        const roomSnaps = await getDocs(q);
+                        const updatePromises = roomSnaps.docs.map(roomDoc => 
+                            setDoc(doc(db, "teacher_rooms", roomDoc.id), { teacher: newFullName, teacherFullName: newFullName }, { merge: true })
+                        );
+                        await Promise.all(updatePromises);
+
+                        // 6. Update local/session storage for the Login Page
+                        sessionStorage.setItem('loggedInUser', newFullName);
+                        sessionStorage.setItem('userFullname', newFullName);
+                        if (localStorage.getItem('rememberedUser') === userName) {
+                            localStorage.setItem('rememberedUser', newFullName);
+                        }
+                        if (avatarChanged && editedAvatarUrl !== '') {
+                            localStorage.setItem(`userAvatar_${newFullName}`, editedAvatarUrl);
+                            localStorage.removeItem(`userAvatar_${userName}`);
+                        } else if (editedAvatarUrl === '') {
+                            localStorage.removeItem(`userAvatar_${newFullName}`);
+                            localStorage.removeItem(`userAvatar_${userName}`);
+                        }
+
+                        setResultModal({ show: true, title: 'Success!', message: 'Profile updated! Reloading...', type: 'success' });
+                        setIsProfileModalOpen(false);
+                        
+                        setTimeout(() => window.location.reload(), 1500);
+                        return;
+                    }
+                } else {
+                    // For Google OAuth users OR if only the avatar changed
+                    await setDoc(userRef, updates, { merge: true });
                     
-                    await setDoc(newDocRef, userData);
-                    await deleteDoc(userRef);
-
-                    // 4. Update foreign keys in teacher_rooms
-                    const q = query(collection(db, "teacher_rooms"), where("teacher", "==", userName));
-                    const roomSnaps = await getDocs(q);
-                    const updatePromises = roomSnaps.docs.map(roomDoc => 
-                        setDoc(doc(db, "teacher_rooms", roomDoc.id), { teacher: newFullName, teacherFullName: newFullName }, { merge: true })
-                    );
-                    await Promise.all(updatePromises);
-
-                    // 5. Update local/session storage for the Login Page
-                    sessionStorage.setItem('loggedInUser', newFullName);
-                    sessionStorage.setItem('userFullname', newFullName);
-                    if (localStorage.getItem('rememberedUser') === userName) {
-                        localStorage.setItem('rememberedUser', newFullName);
-                    }
-                    if (avatarChanged && editedAvatarUrl !== '') {
-                        localStorage.setItem(`userAvatar_${newFullName}`, editedAvatarUrl);
-                        localStorage.removeItem(`userAvatar_${userName}`);
-                    } else if (editedAvatarUrl === '') {
-                        localStorage.removeItem(`userAvatar_${newFullName}`);
-                        localStorage.removeItem(`userAvatar_${userName}`);
+                    if (nameChanged) {
+                        sessionStorage.setItem('userFullname', newFullName);
+                        const q = query(collection(db, "teacher_rooms"), where("teacher", "==", userName));
+                        const roomSnaps = await getDocs(q);
+                        const updatePromises = roomSnaps.docs.map(roomDoc => 
+                            setDoc(doc(db, "teacher_rooms", roomDoc.id), { teacherFullName: newFullName }, { merge: true })
+                        );
+                        await Promise.all(updatePromises);
                     }
 
-                    setResultModal({ show: true, title: 'Success!', message: 'Profile updated! Reloading...', type: 'success' });
+                    setResultModal({ show: true, title: 'Success!', message: 'Your profile has been updated.', type: 'success' });
                     setIsProfileModalOpen(false);
-                    
-                    // Reload the page to sync React state with the new name
-                    setTimeout(() => window.location.reload(), 1500);
                 }
-            } else if (avatarChanged) {
-                await setDoc(userRef, updates, { merge: true });
-                setResultModal({ show: true, title: 'Success!', message: 'Your profile avatar has been updated.', type: 'success' });
-                setIsProfileModalOpen(false);
             }
         } catch (error) {
             console.error("Error updating profile:", error);
-            setResultModal({ show: true, title: 'Error', message: 'Failed to update profile.', type: 'error' });
+            setResultModal({ show: true, title: 'Error', message: `Failed to update: ${error.message || 'Unknown error'}`, type: 'error' });
         }
     };
 
@@ -341,12 +430,48 @@ export default function TeacherDashboard() {
         }
     };
 
+    const handleEditRoomSubmit = async (e) => {
+        e.preventDefault();
+        if (!editRoomSection.trim() || !editRoomGrade.trim()) return;
+        
+        setIsEditRoomModalOpen(false);
+        setResultModal({ show: true, title: 'Updating...', message: 'Saving classroom details...', type: 'loading' });
+        
+        try {
+            await setDoc(doc(db, "teacher_rooms", selectedRoom.id), {
+                section: editRoomSection.trim(),
+                grade: editRoomGrade.trim(),
+                colorTheme: editRoomColor
+            }, { merge: true });
+            setResultModal({ show: true, title: 'Success!', message: 'Classroom updated successfully.', type: 'success' });
+        } catch (error) {
+            console.error("Error updating room: ", error);
+            setResultModal({ show: true, title: 'Error', message: 'Failed to update classroom.', type: 'error' });
+        }
+    };
+
+    const handleConfirmDeleteRoom = async () => {
+        if (!selectedRoom) return;
+        
+        setIsDeleteRoomModalOpen(false);
+        setResultModal({ show: true, title: 'Deleting...', message: 'Removing classroom...', type: 'loading' });
+        
+        try {
+            await deleteDoc(doc(db, "teacher_rooms", selectedRoom.id));
+            setSelectedRoom(null);
+            setResultModal({ show: true, title: 'Deleted', message: 'Classroom deleted successfully.', type: 'success' });
+        } catch (error) {
+            console.error("Error deleting room: ", error);
+            setResultModal({ show: true, title: 'Error', message: 'Failed to delete classroom.', type: 'error' });
+        }
+    };
+
     return (
         <div style={{ minHeight: '100vh', backgroundColor: '#f8faff' }}>
             <nav className="navbar">
                 <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
                 <ul className="nav-links">
-                    <li className="active"><i className="fas fa-chalkboard-teacher"></i> Classrooms</li>
+                    <li className="active"><i className="fas fa-chalkboard-teacher"></i> <span>Dashboard</span></li>
                 </ul>
                 <div className="nav-right" style={{ width: '130px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px' }}>
                     <div className="menu-container" ref={menuRef}>
@@ -391,15 +516,57 @@ export default function TeacherDashboard() {
             </nav>
 
             <main className="dashboard-container">
-                <div className="header-bar">
-                    <h1>My Classrooms</h1>
-                    <button className="btn-create" onClick={() => setIsCreateModalOpen(true)}>
-                        <i className="fas fa-plus"></i> Create Room
-                    </button>
+                <div className="header-bar" style={{ marginBottom: '30px' }}>
+                    <div className="toggle-container" style={{ display: 'flex', background: '#f0f2f5', borderRadius: '12px', padding: '6px', gap: '5px' }}>
+                        <button 
+                            onClick={() => setActiveTab('classrooms')}
+                            style={{ padding: '10px 24px', border: 'none', borderRadius: '10px', background: activeTab === 'classrooms' ? 'white' : 'transparent', color: activeTab === 'classrooms' ? '#6e45e2' : '#666', fontWeight: activeTab === 'classrooms' ? '700' : '600', cursor: 'pointer', boxShadow: activeTab === 'classrooms' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}
+                        >
+                            <i className="fas fa-chalkboard-teacher"></i> My Classrooms
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('overview')}
+                            style={{ padding: '10px 24px', border: 'none', borderRadius: '10px', background: activeTab === 'overview' ? 'white' : 'transparent', color: activeTab === 'overview' ? '#6e45e2' : '#666', fontWeight: activeTab === 'overview' ? '700' : '600', cursor: 'pointer', boxShadow: activeTab === 'overview' ? '0 4px 12px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}
+                        >
+                            <i className="fas fa-chart-pie"></i> Overview
+                        </button>
+                    </div>
+                    {activeTab === 'classrooms' && (
+                        <button className="btn-create" onClick={() => setIsCreateModalOpen(true)}>
+                            <i className="fas fa-plus"></i> Create Room
+                        </button>
+                    )}
                 </div>
 
-                <div className="rooms-grid">
-                    {isLoading ? (
+                {activeTab === 'overview' && (
+                    <div className="stats-overview">
+                        <div className="stat-card">
+                            <div className="stat-icon purple"><i className="fas fa-users"></i></div>
+                            <div className="stat-info">
+                                <h3>Total Students</h3>
+                                <p>{dashboardStats.totalStudents}</p>
+                            </div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-icon orange"><i className="fas fa-chalkboard"></i></div>
+                            <div className="stat-info">
+                                <h3>Active Rooms</h3>
+                                <p>{dashboardStats.totalRooms}</p>
+                            </div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="stat-icon green"><i className="fas fa-trophy"></i></div>
+                            <div className="stat-info">
+                                <h3>Top Performer</h3>
+                                <p>{dashboardStats.topPerformer}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'classrooms' && (
+                    <div className="rooms-grid">
+                        {isLoading ? (
                         <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
                             <i className="fas fa-circle-notch fa-spin" style={{ color: '#6e45e2', fontSize: '3rem', marginBottom: '15px' }}></i>
                             <h2>Loading Classrooms...</h2>
@@ -416,10 +583,36 @@ export default function TeacherDashboard() {
                                 className="room-card" 
                                 onClick={() => navigate(`/teacher-room/${room.id}`)}
                             >
-                                <div className="room-header">
+                                <div className="room-header" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
                                     <div className="room-header-text">
                                         <h2>{room.section}</h2>
                                         <p>{room.grade}</p>
+                                    </div>
+                                    <div className="menu-container room-menu-container">
+                                        <button className="btn-menu" onClick={(e) => { e.stopPropagation(); setActiveRoomMenu(activeRoomMenu === room.id ? null : room.id); }}>
+                                            <i className="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        {activeRoomMenu === room.id && (
+                                            <div className="dropdown-menu show" style={{ right: 0, top: '40px', width: '150px' }} onClick={e => e.stopPropagation()}>
+                                                <div className="dropdown-item" onClick={() => {
+                                                    setSelectedRoom(room);
+                                                    setEditRoomSection(room.section);
+                                                    setEditRoomGrade(room.grade);
+                                                    setEditRoomColor(room.colorTheme || 'purple');
+                                                    setIsEditRoomModalOpen(true);
+                                                    setActiveRoomMenu(null);
+                                                }}>
+                                                    <i className="fas fa-edit" style={{ color: '#6e45e2', width: '20px' }}></i> Edit
+                                                </div>
+                                                <div className="dropdown-item danger" onClick={() => {
+                                                    setSelectedRoom(room);
+                                                    setIsDeleteRoomModalOpen(true);
+                                                    setActiveRoomMenu(null);
+                                                }}>
+                                                    <i className="fas fa-trash" style={{ width: '20px' }}></i> Delete
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="room-body">
@@ -432,7 +625,8 @@ export default function TeacherDashboard() {
                             </div>
                         ))
                     )}
-                </div>
+                    </div>
+                )}
             </main>
 
             {isCreateModalOpen && (
@@ -462,11 +656,87 @@ export default function TeacherDashboard() {
                                     required 
                                 />
                             </div>
+                            <div className="input-group">
+                                <label>Theme Color</label>
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '5px', flexWrap: 'wrap' }}>
+                                    {roomColorPresets.map(preset => (
+                                        <button 
+                                            type="button" 
+                                            key={preset.id}
+                                            onClick={() => setNewRoomColor(preset.id)}
+                                            style={{ background: preset.bg, width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', border: newRoomColor === preset.id ? '3px solid #2d3436' : '3px solid transparent', transition: 'transform 0.2s', transform: newRoomColor === preset.id ? 'scale(1.1)' : 'scale(1)' }}
+                                            title={preset.id}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
                             <div className="modal-actions">
                                 <button type="button" className="btn-cancel" onClick={() => setIsCreateModalOpen(false)}>Cancel</button>
                                 <button type="submit" className="btn-confirm">Create Room</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {isEditRoomModalOpen && selectedRoom && (
+                <div className="modal-container show">
+                    <div className="modal-content">
+                        <h2 className="modal-title">Edit Classroom</h2>
+                        <form onSubmit={handleEditRoomSubmit}>
+                            <div className="input-group">
+                                <label htmlFor="editSectionName">Classroom / Section Name</label>
+                                <input 
+                                    type="text" 
+                                    id="editSectionName"
+                                    value={editRoomSection} 
+                                    onChange={(e) => setEditRoomSection(e.target.value)} 
+                                    required 
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label htmlFor="editGradeLevel">Grade Level</label>
+                                <input 
+                                    type="text" 
+                                    id="editGradeLevel"
+                                    value={editRoomGrade} 
+                                    onChange={(e) => setEditRoomGrade(e.target.value)} 
+                                    required 
+                                />
+                            </div>
+                            <div className="input-group">
+                                <label>Theme Color</label>
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '5px', flexWrap: 'wrap' }}>
+                                    {roomColorPresets.map(preset => (
+                                        <button 
+                                            type="button" 
+                                            key={preset.id}
+                                            onClick={() => setEditRoomColor(preset.id)}
+                                            style={{ background: preset.bg, width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', border: editRoomColor === preset.id ? '3px solid #2d3436' : '3px solid transparent', transition: 'transform 0.2s', transform: editRoomColor === preset.id ? 'scale(1.1)' : 'scale(1)' }}
+                                            title={preset.id}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="modal-actions">
+                                <button type="button" className="btn-cancel" onClick={() => setIsEditRoomModalOpen(false)}>Cancel</button>
+                                <button type="submit" className="btn-confirm">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {isDeleteRoomModalOpen && selectedRoom && (
+                <div className="modal-container show">
+                    <div className="modal-content" style={{ textAlign: 'center' }}>
+                        <i className="fas fa-exclamation-triangle modal-icon-box" style={{ color: '#e74c3c' }}></i>
+                        <h2 style={{ marginBottom: '10px' }}>Delete Classroom</h2>
+                        <p style={{ color: '#666', marginBottom: '20px' }}>Are you sure you want to delete <strong>{selectedRoom.section}</strong>? This action cannot be undone and all content will be lost.</p>
+                        <div className="modal-actions">
+                            <button className="btn-cancel" onClick={() => setIsDeleteRoomModalOpen(false)}>Cancel</button>
+                            <button className="btn-confirm" onClick={handleConfirmDeleteRoom} style={{ backgroundColor: '#e74c3c' }}>Delete</button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -592,12 +862,18 @@ export default function TeacherDashboard() {
             {resultModal.show && (
                 <div className="modal-container show">
                     <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
-                        <i className={`fas ${resultModal.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'} modal-icon-box`} style={{ color: resultModal.type === 'success' ? '#1dd1a1' : '#e74c3c' }}></i>
+                        {resultModal.type === 'loading' ? (
+                            <i className="fas fa-circle-notch fa-spin modal-icon-box" style={{ color: '#6e45e2' }}></i>
+                        ) : (
+                            <i className={`fas ${resultModal.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'} modal-icon-box`} style={{ color: resultModal.type === 'success' ? '#1dd1a1' : '#e74c3c' }}></i>
+                        )}
                         <h2 style={{ marginBottom: '10px' }}>{resultModal.title}</h2>
                         <p style={{ color: '#666', marginBottom: '20px' }}>{resultModal.message}</p>
-                        <div className="modal-actions">
-                            <button className="btn-confirm" onClick={() => setResultModal({ ...resultModal, show: false })} style={{ background: '#6e45e2', width: '100%' }}>Close</button>
-                        </div>
+                        {resultModal.type !== 'loading' && (
+                            <div className="modal-actions">
+                                <button className="btn-confirm" onClick={() => setResultModal({ ...resultModal, show: false })} style={{ background: '#6e45e2', width: '100%' }}>Close</button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

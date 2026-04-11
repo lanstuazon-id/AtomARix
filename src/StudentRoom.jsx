@@ -4,6 +4,15 @@ import './StudentRoom.css';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
+const roomColorPresets = [
+    { id: 'purple', bg: 'linear-gradient(135deg, #6e45e2 0%, #8e44ad 100%)' },
+    { id: 'blue', bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
+    { id: 'green', bg: 'linear-gradient(135deg, #1dd1a1 0%, #10ac84 100%)' },
+    { id: 'orange', bg: 'linear-gradient(135deg, #ff9f43 0%, #ff6b6b 100%)' },
+    { id: 'pink', bg: 'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)' },
+    { id: 'teal', bg: 'linear-gradient(135deg, #00cec9 0%, #01a3a4 100%)' }
+];
+
 export default function StudentRoom() {
     const { roomId } = useParams();
     const navigate = useNavigate();
@@ -179,7 +188,7 @@ export default function StudentRoom() {
             </nav>
 
             <main className="room-container">
-                <div className="class-banner">
+                <div className="class-banner" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
                     <h1>{room.section}</h1>
                     <p>{room.grade}</p>
                     <i className="fas fa-flask banner-icon"></i>
