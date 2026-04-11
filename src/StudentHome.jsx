@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import './StudentHome.css'; 
-import { collection, getDocs, doc, getDoc, setDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { deleteUser } from 'firebase/auth';
 
@@ -138,6 +138,11 @@ export default function StudentHome() {
     const [animCompoundsPct, setAnimCompoundsPct] = useState(0);
     const [hasCelebrated, setHasCelebrated] = useState(false);
 
+    // Loading States
+    const [isLoading, setIsLoading] = useState(true);
+    const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
+    const [isMatchingLoading, setIsMatchingLoading] = useState(true);
+
     useEffect(() => {
         if (!userName) {
             navigate('/');
@@ -183,8 +188,12 @@ export default function StudentHome() {
                         if (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0) {
                             localStorage.setItem(`matchingGameBestScore_${userName}`, data.matchingGameBestScore.toString());
                         }
-                        if (data.avatarUrl) {
-                            localStorage.setItem(`userAvatar_${userName}`, data.avatarUrl);
+                        if (data.avatarUrl !== undefined) {
+                            if (data.avatarUrl === '') {
+                                localStorage.removeItem(`userAvatar_${userName}`);
+                            } else {
+                                localStorage.setItem(`userAvatar_${userName}`, data.avatarUrl);
+                            }
                             setAvatarUrl(data.avatarUrl);
                         }
                         if (roomIdToFetch && data[`lastRead_${roomIdToFetch}`] !== undefined) {
@@ -224,8 +233,10 @@ export default function StudentHome() {
                         }
                         setJoinedRoom(null);
                     }
+                    setIsLoading(false);
                 } catch (error) {
                     console.error("Error parsing user data snapshot:", error);
+                    setIsLoading(false);
                 }
             }, (error) => {
                 console.error("Error listening to user data:", error);
@@ -233,31 +244,44 @@ export default function StudentHome() {
         };
         fetchUserData();
 
-        // Fetch Leaderboard Data in real-time
-        const unsubscribeLeaderboard = onSnapshot(collection(db, "users"), (querySnapshot) => {
+        // Fetch Leaderboard Data in real-time (Optimized)
+        const timeAttackQuery = query(
+            collection(db, "users"),
+            where("timeAttackBestCorrect", ">", 0),
+            orderBy("timeAttackBestCorrect", "desc"),
+            limit(10) // Fetch only top 10 to save reads and bandwidth
+        );
+        const unsubscribeTimeAttack = onSnapshot(timeAttackQuery, (snapshot) => {
             const usersData = [];
+            snapshot.forEach((doc) => {
+                usersData.push({ username: doc.id, score: doc.data().timeAttackBestCorrect });
+            });
+            setLeaderboard(usersData);
+            setIsLeaderboardLoading(false);
+        }, (error) => {
+            console.error("Error fetching Time Attack leaderboard:", error);
+            setIsLeaderboardLoading(false);
+        });
+
+        const matchingQuery = query(
+            collection(db, "users"),
+            where("matchingGameBestScore", ">", 0),
+            orderBy("matchingGameBestScore", "asc"),
+            limit(10) // Lowest valid moves first
+        );
+        const unsubscribeMatching = onSnapshot(matchingQuery, (snapshot) => {
             const matchingData = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data.timeAttackBestCorrect !== undefined && data.timeAttackBestCorrect > 0) {
-                    usersData.push({
-                        username: doc.id,
-                        score: data.timeAttackBestCorrect
-                    });
-                }
-                if (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0 && data.matchingGameBestScore < 999) {
-                    matchingData.push({
-                        username: doc.id,
-                        score: data.matchingGameBestScore
-                    });
+            snapshot.forEach((doc) => {
+                const score = doc.data().matchingGameBestScore;
+                if (score < 999) { // Exclude the 999 default placeholder
+                    matchingData.push({ username: doc.id, score });
                 }
             });
-            usersData.sort((a, b) => b.score - a.score);
-            matchingData.sort((a, b) => a.score - b.score); // Ascending order (fewest moves is best)
-            setLeaderboard(usersData);
             setMatchingLeaderboard(matchingData);
+            setIsMatchingLoading(false);
         }, (error) => {
-            console.error("Error fetching leaderboard:", error);
+            console.error("Error fetching Matching Game leaderboard:", error);
+            setIsMatchingLoading(false);
         });
 
         // Listen for the PWA install prompt
@@ -283,7 +307,8 @@ export default function StudentHome() {
         return () => {
             if (unsubscribeRoom) unsubscribeRoom();
             if (unsubscribeUser) unsubscribeUser();
-            if (unsubscribeLeaderboard) unsubscribeLeaderboard();
+            if (unsubscribeTimeAttack) unsubscribeTimeAttack();
+            if (unsubscribeMatching) unsubscribeMatching();
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
             window.removeEventListener('appinstalled', handleAppInstalled);
         };
@@ -468,7 +493,11 @@ export default function StudentHome() {
 
     const handleProfileUpdate = async () => {
             if (editedAvatarUrl !== avatarUrl) {
-            localStorage.setItem(`userAvatar_${userName}`, editedAvatarUrl);
+                if (editedAvatarUrl === '') {
+                    localStorage.removeItem(`userAvatar_${userName}`);
+                } else {
+                    localStorage.setItem(`userAvatar_${userName}`, editedAvatarUrl);
+                }
                 setAvatarUrl(editedAvatarUrl);
                 try {
                 const userRef = doc(db, "users", userName);
@@ -671,7 +700,12 @@ export default function StudentHome() {
                             </button>
                         </div>
                         <div className="updates-content">
-                            {recentUpdates.length > 0 ? (
+                            {isLoading ? (
+                                <div className="recent-posts-list">
+                                    <div className="recent-post-item skeleton" style={{ height: '75px', border: 'none' }}></div>
+                                    <div className="recent-post-item skeleton" style={{ height: '75px', border: 'none' }}></div>
+                                </div>
+                            ) : recentUpdates.length > 0 ? (
                                 <div className="recent-posts-list">
                                     {recentUpdates.map((update) => (
                                         <div key={update.id} className="recent-post-item">
@@ -707,7 +741,7 @@ export default function StudentHome() {
                         </div>
                         <div className="stat-details">
                             <h4>Elements Learned</h4>
-                            <span>{stats.learned}/118</span>
+                            {isLoading ? <span className="skeleton" style={{ width: '60px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.learned}/118</span>}
                         </div>
                     </div>
                     <div className="progress-stat-card">
@@ -716,7 +750,7 @@ export default function StudentHome() {
                         </div>
                         <div className="stat-details">
                             <h4>Compounds Found</h4>
-                            <span>{stats.compounds}/37</span>
+                            {isLoading ? <span className="skeleton" style={{ width: '60px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.compounds}/37</span>}
                         </div>
                     </div>
                     <div className="score-stat-card">
@@ -725,7 +759,7 @@ export default function StudentHome() {
                         </div>
                         <div className="score-details">
                             <h4>Time Attack Best</h4>
-                            <span>{stats.timeAttack} <small>pts</small></span>
+                            {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.timeAttack} <small>pts</small></span>}
                         </div>
                         <button className="btn-play-game time-attack" onClick={() => navigate('/timeattack')}>
                             Take Quiz
@@ -737,7 +771,7 @@ export default function StudentHome() {
                         </div>
                         <div className="score-details">
                             <h4>Matching Game Best</h4>
-                            <span>{stats.matching === 999 ? '-' : stats.matching} <small>moves</small></span>
+                            {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.matching === 999 ? '-' : stats.matching} <small>moves</small></span>}
                         </div>
                         <button className="btn-play-game matching" onClick={() => navigate('/matchinggame')}>
                             Play Now
@@ -758,7 +792,13 @@ export default function StudentHome() {
                         </div>
                     </div>
                     <div className="leaderboard-list">
-                        {leaderboard.length > 0 ? (
+                        {isLeaderboardLoading ? (
+                            <>
+                                <div className="leaderboard-item skeleton" style={{ height: '48px', border: 'none' }}></div>
+                                <div className="leaderboard-item skeleton" style={{ height: '48px', border: 'none' }}></div>
+                                <div className="leaderboard-item skeleton" style={{ height: '48px', border: 'none' }}></div>
+                            </>
+                        ) : leaderboard.length > 0 ? (
                             <>
                                 {(showAllTimeAttack ? leaderboard : leaderboard.slice(0, 3)).map((user, index) => {
                                 let rankClass = '';
@@ -807,7 +847,13 @@ export default function StudentHome() {
                         </div>
                     </div>
                     <div className="leaderboard-list">
-                        {matchingLeaderboard.length > 0 ? (
+                        {isMatchingLoading ? (
+                            <>
+                                <div className="leaderboard-item skeleton" style={{ height: '48px', border: 'none' }}></div>
+                                <div className="leaderboard-item skeleton" style={{ height: '48px', border: 'none' }}></div>
+                                <div className="leaderboard-item skeleton" style={{ height: '48px', border: 'none' }}></div>
+                            </>
+                        ) : matchingLeaderboard.length > 0 ? (
                             <>
                                 {(showAllMatching ? matchingLeaderboard : matchingLeaderboard.slice(0, 3)).map((user, index) => {
                                 let rankClass = '';

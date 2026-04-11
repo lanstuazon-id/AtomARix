@@ -49,6 +49,8 @@ export default function Login() {
         const authEmail = `${actualUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
 
         if (isLoginView) {
+            // Show loading immediately BEFORE Firebase requests
+            setModal({ show: true, title: 'Authenticating...', message: 'Checking credentials...', type: 'loading' });
             try {
                 // Authenticate with Firebase
                 await signInWithEmailAndPassword(auth, authEmail, password);
@@ -84,7 +86,7 @@ export default function Login() {
                     } else {
                         navigate('/home');
                     }
-                }, 1500);
+                }, 500); // Reduced delay since they already waited for network
             } catch (error) {
                 console.error("Firebase Login Error:", error.code, error.message);
                 let errorMessage = `Invalid username or password. (${error.code})`;
@@ -112,6 +114,9 @@ export default function Login() {
                 }
             }
 
+            // Show loading immediately BEFORE Firebase requests
+            setModal({ show: true, title: 'Creating Account...', message: 'Setting up your profile...', type: 'loading' });
+            
             try {
                 // Create account in Firebase Auth
                 await createUserWithEmailAndPassword(auth, authEmail, password);
@@ -129,7 +134,7 @@ export default function Login() {
                 setTimeout(() => {
                     setModal({ show: false, title: '', message: '', type: '' });
                     setIsLoginView(true);
-                }, 1500);
+                }, 800); // Reduced delay
             } catch (error) {
                 console.error("Firebase Registration Error:", error.code, error.message);
                 let errorMessage = `Error: ${error.message}`;
@@ -151,6 +156,9 @@ export default function Login() {
 
         try {
             const result = await signInWithPopup(auth, provider);
+            
+            // Show loading while syncing to Firestore
+            setModal({ show: true, title: 'Authenticating...', message: 'Syncing your profile...', type: 'loading' });
             const user = result.user;
             
             // Use UID as the document ID for OAuth users to ensure it's completely unique
@@ -179,7 +187,7 @@ export default function Login() {
             setModal({ show: true, title: 'Success!', message: 'Logging you in...', type: 'loading' });
             setTimeout(() => {
                 navigate(userData.role === 'teacher' ? '/dashboard' : '/home');
-            }, 1500);
+            }, 500); // Reduced delay
         } catch (error) {
             console.error("OAuth Error:", error.code, error.message);
             let errorMessage = `Authentication failed. (${error.code})`;

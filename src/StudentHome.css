@@ -653,3 +653,20 @@
     margin-bottom: 5px;
 }
 .class-code-input:focus { border-color: #6e45e2; box-shadow: 0 0 0 4px rgba(110, 69, 226, 0.1); }
+
+/* --- Skeleton Loader --- */
+.skeleton {
+    background: linear-gradient(120deg, #f0f2f5 30%, #f8f9fa 38%, #f0f2f5 40%);
+    background-size: 200% 100%;
+    border-radius: 8px;
+    animation: skeleton-shimmer 1.5s infinite linear;
+    color: transparent !important;
+    pointer-events: none;
+}
+.skeleton * {
+    visibility: hidden;
+}
+@keyframes skeleton-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
