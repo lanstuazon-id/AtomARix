@@ -22,6 +22,14 @@ export default function StudentRoom() {
     const [activeTab, setActiveTab] = useState('stream');
     const [posts, setPosts] = useState([]);
     const [classwork, setClasswork] = useState([]);
+    const [previewAttachment, setPreviewAttachment] = useState(null);
+    const [isPreviewLoading, setIsPreviewLoading] = useState(true);
+
+    // Quiz States
+    const [activeQuiz, setActiveQuiz] = useState(null);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [quizAnswers, setQuizAnswers] = useState({});
+    const [quizResult, setQuizResult] = useState(null);
 
     useEffect(() => {
         // Enforce user login
@@ -79,6 +87,23 @@ export default function StudentRoom() {
         }
     }, [room, userName, roomId]);
 
+    useEffect(() => {
+        if (previewAttachment) {
+            // PDFs don't reliably fire onLoad in iframes, so we skip the spinner for them
+            setIsPreviewLoading(!previewAttachment.type.includes('pdf'));
+        }
+    }, [previewAttachment]);
+
+    // Prevent background scrolling when modal is open
+    useEffect(() => {
+        if (previewAttachment || activeQuiz) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [previewAttachment, activeQuiz]);
+
     const handleLeaveRoom = async () => {
         if (window.confirm("Are you sure you want to leave this class? You will need the class code to join again.")) {
             try {
@@ -105,15 +130,21 @@ export default function StudentRoom() {
                     </div>
                 </div>
             )}
-            {posts.slice().reverse().map(post => (
+            {posts.slice().reverse().map(post => {
+                const pType = post.type || 'Announcement';
+                const pIcon = pType === 'Module' ? 'fa-book' : 'fa-comment-dots';
+                const pColor = pType === 'Module' ? '#4facfe' : '#10ac84';
+                const pBg = pType === 'Module' ? '#eaf4ff' : '#e3fdf5';
+
+                return (
                 <div key={post.id} className="post-card">
-                    <div className="post-icon" style={{ background: '#e3fdf5', color: '#10ac84' }}><i className="fas fa-comment-dots"></i></div>
+                    <div className="post-icon" style={{ background: pBg, color: pColor }}><i className={`fas ${pIcon}`}></i></div>
                     <div className="post-content">
-                        <h4>Announcement</h4>
+                        <h4>{pType}</h4>
                         <span>Posted by {post.author} • {new Date(post.timestamp).toLocaleString()}</span>
                         <p>{post.text}</p>
                         {post.attachment && (
-                            <div style={{ marginTop: '15px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => window.open(post.attachment.url, '_blank')}>
+                            <div style={{ marginTop: '15px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => setPreviewAttachment(post.attachment)}>
                                 <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
                                     <i className={`fas ${post.attachment.type.startsWith('image/') ? 'fa-image' : post.attachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`}></i>
                                 </div>
@@ -127,7 +158,8 @@ export default function StudentRoom() {
                         )}
                     </div>
                 </div>
-            ))}
+                );
+            })}
         </>
     );
 
@@ -146,10 +178,36 @@ export default function StudentRoom() {
                     return (
                         <div key={cw.id} className="post-card">
                             <div className="post-icon" style={{ background: bg, color: color }}><i className={`fas ${icon}`}></i></div>
-                            <div className="post-content">
-                                <h4>{cw.title}</h4>
+                            <div className="post-content" style={{ width: '100%' }}>
+                                <h4>{cw.title} 
+                                    {cw.assessmentType === 'time_attack' && <span style={{fontSize: '0.75rem', background: '#f39c12', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-stopwatch"></i> Time Attack</span>}
+                                    {cw.assessmentType === 'custom' && cw.questions && <span style={{fontSize: '0.75rem', background: '#e74c3c', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-tasks"></i> Custom Quiz</span>}
+                                </h4>
                                 <span>Posted by {room?.teacherFullName || room?.teacher} • {new Date(cw.timestamp).toLocaleString()}</span>
                                 <p>{cw.desc}</p>
+                                {cw.attachment && (
+                                    <div style={{ marginTop: '15px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => setPreviewAttachment(cw.attachment)}>
+                                        <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                                            <i className={`fas ${cw.attachment.type.startsWith('image/') ? 'fa-image' : cw.attachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`}></i>
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                            <span style={{ color: '#2d3436', fontWeight: '600', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '300px' }}>{cw.attachment.name}</span>
+                                            <span style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                                                {cw.attachment.type.startsWith('image/') ? 'Image' : cw.attachment.type.includes('pdf') ? 'PDF Document' : 'Word Document'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                                {cw.assessmentType === 'time_attack' && (
+                                    <button onClick={() => navigate('/timeattack')} style={{ marginTop: '15px', background: '#f39c12', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(243, 156, 18, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                        <i className="fas fa-gamepad"></i> Play Time Attack
+                                    </button>
+                                )}
+                                {cw.assessmentType === 'custom' && cw.questions && (
+                                    <button onClick={() => { setActiveQuiz(cw); setCurrentQuestionIndex(0); setQuizAnswers({}); setQuizResult(null); }} style={{ marginTop: '15px', background: '#e74c3c', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(231, 76, 60, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                        <i className="fas fa-tasks"></i> Take Custom Quiz
+                                    </button>
+                                )}
                             </div>
                         </div>
                     );
@@ -281,6 +339,138 @@ export default function StudentRoom() {
                     </section>
                 </div>
             </main>
+
+            {/* File Preview Modal */}
+            {previewAttachment && (
+                <div className="modal-container show" style={{ zIndex: 9999, backdropFilter: 'blur(5px)' }} onClick={() => setPreviewAttachment(null)}>
+                    <div className="modal-content" style={{ width: '95%', maxWidth: '1400px', height: '95vh', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1e1e1e', border: '1px solid #333' }} onClick={e => e.stopPropagation()}>
+                        
+                        {/* Dark Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', background: '#2d3436', borderBottom: '1px solid #444' }}>
+                            <h3 style={{ margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <i className={`fas ${previewAttachment.type.startsWith('image/') ? 'fa-image' : previewAttachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`} style={{ color: '#4facfe' }}></i>
+                                {previewAttachment.name}
+                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                <button onClick={() => window.open(previewAttachment.url, '_blank')} style={{ background: '#4facfe', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}>
+                                    <i className="fas fa-external-link-alt"></i> Open
+                                </button>
+                                <button onClick={() => setPreviewAttachment(null)} style={{ background: 'transparent', border: 'none', color: '#aaa', fontSize: '1.8rem', cursor: 'pointer', lineHeight: 1, padding: '0 5px' }}>&times;</button>
+                            </div>
+                        </div>
+
+                        {/* Edge-to-Edge Document Body */}
+                        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0f0f0f', position: 'relative' }}>
+                            {isPreviewLoading && (
+                                <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#4facfe', zIndex: 1 }}>
+                                    <i className="fas fa-circle-notch fa-spin" style={{ fontSize: '3rem', marginBottom: '10px' }}></i>
+                                    <span style={{ fontWeight: '600', color: '#fff' }}>Loading preview...</span>
+                                </div>
+                            )}
+                            {previewAttachment.type.startsWith('image/') ? (
+                                <img src={previewAttachment.url} alt={previewAttachment.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', opacity: isPreviewLoading ? 0 : 1, transition: 'opacity 0.3s', position: 'relative', zIndex: 2 }} onLoad={() => setIsPreviewLoading(false)} />
+                            ) : previewAttachment.type.includes('pdf') ? (
+                                <object data={`${previewAttachment.url}#toolbar=0&navpanes=0`} type="application/pdf" width="100%" height="100%" style={{ position: 'relative', zIndex: 2 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', padding: '20px' }}>
+                                        <i className="fas fa-file-pdf" style={{ fontSize: '4rem', color: '#e74c3c', marginBottom: '15px' }}></i>
+                                        <p style={{ color: '#ccc', marginBottom: '20px' }}>Your browser doesn't support inline PDF viewing.</p>
+                                        <button className="btn-primary" onClick={() => window.open(previewAttachment.url, '_blank')} style={{ background: '#4facfe' }}><i className="fas fa-external-link-alt" style={{ marginRight: '8px' }}></i> Open PDF</button>
+                                    </div>
+                                </object>
+                            ) : (
+                                <iframe src={previewAttachment.url} title={previewAttachment.name} width="100%" height="100%" style={{ border: 'none', opacity: isPreviewLoading ? 0 : 1, transition: 'opacity 0.3s', position: 'relative', zIndex: 2, background: 'white' }} onLoad={() => setIsPreviewLoading(false)}></iframe>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Quiz Modal */}
+            {activeQuiz && (
+                <div className="modal-container show" style={{ zIndex: 9999, backdropFilter: 'blur(5px)' }} onClick={() => setActiveQuiz(null)}>
+                    <div className="modal-content" style={{ width: '90%', maxWidth: '800px', height: '80vh', padding: '30px', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '16px', border: '1px solid #eee' }} onClick={e => e.stopPropagation()}>
+                        {quizResult !== null ? (
+                            <div style={{ textAlign: 'center', margin: 'auto' }}>
+                                <i className="fas fa-trophy" style={{ fontSize: '5rem', color: '#f1c40f', marginBottom: '20px' }}></i>
+                                <h2 style={{ color: '#2d3436', fontSize: '2rem', marginBottom: '10px' }}>Quiz Completed!</h2>
+                                <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '30px' }}>You scored <strong>{quizResult}</strong> out of <strong>{activeQuiz.questions.length}</strong>.</p>
+                                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                                    <button className="btn-cancel" onClick={() => setActiveQuiz(null)}>Close</button>
+                                    <button className="btn-confirm" onClick={() => { setCurrentQuestionIndex(0); setQuizAnswers({}); setQuizResult(null); }}>Retake Quiz</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px', marginBottom: '20px' }}>
+                                    <div>
+                                        <h2 style={{ margin: 0, color: '#2d3436', fontSize: '1.5rem' }}>{activeQuiz.title}</h2>
+                                        <p style={{ margin: 0, color: '#888', fontSize: '0.95rem', marginTop: '5px', fontWeight: '600' }}>Question {currentQuestionIndex + 1} of {activeQuiz.questions.length}</p>
+                                    </div>
+                                    <button className="close-modal" onClick={() => setActiveQuiz(null)} style={{ position: 'static' }}>&times;</button>
+                                </div>
+                                
+                                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
+                                    <h3 style={{ fontSize: '1.25rem', color: '#333', marginBottom: '25px', lineHeight: '1.5' }}>
+                                        {activeQuiz.questions[currentQuestionIndex].question}
+                                    </h3>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {activeQuiz.questions[currentQuestionIndex].options.map((opt, oIndex) => {
+                                            const isSelected = quizAnswers[currentQuestionIndex] === oIndex;
+                                            return (
+                                                <button 
+                                                    key={oIndex} 
+                                                    onClick={() => setQuizAnswers({...quizAnswers, [currentQuestionIndex]: oIndex})}
+                                                    style={{ textAlign: 'left', padding: '16px 20px', borderRadius: '12px', border: isSelected ? '2px solid #e74c3c' : '2px solid #eee', background: isSelected ? '#fcf3f2' : '#fff', color: isSelected ? '#e74c3c' : '#555', fontSize: '1.05rem', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '15px', fontWeight: isSelected ? '600' : 'normal' }}
+                                                >
+                                                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: isSelected ? '6px solid #e74c3c' : '2px solid #ccc', background: '#fff', transition: 'all 0.2s', flexShrink: 0 }}></div>
+                                                    {opt}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #f0f2f5' }}>
+                                    <button 
+                                        className="btn-cancel" 
+                                        onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+                                        disabled={currentQuestionIndex === 0}
+                                        style={{ opacity: currentQuestionIndex === 0 ? 0.5 : 1, cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer', background: '#f0f2f5' }}
+                                    >
+                                        <i className="fas fa-chevron-left" style={{ marginRight: '8px' }}></i> Previous
+                                    </button>
+                                    
+                                    {currentQuestionIndex < activeQuiz.questions.length - 1 ? (
+                                        <button 
+                                            className="btn-confirm" 
+                                            onClick={() => setCurrentQuestionIndex(prev => Math.min(activeQuiz.questions.length - 1, prev + 1))}
+                                            disabled={quizAnswers[currentQuestionIndex] === undefined}
+                                            style={{ background: quizAnswers[currentQuestionIndex] === undefined ? '#ccc' : '#e74c3c', cursor: quizAnswers[currentQuestionIndex] === undefined ? 'not-allowed' : 'pointer' }}
+                                        >
+                                            Next <i className="fas fa-chevron-right" style={{ marginLeft: '8px' }}></i>
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            className="btn-confirm" 
+                                            style={{ background: quizAnswers[currentQuestionIndex] === undefined ? '#ccc' : '#1dd1a1', cursor: quizAnswers[currentQuestionIndex] === undefined ? 'not-allowed' : 'pointer' }}
+                                            disabled={quizAnswers[currentQuestionIndex] === undefined}
+                                            onClick={() => {
+                                                let score = 0;
+                                                activeQuiz.questions.forEach((q, i) => {
+                                                    if (quizAnswers[i] === q.correctOption) score++;
+                                                });
+                                                setQuizResult(score);
+                                            }}
+                                        >
+                                            <i className="fas fa-check"></i> Submit Quiz
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

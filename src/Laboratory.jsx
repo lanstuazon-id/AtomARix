@@ -78,7 +78,6 @@ export default function Laboratory() {
     const [showRecipeModal, setShowRecipeModal] = useState(false);
     const [showResultModal, setShowResultModal] = useState(false);
     const [resultData, setResultData] = useState({ type: 'empty', res: null });
-    const [arMode, setArMode] = useState(false);
     const [showDesktopAr, setShowDesktopAr] = useState(false);
     const [qrUrl, setQrUrl] = useState('');
 
@@ -104,20 +103,14 @@ export default function Laboratory() {
         return () => unsubscribe();
     }, [currentUser, discoveredCompoundsKey]);
 
-    // Ensure A-Frame scripts are loaded for AR
+    // Ensure Google's <model-viewer> is loaded for AR
     useEffect(() => {
-        if (!document.getElementById('aframe-script')) {
-            const script1 = document.createElement('script');
-            script1.id = 'aframe-script';
-            script1.src = 'https://aframe.io/releases/1.3.0/aframe.min.js';
-            document.head.appendChild(script1);
-
-            script1.onload = () => {
-                const script2 = document.createElement('script');
-                script2.id = 'arjs-script';
-                script2.src = 'https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js';
-                document.head.appendChild(script2);
-            };
+        if (!document.getElementById('model-viewer-script')) {
+            const script = document.createElement('script');
+            script.id = 'model-viewer-script';
+            script.type = 'module';
+            script.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js';
+            document.head.appendChild(script);
         }
     }, []);
 
@@ -280,55 +273,33 @@ export default function Laboratory() {
         return isMobile || isMacTablet;
     };
 
-    const get3DModelHTML = (formula) => {
-        const anim = `animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"`;
-        if (formula === 'H₂O') {
-            return `<a-entity position="0 0.5 0" ${anim}><a-sphere position="0 0 0" radius="0.4" color="#ff4757"></a-sphere><a-sphere position="-0.35 -0.3 0" radius="0.25" color="#ffffff"></a-sphere><a-sphere position="0.35 -0.3 0" radius="0.25" color="#ffffff"></a-sphere></a-entity>`;
-        } else if (formula === 'CO₂') {
-            return `<a-entity position="0 0.5 0" ${anim}><a-sphere position="0 0 0" radius="0.35" color="#2d3436"></a-sphere><a-sphere position="-0.7 0 0" radius="0.35" color="#ff4757"></a-sphere><a-sphere position="0.7 0 0" radius="0.35" color="#ff4757"></a-sphere><a-cylinder position="-0.35 0 0" radius="0.05" height="0.7" rotation="0 0 90" color="#b2bec3"></a-cylinder><a-cylinder position="0.35 0 0" radius="0.05" height="0.7" rotation="0 0 90" color="#b2bec3"></a-cylinder></a-entity>`;
-        } else if (formula === 'NaCl') {
-            return `<a-entity position="0 0.5 0" ${anim}><a-box color="#f1f2f6" width="0.8" height="0.8" depth="0.8" opacity="0.9"></a-box><a-box color="#1dd1a1" width="0.85" height="0.85" depth="0.85" wireframe="true"></a-box></a-entity>`;
-        } else {
-            return `<a-entity position="0 0.5 0" ${anim}><a-octahedron color="#6e45e2" radius="0.6" opacity="0.8"></a-octahedron><a-octahedron color="#a29bfe" radius="0.7" wireframe="true" animation="property: rotation; to: 360 -360 0; loop: true; dur: 6000"></a-octahedron></a-entity>`;
-        }
+    const getModelFilename = (name) => {
+        // Converts "Sodium Chloride (Salt)" to "sodium_chloride"
+        return name.split(' (')[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     };
 
-    const openAR = (name, formula) => {
-        setShowResultModal(false);
-        if (!isMobileDevice()) {
-            const currentUrl = window.location.href;
-            setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(currentUrl)}`);
-            setShowDesktopAr(true);
-            return;
-        }
-        setArMode(true);
-        setTimeout(() => {
-            const sceneContainer = document.getElementById('aframeSceneContainer');
-            if (sceneContainer) {
-                sceneContainer.innerHTML = `
-                    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false" style="width: 100%; height: 100%;">
-                        <a-marker preset="hiro">
-                            <a-text value="${name}\n(${formula})" position="0 1.5 0" align="center" color="#1dd1a1" scale="1.5 1.5 1.5" rotation="-90 0 0"></a-text>
-                            ${get3DModelHTML(formula)}
-                        </a-marker>
-                        <a-entity camera></a-entity>
-                    </a-scene>
-                `;
+    const openDesktopAR = () => {
+        const arUrl = new URL(window.location.href);
+        arUrl.searchParams.set('compound', resultData.res.formula);
+        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(arUrl.toString())}`);
+        setShowDesktopAr(true);
+    };
+
+    // Auto-open compound if linked from a QR code
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const compoundFormula = params.get('compound');
+        if (compoundFormula) {
+            const res = Object.values(recipes).find(r => r.formula === compoundFormula);
+            if (res) {
+                setTimeout(() => {
+                    setResultData({ type: 'success', res });
+                    setShowResultModal(true);
+                }, 100);
+                window.history.replaceState({}, '', window.location.pathname);
             }
-        }, 100);
-    };
-
-    const closeAR = () => {
-        setArMode(false);
-        const sceneContainer = document.getElementById('aframeSceneContainer');
-        if (sceneContainer) sceneContainer.innerHTML = ''; 
-        const arVideo = document.getElementById('arjs-video');
-        if (arVideo) {
-            const stream = arVideo.srcObject;
-            if (stream) stream.getTracks().forEach(track => track.stop());
-            arVideo.remove();
         }
-    };
+    }, []);
 
     // Array of floating items (icons and text) for the animated background
     const floatingItems = [
@@ -345,7 +316,7 @@ export default function Laboratory() {
     ];
 
     return (
-        <div style={{ background: arMode ? 'transparent' : '#f8faff', minHeight: '100vh', position: 'relative' }}>
+        <div style={{ background: '#f8faff', minHeight: '100vh', position: 'relative' }}>
             {/* Floating Chemistry Background */}
             <div className="floating-background">
                 {floatingItems.map(item => (
@@ -389,7 +360,7 @@ export default function Laboratory() {
                     }
                 `}
             </style>
-            <nav className="navbar" style={{ display: arMode ? 'none' : 'flex' }}>
+            <nav className="navbar">
                 <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
                 <ul className="nav-links">
                     <li onClick={() => navigate('/home')}><i className="fas fa-home"></i> <span>Home</span></li>
@@ -402,7 +373,7 @@ export default function Laboratory() {
                 <div style={{ width: '130px' }}></div>
             </nav>
 
-            <main className="dashboard-container" style={{ display: arMode ? 'none' : 'block', position: 'relative', zIndex: 1 }}>
+            <main className="dashboard-container" style={{ position: 'relative', zIndex: 1 }}>
                 <div className="hero-banner">
                     <div className="hero-text">
                         <h1>Virtual Laboratory ⚗️</h1>
@@ -543,12 +514,40 @@ export default function Laboratory() {
                             )}
                             {resultData.type === 'success' && resultData.res && (
                                 <>
-                                    <div style={{ fontSize: '4.5rem', marginBottom: '15px' }}>{resultData.res.icon}</div>
+                                    <div className="element-model-box" style={{ width: '100%', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
+                                        <model-viewer
+                                            src={`/assets/models/${getModelFilename(resultData.res.name)}.glb`}
+                                            alt={`3D model of ${resultData.res.name}`}
+                                            auto-rotate
+                                            rotation-per-second="45deg"
+                                            scale="0.05 0.05 0.05"
+                                            camera-controls
+                                            ar
+                                            ar-scale="auto"
+                                            ar-modes="webxr scene-viewer quick-look"
+                                            style={{ width: '100%', height: '100%' }}
+                                        >
+                                            <button slot="ar-button" style={{ position: 'absolute', bottom: '15px', right: '15px', background: '#6e45e2', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(110,69,226,0.3)' }}>
+                                                <i className="fas fa-cube"></i> View in AR
+                                            </button>
+                                            <div slot="poster" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0', color: '#888' }}>
+                                                <div style={{ fontSize: '3rem', marginBottom: '10px' }}>{resultData.res.icon}</div>
+                                                <span>Loading 3D Model...</span>
+                                            </div>
+                                        </model-viewer>
+                                        {!isMobileDevice() && (
+                                            <button 
+                                                onClick={openDesktopAR}
+                                                style={{ position: 'absolute', bottom: '15px', right: '15px', background: '#6e45e2', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(110,69,226,0.3)', zIndex: 10 }}
+                                            >
+                                                <i className="fas fa-cube"></i> View in AR
+                                            </button>
+                                        )}
+                                    </div>
                                     <h2 style={{ color: '#2d3436', marginBottom: '5px' }}>Success!</h2>
                                     <p style={{ color: '#1dd1a1', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '10px' }}>Created {resultData.res.name} ({resultData.res.formula})</p>
                                     <p style={{ color: '#666', marginBottom: '25px', lineHeight: '1.5' }}>{resultData.res.desc}</p>
                                     <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
-                                        <button className="btn-primary" style={{ width: '100%' }} onClick={() => openAR(resultData.res.name, resultData.res.formula)}><i className="fas fa-cube"></i> View in AR</button>
                                         <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setShowResultModal(false)}>Close</button>
                                     </div>
                                 </>
@@ -558,22 +557,13 @@ export default function Laboratory() {
                 </div>
             )}
 
-            {/* AR Overlay */}
-            <div className="ar-overlay" style={{ display: arMode ? 'block' : 'none' }}>
-                <button className="ar-close-btn" onClick={closeAR} style={{ zIndex: 20000 }}><i className="fas fa-times"></i></button>
-                <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', zIndex: 20001, background: 'rgba(0,0,0,0.5)', padding: '10px 20px', borderRadius: '10px', width: '80%', textAlign: 'center' }}>
-                    <p style={{ fontSize: '1.1rem', color: 'white' }}>Point your camera at a <strong>Hiro Marker</strong> to view the compound.</p>
-                </div>
-                <div id="aframeSceneContainer" style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 10000 }}></div>
-            </div>
-
             {/* Desktop AR Warning */}
             {showDesktopAr && (
-                <div className="modal-container show">
+                <div className="modal-container show" style={{ zIndex: 10001 }}>
                     <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '40px 30px' }}>
                         <i className="fas fa-mobile-alt" style={{ fontSize: '3.5rem', color: '#4facfe', marginBottom: '15px' }}></i>
-                        <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>Mobile Device Required</h2>
-                        <p style={{ color: '#666', marginBottom: '15px', lineHeight: '1.5' }}>The AR Experience is optimized for smartphones and tablets. Scan the QR code below to open this page on your mobile device.</p>
+                        <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>View in AR</h2>
+                        <p style={{ color: '#666', marginBottom: '15px', lineHeight: '1.5' }}>Scan the QR code with your mobile device's camera to view <strong>{resultData?.res?.name}</strong> in Augmented Reality!</p>
                         <img src={qrUrl} alt="QR Code" style={{ marginBottom: '20px', borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} />
                         <button className="btn-primary" style={{ width: '100%' }} onClick={() => setShowDesktopAr(false)}>Got it</button>
                     </div>

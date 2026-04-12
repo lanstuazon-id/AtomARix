@@ -137,10 +137,9 @@ export default function PeriodicTable() {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('all');
     const [learningFilter, setLearningFilter] = useState('none'); // 'none', 'learned', 'not-learned'
-    const [arMode, setArMode] = useState(false);
+    const [isExpandedTable, setIsExpandedTable] = useState(false);
     const [showDesktopAr, setShowDesktopAr] = useState(false);
     const [qrUrl, setQrUrl] = useState('');
-    const [isExpandedTable, setIsExpandedTable] = useState(false);
 
     // Auto-scroll to highlighted element in full screen mode
     useEffect(() => {
@@ -172,20 +171,28 @@ export default function PeriodicTable() {
         syncData();
     }, [currentUser, storageKey]);
 
-    // A-Frame script loading
-    useEffect(() => {
-        if (!document.getElementById('aframe-script')) {
-            const script1 = document.createElement('script');
-            script1.id = 'aframe-script';
-            script1.src = 'https://aframe.io/releases/1.3.0/aframe.min.js';
-            document.head.appendChild(script1);
+    // Mobile Detection & Desktop AR Fallback
+    const isMobileDevice = () => {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isMacTablet = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        return isMobile || isMacTablet;
+    };
 
-            script1.onload = () => {
-                const script2 = document.createElement('script');
-                script2.id = 'arjs-script';
-                script2.src = 'https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js';
-                document.head.appendChild(script2);
-            };
+    const openDesktopAR = () => {
+        const arUrl = new URL(window.location.href);
+        arUrl.searchParams.set('element', selectedElement.symbol);
+        setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(arUrl.toString())}`);
+        setShowDesktopAr(true);
+    };
+
+    // Load Google's <model-viewer> component for Markerless AR
+    useEffect(() => {
+        if (!document.getElementById('model-viewer-script')) {
+            const script = document.createElement('script');
+            script.id = 'model-viewer-script';
+            script.type = 'module';
+            script.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js';
+            document.head.appendChild(script);
         }
     }, []);
 
@@ -215,6 +222,16 @@ export default function PeriodicTable() {
             window.speechSynthesis.cancel();
         }
     };
+
+    // Auto-open element if linked from a QR code
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const elementSymbol = params.get('element');
+        if (elementSymbol && elementData[elementSymbol]) {
+            setTimeout(() => openModal(elementSymbol), 100);
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, []); // Run once on mount
 
     const handlePronounce = () => {
         if (!selectedElement || !('speechSynthesis' in window)) return;
@@ -270,56 +287,6 @@ export default function PeriodicTable() {
         setActiveCategory('all');
     };
 
-    // AR Logic
-    const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    const openAR = () => {
-        if (!selectedElement) return;
-        closeModal();
-
-        if (!isMobileDevice()) {
-            setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(window.location.href)}`);
-            setShowDesktopAr(true);
-            return;
-        }
-
-        setArMode(true);
-        setTimeout(() => {
-            const sceneContainer = document.getElementById('aframeSceneContainer');
-            if (sceneContainer) {
-                const { symbol, name, n: atomicNumber, cat } = selectedElement;
-                const colorMap = { "alkali-metal": "#ff9f43", "alkaline-earth": "#ff6b6b", "nonmetal": "#48dbfb", "noble-gas": "#1dd1a1", "metalloid": "#a29bfe", "post-transition": "#ced4da", "transition-metal": "#ffe066", "lanthanide": "#66d9e8", "actinide": "#faa2c1" };
-                const elColor = colorMap[cat] || "#6e45e2";
-                sceneContainer.innerHTML = `
-                    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false" style="width: 100%; height: 100%;">
-                        <a-marker preset="hiro">
-                            <a-text value="${atomicNumber} ${symbol}\n${name}" position="0 1.5 0" align="center" color="${elColor}" scale="1.5 1.5 1.5" rotation="-90 0 0"></a-text>
-                            <a-entity position="0 0.5 0">
-                                <a-sphere radius="0.3" color="${elColor}" material="opacity: 0.9"></a-sphere>
-                                <a-ring radius="0.6" color="#ffffff" material="opacity: 0.5; side: double" animation="property: rotation; to: 360 360 0; loop: true; dur: 4000; easing: linear"></a-ring>
-                                <a-ring radius="0.7" color="#ffffff" material="opacity: 0.5; side: double" rotation="60 0 0" animation="property: rotation; to: 420 360 0; loop: true; dur: 5000; easing: linear"></a-ring>
-                                <a-ring radius="0.8" color="#ffffff" material="opacity: 0.5; side: double" rotation="120 0 0" animation="property: rotation; to: 480 360 0; loop: true; dur: 6000; easing: linear"></a-ring>
-                            </a-entity>
-                        </a-marker>
-                        <a-entity camera></a-entity>
-                    </a-scene>
-                `;
-            }
-        }, 100);
-    };
-
-    const closeAR = () => {
-        setArMode(false);
-        const sceneContainer = document.getElementById('aframeSceneContainer');
-        if (sceneContainer) sceneContainer.innerHTML = '';
-        const arVideo = document.getElementById('arjs-video');
-        if (arVideo) {
-            const stream = arVideo.srcObject;
-            if (stream) stream.getTracks().forEach(track => track.stop());
-            arVideo.remove();
-        }
-    };
-
     const filterCategories = ["all", "alkali-metal", "alkaline-earth", "nonmetal", "noble-gas", "transition-metal", "post-transition", "metalloid", "lanthanide", "actinide"];
 
     // Array of floating items (icons and text) for the animated background
@@ -337,7 +304,7 @@ export default function PeriodicTable() {
     ];
 
     return (
-        <div style={{ background: arMode ? 'transparent' : '#f8faff', minHeight: '100vh', position: 'relative' }}>
+        <div style={{ background: '#f8faff', minHeight: '100vh', position: 'relative' }}>
             {/* Floating Chemistry Background */}
             <div className="floating-background">
                 {floatingItems.map(item => (
@@ -386,7 +353,7 @@ export default function PeriodicTable() {
                 }
             `}
             </style>
-             <nav className="navbar" style={{ display: arMode ? 'none' : 'flex' }}>
+             <nav className="navbar">
                 <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
                 <ul className="nav-links">
                     <li onClick={() => navigate('/home')}><i className="fas fa-home"></i> <span>Home</span></li>
@@ -399,7 +366,7 @@ export default function PeriodicTable() {
                 <div style={{ width: '130px' }}></div>
             </nav>
 
-            <main className="main-container" style={{ display: arMode ? 'none' : 'block', position: 'relative', zIndex: 1 }}>
+            <main className="main-container" style={{ position: 'relative', zIndex: 1 }}>
                 <section className="controls-section">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <div className={`search-container ${isExpandedTable ? 'expanded-mode' : ''}`} style={{ marginBottom: 0 }}>
@@ -482,18 +449,45 @@ export default function PeriodicTable() {
                                     <i className="fas fa-code-branch"></i>
                                     <div><p className="data-label">Electron Configuration</p><p>{selectedElement.config}</p></div>
                                 </div>
+                                <div className="fact-box fun-fact-box" style={{ marginTop: '15px' }}>
+                                    <i className="fas fa-lightbulb"></i>
+                                    <div><p className="data-label">Fun Fact</p><p style={{ fontSize: '0.95rem' }}>{selectedElement.fact}</p></div>
+                                </div>
                             </div>
                             <div className="modal-right-col">
-                                <button className="ar-btn" onClick={openAR} style={{ width: '100%', maxWidth: '360px', margin: '0 auto 15px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                                    <i className="fas fa-cube"></i> View in AR
-                                </button>
-                                <div className="element-image-box" style={{ width: '100%', maxWidth: '360px', height: '240px', margin: '0 auto 20px', backgroundColor: '#f0f0f0', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e1e1e1' }}>
+                                <div className="element-image-box" style={{ width: '100%', maxWidth: '360px', height: '200px', margin: '0 auto 15px', backgroundColor: '#f0f0f0', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e1e1e1' }}>
                                     <img src={`/assets/elements/${selectedElement.name.toLowerCase()}.jpg`} alt={selectedElement.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }} />
                                     <span style={{ color: '#aaa', display: 'none', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}><i className="fas fa-image" style={{ fontSize: '2rem', marginBottom: '8px', color: '#ccc' }}></i> No Image Available</span>
                                 </div>
-                                <div className="fact-box fun-fact-box" style={{ marginBottom: 0 }}>
-                                    <i className="fas fa-lightbulb"></i>
-                                    <div><p className="data-label">Fun Fact</p><p style={{ fontSize: '0.95rem' }}>{selectedElement.fact}</p></div>
+                                <div className="element-model-box" style={{ width: '100%', maxWidth: '360px', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
+                                    <model-viewer
+                                        src={`/assets/models/${selectedElement.name.toLowerCase()}.glb`}
+                                        alt={`3D model of ${selectedElement.name}`}
+                                        auto-rotate
+                                        rotation-per-second="45deg"
+                                        scale="0.05 0.05 0.05"
+                                        camera-controls
+                                        ar
+                                        ar-scale="auto"
+                                        ar-modes="webxr scene-viewer quick-look"
+                                        style={{ width: '100%', height: '100%' }}
+                                    >
+                                        <button slot="ar-button" style={{ position: 'absolute', bottom: '15px', right: '15px', background: '#6e45e2', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(110,69,226,0.3)' }}>
+                                            <i className="fas fa-cube"></i> View in AR
+                                        </button>
+                                        <div slot="poster" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f0f0', color: '#888' }}>
+                                            <i className="fas fa-cube" style={{ fontSize: '3rem', marginBottom: '10px', color: '#ccc' }}></i>
+                                            <span>Loading 3D Model...</span>
+                                        </div>
+                                    </model-viewer>
+                                    {!isMobileDevice() && (
+                                        <button 
+                                            onClick={openDesktopAR}
+                                            style={{ position: 'absolute', bottom: '15px', right: '15px', background: '#6e45e2', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(110,69,226,0.3)', zIndex: 10 }}
+                                        >
+                                            <i className="fas fa-cube"></i> View in AR
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -501,22 +495,12 @@ export default function PeriodicTable() {
                 </div>
             )}
 
-            {arMode && (
-                <div className="ar-overlay" style={{ display: 'block' }}>
-                    <button className="ar-close-btn" onClick={closeAR}><i className="fas fa-times"></i></button>
-                    <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', zIndex: 20001, background: 'rgba(0,0,0,0.5)', padding: '10px 20px', borderRadius: '10px', width: '80%', textAlign: 'center' }}>
-                        <p style={{ fontSize: '1.1rem', color: 'white' }}>Point your camera at a <strong>Hiro Marker</strong> to view the element.</p>
-                    </div>
-                    <div id="aframeSceneContainer" style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 10000 }}></div>
-                </div>
-            )}
-
             {showDesktopAr && (
-                <div className="modal-container show">
+                <div className="modal-container show" style={{ zIndex: 10001 }}>
                     <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', padding: '40px 30px' }}>
                         <i className="fas fa-mobile-alt" style={{ fontSize: '3.5rem', color: '#4facfe', marginBottom: '15px' }}></i>
-                        <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>Mobile Device Required</h2>
-                        <p style={{ color: '#666', marginBottom: '15px', lineHeight: '1.5' }}>The AR Experience is optimized for smartphones and tablets. Scan the QR code below to open this page on your mobile device.</p>
+                        <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>View in AR</h2>
+                        <p style={{ color: '#666', marginBottom: '15px', lineHeight: '1.5' }}>Scan the QR code with your mobile device's camera to view <strong>{selectedElement?.name}</strong> in Augmented Reality!</p>
                         <img src={qrUrl} alt="QR Code" style={{ marginBottom: '20px', borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} />
                         <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setShowDesktopAr(false)}>Got it</button>
                     </div>

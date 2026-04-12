@@ -576,10 +576,19 @@ export default function StudentHome() {
             author: p.author || joinedRoom.teacherFullName || joinedRoom.teacher, timestamp: p.timestamp
         }));
         
-        const classworks = (joinedRoom.classwork || []).map(cw => ({
-            id: `cw-${cw.id}`, type: cw.type, title: cw.type === 'module' ? `New Module: ${cw.title}` : `New Assessment: ${cw.title}`,
-            desc: cw.desc, author: joinedRoom.teacherFullName || joinedRoom.teacher, timestamp: cw.timestamp
-        }));
+        const classworks = (joinedRoom.classwork || []).map(cw => {
+            let titlePrefix = cw.type === 'module' ? 'New Module: ' : 'New Assessment: ';
+            if (cw.type === 'assessment') {
+                if (cw.assessmentType === 'time_attack') titlePrefix = 'New Time Attack: ';
+                if (cw.assessmentType === 'custom') titlePrefix = 'New Custom Quiz: ';
+            }
+            return {
+                id: `cw-${cw.id}`, type: cw.type, assessmentType: cw.assessmentType, 
+                title: `${titlePrefix}${cw.title}`,
+                desc: cw.desc, author: joinedRoom.teacherFullName || joinedRoom.teacher, 
+                timestamp: cw.timestamp
+            };
+        });
         
         return [...posts, ...classworks]
             .filter(update => new Date(update.timestamp).getTime() > effectiveLastRead)
@@ -835,7 +844,8 @@ export default function StudentHome() {
                                             <div className={`recent-post-icon ${update.type}`}>
                                                 <i className={`fas ${
                                                     update.type === 'announcement' ? 'fa-comment-dots' :
-                                                    update.type === 'module' ? 'fa-book' : 'fa-clipboard-check'
+                                                    update.type === 'module' ? 'fa-book' : 
+                                                    (update.assessmentType === 'time_attack' ? 'fa-stopwatch' : 'fa-tasks')
                                                 }`}></i>
                                             </div>
                                             <div className="recent-post-details">
