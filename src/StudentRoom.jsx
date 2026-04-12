@@ -172,8 +172,65 @@ export default function StudentRoom() {
         </div>
     );
 
+    // Array of floating items (icons and text) for the animated background
+    const floatingItems = [
+        { id: 1, icon: 'fas fa-atom', left: '10%', animDuration: '15s', delay: '0s', size: '3rem' },
+        { id: 2, icon: 'fas fa-flask', left: '30%', animDuration: '20s', delay: '2s', size: '2.5rem' },
+        { id: 3, text: 'H₂O', left: '50%', animDuration: '18s', delay: '4s', size: '2rem', fontWeight: 'bold' },
+        { id: 4, icon: 'fas fa-vial', left: '70%', animDuration: '22s', delay: '1s', size: '3.5rem' },
+        { id: 5, text: 'Au', left: '85%', animDuration: '16s', delay: '5s', size: '2.5rem', fontWeight: 'bold' },
+        { id: 6, icon: 'fas fa-atom', left: '20%', animDuration: '25s', delay: '7s', size: '4rem' },
+        { id: 7, text: 'O₂', left: '40%', animDuration: '19s', delay: '3s', size: '2.2rem', fontWeight: 'bold' },
+        { id: 8, icon: 'fas fa-microscope', left: '60%', animDuration: '21s', delay: '6s', size: '3rem' },
+        { id: 9, text: 'NaCl', left: '80%', animDuration: '24s', delay: '8s', size: '2.8rem', fontWeight: 'bold' },
+        { id: 10, icon: 'fas fa-flask', left: '5%', animDuration: '17s', delay: '9s', size: '2rem' },
+    ];
+
     return (
-        <div>
+        <div style={{ position: 'relative' }}>
+            {/* Floating Chemistry Background */}
+            <div className="floating-background">
+                {floatingItems.map(item => (
+                    <div 
+                        key={item.id} 
+                        className="floating-item" 
+                        style={{ 
+                            left: item.left, 
+                            animationDuration: item.animDuration, 
+                            animationDelay: item.delay,
+                            fontSize: item.size,
+                            fontWeight: item.fontWeight || 'normal'
+                        }}
+                    >
+                        {item.icon ? <i className={item.icon}></i> : item.text}
+                    </div>
+                ))}
+            </div>
+            <style>
+                {`
+                    .floating-background {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        pointer-events: none;
+                        z-index: 0;
+                        overflow: hidden;
+                    }
+                    .floating-item {
+                        position: absolute;
+                        color: #6e45e2;
+                        opacity: 0.08;
+                        bottom: -100px;
+                        animation: float-up infinite linear;
+                    }
+                    @keyframes float-up {
+                        0% { transform: translateY(0) rotate(0deg); }
+                        100% { transform: translateY(-120vh) rotate(360deg); }
+                    }
+                `}
+            </style>
             <nav className="navbar">
                 <div className="nav-brand" style={{ width: '130px' }} onClick={() => navigate('/home')}>
                     <i className="fas fa-arrow-left" style={{ fontSize: '1.1rem', color: '#666', marginRight: '5px' }}></i>
@@ -187,7 +244,7 @@ export default function StudentRoom() {
                 <div style={{ width: '130px' }}></div>
             </nav>
 
-            <main className="room-container">
+            <main className="room-container" style={{ position: 'relative', zIndex: 1 }}>
                 <div className="class-banner" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
                     <h1>{room.section}</h1>
                     <p>{room.grade}</p>

@@ -466,13 +466,44 @@ export default function TeacherDashboard() {
         }
     };
 
+    // Array of floating items (icons and text) for the animated background
+    const floatingItems = [
+        { id: 1, icon: 'fas fa-atom', left: '10%', animDuration: '15s', delay: '0s', size: '3rem' },
+        { id: 2, icon: 'fas fa-flask', left: '30%', animDuration: '20s', delay: '2s', size: '2.5rem' },
+        { id: 3, text: 'H₂O', left: '50%', animDuration: '18s', delay: '4s', size: '2rem', fontWeight: 'bold' },
+        { id: 4, icon: 'fas fa-vial', left: '70%', animDuration: '22s', delay: '1s', size: '3.5rem' },
+        { id: 5, text: 'Au', left: '85%', animDuration: '16s', delay: '5s', size: '2.5rem', fontWeight: 'bold' },
+        { id: 6, icon: 'fas fa-atom', left: '20%', animDuration: '25s', delay: '7s', size: '4rem' },
+        { id: 7, text: 'O₂', left: '40%', animDuration: '19s', delay: '3s', size: '2.2rem', fontWeight: 'bold' },
+        { id: 8, icon: 'fas fa-microscope', left: '60%', animDuration: '21s', delay: '6s', size: '3rem' },
+        { id: 9, text: 'NaCl', left: '80%', animDuration: '24s', delay: '8s', size: '2.8rem', fontWeight: 'bold' },
+        { id: 10, icon: 'fas fa-flask', left: '5%', animDuration: '17s', delay: '9s', size: '2rem' },
+    ];
+
     return (
-        <div style={{ minHeight: '100vh', backgroundColor: '#f8faff' }}>
+        <div style={{ minHeight: '100vh', backgroundColor: '#f8faff', position: 'relative' }}>
+            {/* Floating Chemistry Background */}
+            <div className="floating-background">
+                {floatingItems.map(item => (
+                    <div 
+                        key={item.id} 
+                        className="floating-item" 
+                        style={{ 
+                            left: item.left, 
+                            animationDuration: item.animDuration, 
+                            animationDelay: item.delay,
+                            fontSize: item.size,
+                            fontWeight: item.fontWeight || 'normal'
+                        }}
+                    >
+                        {item.icon ? <i className={item.icon}></i> : item.text}
+                    </div>
+                ))}
+            </div>
+
             <nav className="navbar">
                 <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
-                <ul className="nav-links">
-                    <li className="active"><i className="fas fa-chalkboard-teacher"></i> <span>Dashboard</span></li>
-                </ul>
+                <div></div>
                 <div className="nav-right" style={{ width: '130px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px' }}>
                     <div className="menu-container" ref={menuRef}>
                         <button 
@@ -515,7 +546,100 @@ export default function TeacherDashboard() {
                 </div>
             </nav>
 
-            <main className="dashboard-container">
+            <main className="dashboard-container" style={{ position: 'relative', zIndex: 1 }}>
+                <style>
+                    {`
+                        .floating-background {
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100vw;
+                            height: 100vh;
+                            pointer-events: none;
+                            z-index: 0;
+                            overflow: hidden;
+                        }
+                        .floating-item {
+                            position: absolute;
+                            color: #6e45e2;
+                            opacity: 0.08;
+                            bottom: -100px;
+                            animation: float-up infinite linear;
+                        }
+                        @keyframes float-up {
+                            0% { transform: translateY(0) rotate(0deg); }
+                            100% { transform: translateY(-120vh) rotate(360deg); }
+                        }
+                        .teacher-hero-banner {
+                            background: linear-gradient(135deg, #6e45e2 0%, #4facfe 100%);
+                            padding: 35px 40px;
+                            border-radius: 16px;
+                            color: white;
+                            margin-bottom: 30px;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            box-shadow: 0 8px 20px rgba(110, 69, 226, 0.15);
+                            position: relative;
+                            overflow: hidden;
+                        }
+                        .teacher-hero-banner .hero-content {
+                            position: relative;
+                            z-index: 2;
+                        }
+                        .teacher-hero-banner h1 { margin: 0 0 8px 0; font-size: 2.2rem; font-weight: bold; line-height: 1.2; }
+                        .teacher-hero-banner p { margin: 0; font-size: 1.1rem; opacity: 0.9; }
+                        .teacher-hero-banner .hero-icon-bg { font-size: 4.5rem; opacity: 0.2; z-index: 1; }
+
+                        /* Button & Card Pop Animation */
+                        .btn-create, .room-card {
+                            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+                        }
+                        .btn-create:active {
+                            transform: scale(0.85) !important;
+                        }
+                        .room-card:active {
+                            transform: scale(0.92) !important;
+                        }
+
+                        @media (max-width: 768px) {
+                            .teacher-hero-banner { padding: 25px 20px; }
+                            .teacher-hero-banner h1 { font-size: 1.5rem; max-width: 85%; }
+                            .teacher-hero-banner p { font-size: 0.95rem; max-width: 80%; }
+                            .teacher-hero-banner .hero-icon-bg {
+                                position: absolute;
+                                right: -10px;
+                                bottom: -15px;
+                                font-size: 6.5rem;
+                                opacity: 0.15;
+                            }
+                            .btn-create.mobile-fab {
+                                position: fixed;
+                                bottom: 30px;
+                                right: 20px;
+                                width: 60px;
+                                height: 60px;
+                                border-radius: 50%;
+                                padding: 0;
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                box-shadow: 0 6px 20px rgba(110, 69, 226, 0.4);
+                                z-index: 999;
+                            }
+                            .btn-create.mobile-fab .fab-text { display: none; }
+                            .btn-create.mobile-fab i { font-size: 1.5rem; margin: 0; }
+                        }
+                    `}
+                </style>
+                <div className="teacher-hero-banner">
+                    <div className="hero-content">
+                        <h1>Welcome, {sessionStorage.getItem('userFullname') || userName}! 🧑‍🏫</h1>
+                        <p>Ready to inspire your students today?</p>
+                    </div>
+                    <i className="fas fa-chalkboard-teacher hero-icon-bg"></i>
+                </div>
+
                 <div className="header-bar" style={{ marginBottom: '30px' }}>
                     <div className="toggle-container" style={{ display: 'flex', background: '#f0f2f5', borderRadius: '12px', padding: '6px', gap: '5px' }}>
                         <button 
@@ -532,8 +656,8 @@ export default function TeacherDashboard() {
                         </button>
                     </div>
                     {activeTab === 'classrooms' && (
-                        <button className="btn-create" onClick={() => setIsCreateModalOpen(true)}>
-                            <i className="fas fa-plus"></i> Create Room
+                        <button className="btn-create mobile-fab" onClick={() => setIsCreateModalOpen(true)}>
+                            <i className="fas fa-plus"></i> <span className="fab-text">Create Room</span>
                         </button>
                     )}
                 </div>

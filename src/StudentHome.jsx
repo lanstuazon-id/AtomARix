@@ -588,8 +588,124 @@ export default function StudentHome() {
     };
     const recentUpdates = getRecentUpdates();
 
+    // Array of floating items (icons and text) for the animated background
+    const floatingItems = [
+        { id: 1, icon: 'fas fa-atom', left: '10%', animDuration: '15s', delay: '0s', size: '3rem' },
+        { id: 2, icon: 'fas fa-flask', left: '30%', animDuration: '20s', delay: '2s', size: '2.5rem' },
+        { id: 3, text: 'H₂O', left: '50%', animDuration: '18s', delay: '4s', size: '2rem', fontWeight: 'bold' },
+        { id: 4, icon: 'fas fa-vial', left: '70%', animDuration: '22s', delay: '1s', size: '3.5rem' },
+        { id: 5, text: 'Au', left: '85%', animDuration: '16s', delay: '5s', size: '2.5rem', fontWeight: 'bold' },
+        { id: 6, icon: 'fas fa-atom', left: '20%', animDuration: '25s', delay: '7s', size: '4rem' },
+        { id: 7, text: 'O₂', left: '40%', animDuration: '19s', delay: '3s', size: '2.2rem', fontWeight: 'bold' },
+        { id: 8, icon: 'fas fa-microscope', left: '60%', animDuration: '21s', delay: '6s', size: '3rem' },
+        { id: 9, text: 'NaCl', left: '80%', animDuration: '24s', delay: '8s', size: '2.8rem', fontWeight: 'bold' },
+        { id: 10, icon: 'fas fa-flask', left: '5%', animDuration: '17s', delay: '9s', size: '2rem' },
+    ];
+
     return (
-        <div>
+        <div style={{ position: 'relative' }}>
+            {/* Floating Chemistry Background */}
+            <div className="floating-background">
+                {floatingItems.map(item => (
+                    <div 
+                        key={item.id} 
+                        className="floating-item" 
+                        style={{ 
+                            left: item.left, 
+                            animationDuration: item.animDuration, 
+                            animationDelay: item.delay,
+                            fontSize: item.size,
+                            fontWeight: item.fontWeight || 'normal'
+                        }}
+                    >
+                        {item.icon ? <i className={item.icon}></i> : item.text}
+                    </div>
+                ))}
+            </div>
+            <style>
+                {`
+                    .floating-background {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        pointer-events: none;
+                        z-index: 0;
+                        overflow: hidden;
+                    }
+                    .floating-item {
+                        position: absolute;
+                        color: #6e45e2;
+                        opacity: 0.08;
+                        bottom: -100px;
+                        animation: float-up infinite linear;
+                    }
+                    @keyframes float-up {
+                        0% { transform: translateY(0) rotate(0deg); }
+                        100% { transform: translateY(-120vh) rotate(360deg); }
+                    }
+
+                    /* Button Pop Animation */
+                    .btn-join-room {
+                        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s !important;
+                    }
+                    .btn-join-room:active {
+                        transform: scale(0.85) !important;
+                    }
+
+                    /* Mobile Hero Banner Redesign */
+                    @media (max-width: 768px) {
+                        .hero-banner {
+                            padding: 30px 25px !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            align-items: flex-start !important;
+                            justify-content: center !important;
+                            position: relative !important;
+                            overflow: hidden !important;
+                            min-height: 140px !important;
+                            border-radius: 16px !important;
+                        }
+                        .hero-banner .hero-text { position: relative; z-index: 2; }
+                        .hero-banner .hero-text h1 { font-size: 1.7rem !important; margin-bottom: 8px !important; line-height: 1.2 !important; max-width: 85% !important; }
+                        .hero-banner .hero-text p { font-size: 0.95rem !important; opacity: 0.9 !important; max-width: 80% !important; margin: 0 !important; }
+                        
+                        .hero-icon-bg {
+                            display: block !important;
+                            position: absolute !important;
+                            right: -10px !important;
+                            bottom: -20px !important;
+                            font-size: 7.5rem !important;
+                            opacity: 0.15 !important;
+                            z-index: 1 !important;
+                            transform: rotate(-15deg) !important;
+                            pointer-events: none !important;
+                        }
+
+                        /* Float the join room button perfectly as a pill */
+                        .hero-banner .btn-join-room {
+                            position: fixed !important;
+                            bottom: 30px !important;
+                            right: 20px !important;
+                            z-index: 999 !important;
+                            border-radius: 30px !important;
+                            padding: 14px 24px !important;
+                            box-shadow: 0 6px 20px rgba(110, 69, 226, 0.4) !important;
+                            display: flex !important;
+                            align-items: center !important;
+                            gap: 10px !important;
+                            font-size: 1.05rem !important;
+                            margin: 0 !important;
+                        }
+                        .hero-banner .btn-join-room.hide-fab {
+                            transform: translateY(120px) !important;
+                            opacity: 0 !important;
+                            pointer-events: none !important;
+                        }
+                    }
+                `}
+            </style>
             <nav className={`navbar ${isScrolled ? 'scrolled-hide' : ''}`}>
                 <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
                 <ul className="nav-links">
@@ -642,7 +758,7 @@ export default function StudentHome() {
                 </div>
             </nav>
 
-            <main className="dashboard-container">
+            <main className="dashboard-container" style={{ position: 'relative', zIndex: 1 }}>
                 {/* PWA Custom Install Banner */}
                 {showInstallBanner && (
                     <div className="install-banner">
@@ -681,6 +797,7 @@ export default function StudentHome() {
                         <h1>Welcome, {userName}! 🧪</h1>
                         <p>Ready to explore the elements today?</p>
                     </div>
+                    <i className="fas fa-flask hero-icon-bg" style={{ display: 'none' }}></i>
                     <button className={`btn-join-room ${!showJoinBtn ? 'hide-fab' : ''}`} onClick={handleJoinRoomClick}>
                         {joinedRoom ? (
                             <><i className="fas fa-door-open"></i> <span>Enter {joinedRoom.section}</span></>
