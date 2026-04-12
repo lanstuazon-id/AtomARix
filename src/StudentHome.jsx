@@ -648,7 +648,7 @@ export default function StudentHome() {
 
                     /* Button Pop Animation */
                     .btn-join-room {
-                        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s !important;
+                        transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease-out !important;
                     }
                     .btn-join-room:active {
                         transform: scale(0.85) !important;
@@ -683,25 +683,31 @@ export default function StudentHome() {
                             pointer-events: none !important;
                         }
 
-                        /* Float the join room button perfectly as a pill */
+                        /* Float the join room button perfectly as an icon-only FAB above the tab bar */
                         .hero-banner .btn-join-room {
                             position: fixed !important;
-                            bottom: 30px !important;
-                            right: 20px !important;
-                            z-index: 999 !important;
-                            border-radius: 30px !important;
-                            padding: 14px 24px !important;
-                            box-shadow: 0 6px 20px rgba(110, 69, 226, 0.4) !important;
+                            bottom: 105px !important;
+                            left: 20px !important;
+                            width: 60px !important;
+                            height: 60px !important;
+                            border-radius: 50% !important;
+                            padding: 0 !important;
                             display: flex !important;
                             align-items: center !important;
-                            gap: 10px !important;
-                            font-size: 1.05rem !important;
+                            justify-content: center !important;
+                            box-shadow: 0 6px 20px rgba(110, 69, 226, 0.4) !important;
+                            z-index: 99999 !important;
                             margin: 0 !important;
+                            background: linear-gradient(135deg, #4facfe 0%, #ee0979 100%) !important;
+                            border: none !important;
                         }
+                        .hero-banner .btn-join-room span { display: none !important; }
+                        .hero-banner .btn-join-room i { font-size: 1.5rem !important; margin: 0 !important; }
                         .hero-banner .btn-join-room.hide-fab {
                             transform: translateY(120px) !important;
                             opacity: 0 !important;
                             pointer-events: none !important;
+                            transition: transform 0.3s ease-in, opacity 0.3s ease-in !important;
                         }
                     }
                 `}

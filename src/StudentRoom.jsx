@@ -112,6 +112,19 @@ export default function StudentRoom() {
                         <h4>Announcement</h4>
                         <span>Posted by {post.author} • {new Date(post.timestamp).toLocaleString()}</span>
                         <p>{post.text}</p>
+                        {post.attachment && (
+                            <div style={{ marginTop: '15px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => window.open(post.attachment.url, '_blank')}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                                    <i className={`fas ${post.attachment.type.startsWith('image/') ? 'fa-image' : post.attachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`}></i>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                    <span style={{ color: '#2d3436', fontWeight: '600', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '300px' }}>{post.attachment.name}</span>
+                                    <span style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                                        {post.attachment.type.startsWith('image/') ? 'Image' : post.attachment.type.includes('pdf') ? 'PDF Document' : 'Word Document'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             ))}

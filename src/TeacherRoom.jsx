@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './TeacherRoom.css';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
@@ -32,6 +32,18 @@ export default function TeacherRoom() {
     const [cwTitle, setCwTitle] = useState('');
     const [cwDesc, setCwDesc] = useState('');
 
+    // Attachment States
+    const [attachment, setAttachment] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef(null);
+
+    // Announcement Edit/Delete States
+    const [activePostMenu, setActivePostMenu] = useState(null);
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [isEditPostModalOpen, setIsEditPostModalOpen] = useState(false);
+    const [isDeletePostModalOpen, setIsDeletePostModalOpen] = useState(false);
+    const [editPostContent, setEditPostContent] = useState('');
+
     useEffect(() => {
         // Enforce teacher role
         if (sessionStorage.getItem('userRole') !== 'teacher') {
@@ -59,26 +71,125 @@ export default function TeacherRoom() {
         return () => unsubscribe();
     }, [roomId, navigate]);
 
+    // Close dropdown menu when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (!event.target.closest('.post-menu-container')) {
+                setActivePostMenu(null);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate allowed file types
+        const validTypes = [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'application/pdf',
+            'application/msword', 
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+        
+        if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) {
+            alert('Invalid file type! Only Images, PDFs, and Word documents are allowed.');
+            return;
+        }
+        
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            alert('File is too large! Maximum size is 10MB.');
+            return;
+        }
+
+        setAttachment(file);
+        e.target.value = ''; // Reset hidden input
+    };
+
     const handleCreatePost = async (e) => {
         e.preventDefault();
-        if (!postContent.trim()) return alert('Announcement cannot be empty!');
+        if (!postContent.trim() && !attachment) return alert('Announcement cannot be empty!');
 
-        const newPost = {
-            id: Date.now(),
-            text: postContent,
-            author: room.teacherFullName || room.teacher,
-            timestamp: new Date().toISOString()
-        };
+        setIsUploading(true);
+        let attachmentData = null;
 
-        const updatedPosts = [...posts, newPost];
         try {
+            // 1. Upload File to Cloudinary (if one is attached)
+            if (attachment) {
+                const formData = new FormData();
+                formData.append('file', attachment);
+                formData.append('upload_preset', 'atomarix_uploads'); 
+                
+                // Put your Cloudinary cloud name here! (Keep /auto/upload exactly as is)
+                const cloudinaryUrl = `https://api.cloudinary.com/v1_1/dht7nou2f/auto/upload`;
+                
+                const response = await fetch(cloudinaryUrl, { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                if (!response.ok) throw new Error(data.error?.message || 'Cloudinary upload failed');
+
+                attachmentData = {
+                    name: attachment.name,
+                    url: data.secure_url,
+                    type: attachment.type
+                };
+            }
+
+            // 2. Save Announcement to Firestore
+            const newPost = {
+                id: Date.now(),
+                text: postContent,
+                attachment: attachmentData,
+                author: room.teacherFullName || room.teacher,
+                timestamp: new Date().toISOString()
+            };
+
+            const updatedPosts = [...posts, newPost];
             const roomRef = doc(db, "teacher_rooms", roomId);
             await updateDoc(roomRef, { posts: updatedPosts });
             setPostContent('');
+            setAttachment(null);
             setIsPostModalOpen(false);
         } catch (error) {
             console.error("Error creating post: ", error);
             alert("Failed to create post. Please try again.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleEditPostSubmit = async (e) => {
+        e.preventDefault();
+        if (!editPostContent.trim()) return alert('Announcement cannot be empty!');
+
+        const updatedPosts = posts.map(p => 
+            p.id === selectedPost.id ? { ...p, text: editPostContent } : p
+        );
+        
+        try {
+            const roomRef = doc(db, "teacher_rooms", roomId);
+            await updateDoc(roomRef, { posts: updatedPosts });
+            setIsEditPostModalOpen(false);
+            setSelectedPost(null);
+        } catch (error) {
+            console.error("Error updating post: ", error);
+            alert("Failed to update announcement.");
+        }
+    };
+
+    const handleConfirmDeletePost = async () => {
+        if (!selectedPost) return;
+        const updatedPosts = posts.filter(p => p.id !== selectedPost.id);
+        try {
+            const roomRef = doc(db, "teacher_rooms", roomId);
+            await updateDoc(roomRef, { posts: updatedPosts });
+            setIsDeletePostModalOpen(false);
+            setSelectedPost(null);
+        } catch (error) {
+            console.error("Error deleting post: ", error);
+            alert("Failed to delete announcement.");
         }
     };
 
@@ -132,9 +243,48 @@ export default function TeacherRoom() {
                 <div key={post.id} className="post-card">
                     <div className="post-icon" style={{ background: '#e3fdf5', color: '#10ac84' }}><i className="fas fa-comment-dots"></i></div>
                     <div className="post-content">
-                        <h4>Announcement</h4>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <h4>Announcement</h4>
+                            <div className="menu-container post-menu-container">
+                                <button className="btn-menu" onClick={(e) => { e.stopPropagation(); setActivePostMenu(activePostMenu === post.id ? null : post.id); }}>
+                                    <i className="fas fa-ellipsis-v"></i>
+                                </button>
+                                {activePostMenu === post.id && (
+                                    <div className="dropdown-menu show" style={{ right: 0, top: '35px', width: '130px' }} onClick={e => e.stopPropagation()}>
+                                        <div className="dropdown-item" onClick={() => {
+                                            setSelectedPost(post);
+                                            setEditPostContent(post.text);
+                                            setIsEditPostModalOpen(true);
+                                            setActivePostMenu(null);
+                                        }}>
+                                            <i className="fas fa-edit" style={{ color: '#6e45e2', width: '20px' }}></i> Edit
+                                        </div>
+                                        <div className="dropdown-item danger" onClick={() => {
+                                            setSelectedPost(post);
+                                            setIsDeletePostModalOpen(true);
+                                            setActivePostMenu(null);
+                                        }}>
+                                            <i className="fas fa-trash" style={{ width: '20px' }}></i> Delete
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                         <span>Posted by {post.author} • {new Date(post.timestamp).toLocaleString()}</span>
                         <p>{post.text}</p>
+                        {post.attachment && (
+                            <div style={{ marginTop: '15px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => window.open(post.attachment.url, '_blank')}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                                    <i className={`fas ${post.attachment.type.startsWith('image/') ? 'fa-image' : post.attachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`}></i>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                    <span style={{ color: '#2d3436', fontWeight: '600', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '300px' }}>{post.attachment.name}</span>
+                                    <span style={{ color: '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                                        {post.attachment.type.startsWith('image/') ? 'Image' : post.attachment.type.includes('pdf') ? 'PDF Document' : 'Word Document'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             ))}
@@ -295,14 +445,58 @@ export default function TeacherRoom() {
 
             {/* Create Post Modal */}
             {isPostModalOpen && (
-                <div className="modal-container">
-                    <div className="modal-content">
-                        <h2 style={{ marginBottom: '20px' }}>Announce something to your class</h2>
+                <div className="modal-container show">
+                    <div className="modal-content announce-modal">
+                        <div className="announce-modal-header">
+                            <h2>Create Announcement</h2>
+                            <button className="close-modal" onClick={() => setIsPostModalOpen(false)}>&times;</button>
+                        </div>
                         <form onSubmit={handleCreatePost}>
-                            <textarea value={postContent} onChange={e => setPostContent(e.target.value)} rows="5" placeholder="Share with your class..." style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '1rem', resize: 'vertical' }}></textarea>
-                            <div className="modal-actions">
-                                <button type="button" className="btn-cancel" onClick={() => setIsPostModalOpen(false)}>Cancel</button>
-                                <button type="submit" className="btn-confirm">Post</button>
+                            <input 
+                                type="file" 
+                                accept="image/*,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+                                ref={fileInputRef} 
+                                style={{ display: 'none' }} 
+                                onChange={handleFileChange} 
+                            />
+                            <div className="announce-input-area" style={{ flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', gap: '15px', width: '100%' }}>
+                                    <div className="avatar"><i className="fas fa-user"></i></div>
+                                    <textarea value={postContent} onChange={e => setPostContent(e.target.value)} rows="4" placeholder="Share something with your class..." className="modern-textarea" autoFocus></textarea>
+                                </div>
+                                {attachment && (
+                                    <div style={{ marginLeft: '60px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #e1e1e1', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: 'calc(100% - 60px)', boxSizing: 'border-box' }}>
+                                        <span style={{ fontSize: '0.9rem', color: '#333', display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <i className={`fas ${attachment.type.startsWith('image/') ? 'fa-image' : attachment.type === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-word'}`} style={{ color: '#6e45e2', fontSize: '1.2rem' }}></i> 
+                                            {attachment.name}
+                                        </span>
+                                        <button type="button" onClick={() => setAttachment(null)} style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1.1rem' }}><i className="fas fa-times"></i></button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="announce-toolbar">
+                                <div className="toolbar-icons">
+                                <button type="button" title="Attach file" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                                    <i className="fas fa-paperclip"></i>
+                                </button>
+                                <button type="button" title="Add link" onClick={() => { 
+                                    const url = window.prompt("Enter the URL to share:"); 
+                                    if (url) setPostContent(prev => prev + (prev.endsWith(' ') ? '' : ' ') + url + ' '); 
+                                }}>
+                                    <i className="fas fa-link"></i>
+                                </button>
+                                <button type="button" title="Format text" onClick={() => {
+                                    setPostContent(prev => prev + (prev.endsWith(' ') ? '' : ' ') + '**bold text** ');
+                                }}>
+                                    <i className="fas fa-bold"></i>
+                                </button>
+                                </div>
+                                <div className="modal-actions" style={{ marginTop: 0 }}>
+                                    <button type="button" className="btn-cancel" onClick={() => setIsPostModalOpen(false)}>Cancel</button>
+                                    <button type="submit" className={`btn-confirm ${(!postContent.trim() && !attachment) || isUploading ? 'disabled' : ''}`} disabled={(!postContent.trim() && !attachment) || isUploading}>
+                                        {isUploading ? 'Posting...' : 'Post'}
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -332,6 +526,37 @@ export default function TeacherRoom() {
                                 <button type="submit" className="btn-confirm">Post</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Post Modal */}
+            {isEditPostModalOpen && selectedPost && (
+                <div className="modal-container show">
+                    <div className="modal-content">
+                        <h2 style={{ marginBottom: '20px' }}>Edit Announcement</h2>
+                        <form onSubmit={handleEditPostSubmit}>
+                            <textarea value={editPostContent} onChange={e => setEditPostContent(e.target.value)} rows="5" style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', outline: 'none', fontSize: '1rem', resize: 'vertical' }} required></textarea>
+                            <div className="modal-actions">
+                                <button type="button" className="btn-cancel" onClick={() => setIsEditPostModalOpen(false)}>Cancel</button>
+                                <button type="submit" className="btn-confirm">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Post Modal */}
+            {isDeletePostModalOpen && selectedPost && (
+                <div className="modal-container show">
+                    <div className="modal-content" style={{ textAlign: 'center' }}>
+                        <i className="fas fa-exclamation-triangle modal-icon-box" style={{ color: '#e74c3c' }}></i>
+                        <h2 style={{ marginBottom: '10px' }}>Delete Announcement</h2>
+                        <p style={{ color: '#666', marginBottom: '20px' }}>Are you sure you want to delete this announcement? This action cannot be undone.</p>
+                        <div className="modal-actions">
+                            <button className="btn-cancel" onClick={() => setIsDeletePostModalOpen(false)}>Cancel</button>
+                            <button className="btn-confirm" onClick={handleConfirmDeletePost} style={{ backgroundColor: '#e74c3c' }}>Delete</button>
+                        </div>
                     </div>
                 </div>
             )}
