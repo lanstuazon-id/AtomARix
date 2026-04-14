@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './StudentRoom.css';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
 const roomColorPresets = [
@@ -13,23 +13,49 @@ const roomColorPresets = [
     { id: 'teal', bg: 'linear-gradient(135deg, #00cec9 0%, #01a3a4 100%)' }
 ];
 
+const taElements = [
+    { sym: 'H', name: 'Hydrogen', n: 1 }, { sym: 'He', name: 'Helium', n: 2 }, { sym: 'Li', name: 'Lithium', n: 3 },
+    { sym: 'Be', name: 'Beryllium', n: 4 }, { sym: 'B', name: 'Boron', n: 5 }, { sym: 'C', name: 'Carbon', n: 6 },
+    { sym: 'N', name: 'Nitrogen', n: 7 }, { sym: 'O', name: 'Oxygen', n: 8 }, { sym: 'F', name: 'Fluorine', n: 9 },
+    { sym: 'Ne', name: 'Neon', n: 10 }, { sym: 'Na', name: 'Sodium', n: 11 }, { sym: 'Mg', name: 'Magnesium', n: 12 },
+    { sym: 'Al', name: 'Aluminium', n: 13 }, { sym: 'Si', name: 'Silicon', n: 14 }, { sym: 'P', name: 'Phosphorus', n: 15 },
+    { sym: 'S', name: 'Sulfur', n: 16 }, { sym: 'Cl', name: 'Chlorine', n: 17 }, { sym: 'Ar', name: 'Argon', n: 18 },
+    { sym: 'K', name: 'Potassium', n: 19 }, { sym: 'Ca', name: 'Calcium', n: 20 }, { sym: 'Fe', name: 'Iron', n: 26 },
+    { sym: 'Cu', name: 'Copper', n: 29 }, { sym: 'Zn', name: 'Zinc', n: 30 }, { sym: 'Ag', name: 'Silver', n: 47 },
+    { sym: 'Au', name: 'Gold', n: 79 }, { sym: 'Hg', name: 'Mercury', n: 80 }, { sym: 'Pb', name: 'Lead', n: 82 },
+    { sym: 'U', name: 'Uranium', n: 92 }, { sym: 'Pt', name: 'Platinum', n: 78 }, { sym: 'Ni', name: 'Nickel', n: 28 }
+];
+
 export default function StudentRoom() {
     const { roomId } = useParams();
     const navigate = useNavigate();
     const userName = sessionStorage.getItem('loggedInUser');
 
     const [room, setRoom] = useState(null);
-    const [activeTab, setActiveTab] = useState('stream');
+    const [activeTab, setActiveTab] = useState('feed');
     const [posts, setPosts] = useState([]);
     const [classwork, setClasswork] = useState([]);
     const [previewAttachment, setPreviewAttachment] = useState(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(true);
+    const [students, setStudents] = useState([]);
+    const [teacherAvatar, setTeacherAvatar] = useState('');
 
     // Quiz States
     const [activeQuiz, setActiveQuiz] = useState(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [quizAnswers, setQuizAnswers] = useState({});
     const [quizResult, setQuizResult] = useState(null);
+    const [isReviewingQuiz, setIsReviewingQuiz] = useState(false);
+    const [isLeaveRoomModalOpen, setIsLeaveRoomModalOpen] = useState(false);
+
+    // Classroom Time Attack States
+    const [activeTimeAttack, setActiveTimeAttack] = useState(null);
+    const [taGameState, setTaGameState] = useState('start');
+    const [taTimeLeft, setTaTimeLeft] = useState(60);
+    const [taCorrect, setTaCorrect] = useState(0);
+    const [taWrong, setTaWrong] = useState(0);
+    const [taQuestion, setTaQuestion] = useState(null);
+    const [taOptions, setTaOptions] = useState([]);
 
     useEffect(() => {
         // Enforce user login
@@ -61,6 +87,33 @@ export default function StudentRoom() {
 
         return () => unsubscribe();
     }, [roomId, navigate, userName]);
+
+    // Fetch students in this room
+    useEffect(() => {
+        const q = query(collection(db, "users"), where("role", "==", "student"), where("joinedRoomId", "==", roomId));
+        const unsubscribeStudents = onSnapshot(q, (snapshot) => {
+            const studentList = [];
+            snapshot.forEach(doc => {
+                studentList.push({ id: doc.id, ...doc.data() });
+            });
+            setStudents(studentList);
+        });
+        return () => unsubscribeStudents();
+    }, [roomId]);
+
+    // Fetch teacher avatar
+    useEffect(() => {
+        if (room?.teacher) {
+            const unsubscribe = onSnapshot(doc(db, "users", room.teacher), (docSnap) => {
+                if (docSnap.exists()) {
+                    setTeacherAvatar(docSnap.data().avatarUrl || '');
+                }
+            }, (error) => {
+                console.error("Error fetching teacher avatar:", error);
+            });
+            return () => unsubscribe();
+        }
+    }, [room?.teacher]);
 
     // Mark room updates as read when the student views the room
     useEffect(() => {
@@ -96,30 +149,175 @@ export default function StudentRoom() {
 
     // Prevent background scrolling when modal is open
     useEffect(() => {
-        if (previewAttachment || activeQuiz) {
+        if (previewAttachment || activeQuiz || activeTimeAttack || isLeaveRoomModalOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
         }
         return () => { document.body.style.overflow = ''; };
-    }, [previewAttachment, activeQuiz]);
+    }, [previewAttachment, activeQuiz, activeTimeAttack, isLeaveRoomModalOpen]);
 
-    const handleLeaveRoom = async () => {
-        if (window.confirm("Are you sure you want to leave this class? You will need the class code to join again.")) {
-            try {
-                const userRef = doc(db, "users", userName);
-                await setDoc(userRef, { joinedRoomId: null }, { merge: true });
-            } catch (error) {
-                console.error("Error leaving room:", error);
-            }
-            localStorage.removeItem(`joinedRoomId_${userName}`);
-            localStorage.removeItem(`joinedRoomSection_${userName}`);
-            navigate('/home');
+    // Timer Effect for Time Attack
+    useEffect(() => {
+        let timer;
+        if (taGameState === 'playing' && taTimeLeft > 0) {
+            timer = setInterval(() => setTaTimeLeft(prev => prev - 1), 1000);
+        } else if (taTimeLeft === 0 && taGameState === 'playing') {
+            setTaGameState('end');
+        }
+        return () => clearInterval(timer);
+    }, [taGameState, taTimeLeft]);
+
+    // Submit Time Attack Score Effect
+    useEffect(() => {
+        if (taGameState === 'end' && activeTimeAttack) {
+            const submitTaScore = async () => {
+                try {
+                    const roomRef = doc(db, "teacher_rooms", roomId);
+                    const updatedClasswork = classwork.map(cw => {
+                        if (cw.id === activeTimeAttack.id) {
+                            const existingSubmissions = cw.submissions || [];
+                            const filteredSubmissions = existingSubmissions.filter(sub => sub.studentId !== userName);
+                            // Only update if new score is higher
+                            const oldSub = existingSubmissions.find(sub => sub.studentId === userName);
+                            if (oldSub && oldSub.score >= taCorrect) return cw;
+
+                            return {
+                                ...cw,
+                                submissions: [
+                                    ...filteredSubmissions,
+                                    {
+                                        studentId: userName,
+                                        studentName: sessionStorage.getItem('userFullname') || userName,
+                                        score: taCorrect,
+                                        wrong: taWrong,
+                                        total: 60, // Represents 60 seconds
+                                        timestamp: new Date().toISOString()
+                                    }
+                                ]
+                            };
+                        }
+                        return cw;
+                    });
+                    await setDoc(roomRef, { classwork: updatedClasswork }, { merge: true });
+                } catch (error) {
+                    console.error("Error saving time attack result:", error);
+                }
+            };
+            submitTaScore();
+        }
+    }, [taGameState, activeTimeAttack, classwork, roomId, userName, taCorrect]);
+
+    const startTaGame = () => {
+        setTaCorrect(0);
+        setTaWrong(0);
+        setTaTimeLeft(60);
+        setTaGameState('playing');
+        generateTaQuestion();
+    };
+
+    const generateTaQuestion = () => {
+        const el = taElements[Math.floor(Math.random() * taElements.length)];
+        
+        const qTypes = [
+            { text: "What is the symbol for", subject: el.name, correct: el.sym, field: 'sym' },
+            { text: "Which element has the symbol", subject: el.sym, correct: el.name, field: 'name' },
+            { text: "What is the atomic number of", subject: el.name, correct: el.n.toString(), field: 'n' },
+            { text: "Which element has atomic number", subject: el.n.toString(), correct: el.name, field: 'name' }
+        ];
+        
+        const qType = qTypes[Math.floor(Math.random() * qTypes.length)];
+        setTaQuestion(qType);
+
+        let newOptions = [qType.correct];
+        while (newOptions.length < 4) {
+            let rVal = taElements[Math.floor(Math.random() * taElements.length)][qType.field].toString();
+            if (!newOptions.includes(rVal)) newOptions.push(rVal);
+        }
+
+        for (let i = newOptions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newOptions[i], newOptions[j]] = [newOptions[j], newOptions[i]];
+        }
+        setTaOptions(newOptions);
+    };
+
+    const checkTaAnswer = (selectedAns) => {
+        if (selectedAns === taQuestion.correct) {
+            setTaCorrect(prev => prev + 1);
+        } else {
+            setTaWrong(prev => prev + 1);
+        }
+        generateTaQuestion();
+    };
+
+    const handleConfirmLeaveRoom = async () => {
+        try {
+            const userRef = doc(db, "users", userName);
+            await setDoc(userRef, { joinedRoomId: null }, { merge: true });
+        } catch (error) {
+            console.error("Error leaving room:", error);
+        }
+        localStorage.removeItem(`joinedRoomId_${userName}`);
+        localStorage.removeItem(`joinedRoomSection_${userName}`);
+        setIsLeaveRoomModalOpen(false);
+        navigate('/home');
+    };
+
+    const handleQuizSubmit = async () => {
+        let score = 0;
+        activeQuiz.questions.forEach((q, i) => {
+            if (quizAnswers[i] === q.correctOption) score++;
+        });
+        setQuizResult(score);
+
+        // Save score and specific answers to the classroom activity in the cloud
+        try {
+            const roomRef = doc(db, "teacher_rooms", roomId);
+            const updatedClasswork = classwork.map(cw => {
+                if (cw.id === activeQuiz.id) {
+                    const existingSubmissions = cw.submissions || [];
+                    // Remove old submission if they are retaking the quiz
+                    const filteredSubmissions = existingSubmissions.filter(sub => sub.studentId !== userName);
+                    return {
+                        ...cw,
+                        submissions: [
+                            ...filteredSubmissions,
+                            {
+                                studentId: userName,
+                                studentName: sessionStorage.getItem('userFullname') || userName,
+                                score: score,
+                                total: activeQuiz.questions.length,
+                                answers: quizAnswers,
+                                timestamp: new Date().toISOString()
+                            }
+                        ]
+                    };
+                }
+                return cw;
+            });
+            await setDoc(roomRef, { classwork: updatedClasswork }, { merge: true });
+        } catch (error) {
+            console.error("Error saving quiz result:", error);
         }
     };
 
-    const renderStream = () => (
-        <>
+    const renderTextWithFormatting = (text) => {
+        if (!text) return null;
+        const parts = text.split(/(\*\*.*?\*\*|https?:\/\/[^\s]+)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+                return <strong key={i} style={{ color: '#2d3436' }}>{part.slice(2, -2)}</strong>;
+            }
+            if (/^https?:\/\//.test(part)) {
+                return <a key={i} href={part} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#4facfe', textDecoration: 'none', fontWeight: '600' }} onMouseEnter={e => e.target.style.textDecoration='underline'} onMouseLeave={e => e.target.style.textDecoration='none'}>{part}</a>;
+            }
+            return <span key={i}>{part}</span>;
+        });
+    };
+
+    const renderFeed = () => (
+        <div className="masonry-grid">
             {posts.length === 0 && (
                 <div className="post-card">
                     <div className="post-icon"><i className="fas fa-clipboard-list"></i></div>
@@ -142,7 +340,7 @@ export default function StudentRoom() {
                     <div className="post-content">
                         <h4>{pType}</h4>
                         <span>Posted by {post.author} • {new Date(post.timestamp).toLocaleString()}</span>
-                        <p>{post.text}</p>
+                        <p style={{ marginTop: '12px', color: '#2d3436', lineHeight: '1.6', whiteSpace: 'pre-wrap', fontSize: '1.05rem', fontWeight: '500' }}>{renderTextWithFormatting(post.text)}</p>
                         {post.attachment && (
                             <div style={{ marginTop: '15px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => setPreviewAttachment(post.attachment)}>
                                 <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
@@ -160,21 +358,23 @@ export default function StudentRoom() {
                 </div>
                 );
             })}
-        </>
+        </div>
     );
 
-    const renderClasswork = () => (
+    const renderActivities = () => (
         <>
             {classwork.length === 0 ? (
                 <div className="empty-state">
                     <i className="fas fa-book-reader"></i>
-                    <p>Your teacher hasn't assigned any classwork yet.</p>
+                    <p>Your teacher hasn't assigned any activities yet.</p>
                 </div>
             ) : (
-                classwork.slice().reverse().map(cw => {
-                    const icon = cw.type === 'module' ? 'fa-book' : 'fa-clipboard-check';
-                    const color = cw.type === 'module' ? '#4facfe' : '#e74c3c';
-                    const bg = cw.type === 'module' ? '#e6f4ff' : '#fceae9';
+                <div className="masonry-grid">
+                    {classwork.slice().reverse().map(cw => {
+                    const icon = cw.assessmentType === 'time_attack' ? 'fa-stopwatch' : 'fa-tasks';
+                    const color = cw.assessmentType === 'time_attack' ? '#f39c12' : '#e74c3c';
+                    const bg = cw.assessmentType === 'time_attack' ? '#fffdf7' : '#fcf3f2';
+                    const mySubmission = cw.submissions?.find(sub => sub.studentId === userName);
                     return (
                         <div key={cw.id} className="post-card">
                             <div className="post-icon" style={{ background: bg, color: color }}><i className={`fas ${icon}`}></i></div>
@@ -199,30 +399,58 @@ export default function StudentRoom() {
                                     </div>
                                 )}
                                 {cw.assessmentType === 'time_attack' && (
-                                    <button onClick={() => navigate('/timeattack')} style={{ marginTop: '15px', background: '#f39c12', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(243, 156, 18, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                    <button onClick={() => { setActiveTimeAttack(cw); setTaGameState('start'); }} style={{ marginTop: '15px', background: '#f39c12', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(243, 156, 18, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
                                         <i className="fas fa-gamepad"></i> Play Time Attack
                                     </button>
                                 )}
                                 {cw.assessmentType === 'custom' && cw.questions && (
-                                    <button onClick={() => { setActiveQuiz(cw); setCurrentQuestionIndex(0); setQuizAnswers({}); setQuizResult(null); }} style={{ marginTop: '15px', background: '#e74c3c', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(231, 76, 60, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-                                        <i className="fas fa-tasks"></i> Take Custom Quiz
-                                    </button>
+                                    mySubmission ? (
+                                        <button onClick={() => { setActiveQuiz(cw); setQuizResult(mySubmission.score); setQuizAnswers(mySubmission.answers); setIsReviewingQuiz(false); }} style={{ marginTop: '15px', background: '#1dd1a1', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(29, 209, 161, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                            <i className="fas fa-check-double"></i> View Results
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => { setActiveQuiz(cw); setCurrentQuestionIndex(0); setQuizAnswers({}); setQuizResult(null); setIsReviewingQuiz(false); }} style={{ marginTop: '15px', background: '#e74c3c', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(231, 76, 60, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                            <i className="fas fa-tasks"></i> Take Custom Quiz
+                                        </button>
+                                    )
                                 )}
                             </div>
                         </div>
                     );
-                })
+                    })}
+                </div>
             )}
         </>
     );
 
-    const renderPeople = () => (
-        <>
-            <h2 style={{ color: '#6e45e2', borderBottom: '2px solid #6e45e2', paddingBottom: '10px', marginBottom: '20px' }}>Teachers</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', fontSize: '1.1rem', color: '#333' }}>
-                <i className="fas fa-user-circle" style={{ fontSize: '2rem', color: '#aaa' }}></i> {room?.teacherFullName || room?.teacher}
+    const renderMembers = () => (
+        <div className="post-card">
+            <div className="post-content" style={{ width: '100%' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#6e45e2', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px' }}>Teachers</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: teacherAvatar ? 'transparent' : '#f3f0ff', color: '#6e45e2', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', backgroundImage: teacherAvatar ? `url('${teacherAvatar}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        {!teacherAvatar && <i className="fas fa-user-shield"></i>}
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#2d3436' }}>{room?.teacherFullName || room?.teacher}</span>
+                </div>
+
+                <h3 style={{ marginTop: '30px', marginBottom: '20px', color: '#4facfe', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px' }}>Classmates ({students.length})</h3>
+                {students.length === 0 ? (
+                    <p style={{ color: '#888', textAlign: 'center', padding: '20px 0' }}>No other students have joined this class yet.</p>
+                ) : (
+                    <div style={{ display: 'grid', gap: '15px' }}>
+                        {students.map(student => (
+                            <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '10px 15px', background: '#fdfdfd', border: '1px solid #eee', borderRadius: '12px' }}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: student.avatarUrl ? 'transparent' : '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', backgroundImage: student.avatarUrl ? `url('${student.avatarUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                                    {!student.avatarUrl && <i className="fas fa-user"></i>}
+                                </div>
+                                <span style={{ fontWeight: 600, fontSize: '1.05rem', color: '#2d3436' }}>{student.fullname || student.username} {student.username === userName ? <span style={{ color: '#888', fontWeight: 'normal', fontSize: '0.9rem' }}>(You)</span> : ''}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
-        </>
+        </div>
     );
 
     if (!room) return (
@@ -300,6 +528,83 @@ export default function StudentRoom() {
                         0% { transform: translateY(0) rotate(0deg); }
                         100% { transform: translateY(-120vh) rotate(360deg); }
                     }
+                    
+                    /* Modern Room Dashboard Redesign */
+                    .modern-room-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 35px 40px;
+                        border-radius: 24px;
+                        color: white;
+                        margin-bottom: 20px;
+                        box-shadow: 0 12px 35px rgba(0,0,0,0.1);
+                        position: relative;
+                        overflow: hidden;
+                        flex-wrap: wrap;
+                        gap: 20px;
+                    }
+                    .header-info {
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .header-info h1 {
+                        font-size: 2.8rem;
+                        margin: 0 0 8px 0;
+                        font-weight: 800;
+                        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    }
+                    .header-info p {
+                        font-size: 1.2rem;
+                        margin: 0;
+                        opacity: 0.9;
+                        font-weight: 500;
+                    }
+                    .header-actions {
+                        position: relative;
+                        z-index: 2;
+                        display: flex;
+                        align-items: center;
+                    }
+                    .modern-feed-container {
+                        max-width: 1000px;
+                        margin: 0 auto;
+                        width: 100%;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 20px;
+                    }
+                    .masonry-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+                        gap: 20px;
+                        align-items: start;
+                        width: 100%;
+                    }
+                    @media (max-width: 768px) {
+                        .modern-room-header { padding: 25px 20px; flex-direction: column; align-items: flex-start; }
+                        .header-info h1 { font-size: 2rem; }
+                        .masonry-grid { grid-template-columns: 1fr; }
+                    }
+                    
+                    /* Time Attack Mobile Tap Fix */
+                    .ta-option-btn {
+                        padding: 20px;
+                        font-size: 1.2rem;
+                        border-radius: 12px;
+                        border: 2px solid #eee;
+                        background: #fdfdfd;
+                        cursor: pointer;
+                        transition: all 0.1s;
+                        font-weight: bold;
+                        color: #4facfe;
+                        outline: none !important;
+                        -webkit-tap-highlight-color: transparent !important;
+                    }
+                    @media (hover: hover) {
+                        .ta-option-btn:hover { border-color: #4facfe; background: #eaf4ff; }
+                    }
+                    .ta-option-btn:active { transform: scale(0.95); }
                 `}
             </style>
             <nav className="navbar">
@@ -308,35 +613,45 @@ export default function StudentRoom() {
                     <i className="fas fa-atom"></i>
                 </div>
                 <ul className="nav-links">
-                    <li className={activeTab === 'stream' ? 'active' : ''} onClick={() => setActiveTab('stream')}><i className="fas fa-stream"></i> <span>Stream</span></li>
-                    <li className={activeTab === 'classwork' ? 'active' : ''} onClick={() => setActiveTab('classwork')}><i className="fas fa-clipboard-list"></i> <span>Classwork</span></li>
-                    <li className={activeTab === 'people' ? 'active' : ''} onClick={() => setActiveTab('people')}><i className="fas fa-users"></i> <span>People</span></li>
+                    <li className={activeTab === 'feed' ? 'active' : ''} onClick={() => setActiveTab('feed')}><i className="fas fa-layer-group"></i> <span>Feed</span></li>
+                    <li className={activeTab === 'activities' ? 'active' : ''} onClick={() => setActiveTab('activities')}><i className="fas fa-tasks"></i> <span>Activities</span></li>
+                    <li className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}><i className="fas fa-users"></i> <span>Members</span></li>
                 </ul>
                 <div style={{ width: '130px' }}></div>
             </nav>
 
-            <main className="room-container" style={{ position: 'relative', zIndex: 1 }}>
-                <div className="class-banner" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
-                    <h1>{room.section}</h1>
-                    <p>{room.grade}</p>
-                    <i className="fas fa-flask banner-icon"></i>
+            <main className="room-container" style={{ position: 'relative', zIndex: 1, padding: '30px 20px 50px 20px', maxWidth: '1200px', margin: '0 auto' }}>
+                <div className="modern-room-header" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
+                    <div className="header-info">
+                        {activeTab === 'members' ? (
+                            <>
+                                <h1>Class Members</h1>
+                                <p>View your teacher and classmates here.</p>
+                            </>
+                        ) : activeTab === 'activities' ? (
+                            <>
+                                <h1>Class Activities</h1>
+                                <p>View and complete your assigned tasks.</p>
+                            </>
+                        ) : (
+                            <>
+                                <h1>{room.section}</h1>
+                                <p>{room.grade}</p>
+                            </>
+                        )}
+                    </div>
+                    <div className="header-actions">
+                        <button onClick={() => setIsLeaveRoomModalOpen(true)} className="btn-leave-room" style={{ background: 'rgba(255,255,255,0.9)', color: '#e74c3c', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }} onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                            <i className="fas fa-sign-out-alt"></i> Leave Room
+                        </button>
+                    </div>
+                    <i className={`fas ${activeTab === 'members' ? 'fa-users' : activeTab === 'activities' ? 'fa-tasks' : 'fa-flask'}`} style={{ position: 'absolute', right: '-20px', bottom: '-40px', fontSize: '14rem', opacity: 0.1, transform: 'rotate(-15deg)' }}></i>
                 </div>
 
-                <div className="content-layout">
-                    <aside className="side-panel">
-                        <div className="info-box" style={{ marginBottom: '15px' }}>
-                            <h3>Upcoming</h3>
-                            <p>Woohoo, no work due soon!</p>
-                        </div>
-                        <div className="info-box" style={{ marginTop: '15px', textAlign: 'center', borderColor: '#fceae9', background: '#fffcfc' }}>
-                            <button onClick={handleLeaveRoom} className="btn-leave-room"><i className="fas fa-sign-out-alt"></i> Leave Room</button>
-                        </div>
-                    </aside>
-                    <section className="main-panel">
-                        {activeTab === 'stream' && renderStream()}
-                        {activeTab === 'classwork' && renderClasswork()}
-                        {activeTab === 'people' && renderPeople()}
-                    </section>
+                <div className="modern-feed-container">
+                        {activeTab === 'feed' && renderFeed()}
+                        {activeTab === 'activities' && renderActivities()}
+                        {activeTab === 'members' && renderMembers()}
                 </div>
             </main>
 
@@ -389,14 +704,48 @@ export default function StudentRoom() {
             {activeQuiz && (
                 <div className="modal-container show" style={{ zIndex: 9999, backdropFilter: 'blur(5px)' }} onClick={() => setActiveQuiz(null)}>
                     <div className="modal-content" style={{ width: '90%', maxWidth: '800px', height: '80vh', padding: '30px', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '16px', border: '1px solid #eee' }} onClick={e => e.stopPropagation()}>
-                        {quizResult !== null ? (
+                        {isReviewingQuiz ? (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px', marginBottom: '20px' }}>
+                                    <h2 style={{ margin: 0, color: '#2d3436', fontSize: '1.5rem' }}>Review Mistakes</h2>
+                                    <button className="close-modal" onClick={() => setActiveQuiz(null)} style={{ position: 'static' }}>&times;</button>
+                                </div>
+                                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px', textAlign: 'left' }}>
+                                    {activeQuiz.questions.map((q, qIdx) => {
+                                        const studentAnsIdx = quizAnswers[qIdx];
+                                        const isCorrect = studentAnsIdx === q.correctOption;
+                                        return (
+                                            <div key={qIdx} style={{ padding: '15px', borderRadius: '12px', background: isCorrect ? '#f0fdf4' : '#fff0f0', border: `1px solid ${isCorrect ? '#bbf7d0' : '#fecaca'}`, marginBottom: '15px' }}>
+                                                <p style={{ margin: '0 0 10px 0', fontWeight: '600', color: '#333', fontSize: '1.1rem' }}>{qIdx + 1}. {q.question}</p>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    {q.options.map((opt, oIdx) => {
+                                                        let bg = '#fff'; let border = '1px solid #ddd'; let color = '#555'; let icon = null;
+                                                        if (oIdx === q.correctOption) { bg = '#1dd1a1'; color = '#fff'; border = '1px solid #1dd1a1'; icon = <i className="fas fa-check" style={{ marginRight: '8px' }}></i>; }
+                                                        else if (oIdx === studentAnsIdx && !isCorrect) { bg = '#e74c3c'; color = '#fff'; border = '1px solid #e74c3c'; icon = <i className="fas fa-times" style={{ marginRight: '8px' }}></i>; }
+                                                        
+                                                        return (
+                                                            <div key={oIdx} style={{ padding: '10px 15px', borderRadius: '8px', background: bg, border: border, color: color, fontSize: '0.95rem', fontWeight: (oIdx === q.correctOption || oIdx === studentAnsIdx) ? 'bold' : 'normal' }}>
+                                                                {icon} {opt}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px', paddingTop: '20px', borderTop: '2px solid #f0f2f5' }}>
+                                    <button className="btn-cancel" onClick={() => setIsReviewingQuiz(false)}>Back to Score</button>
+                                </div>
+                            </>
+                        ) : quizResult !== null ? (
                             <div style={{ textAlign: 'center', margin: 'auto' }}>
                                 <i className="fas fa-trophy" style={{ fontSize: '5rem', color: '#f1c40f', marginBottom: '20px' }}></i>
                                 <h2 style={{ color: '#2d3436', fontSize: '2rem', marginBottom: '10px' }}>Quiz Completed!</h2>
                                 <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '30px' }}>You scored <strong>{quizResult}</strong> out of <strong>{activeQuiz.questions.length}</strong>.</p>
                                 <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
                                     <button className="btn-cancel" onClick={() => setActiveQuiz(null)}>Close</button>
-                                    <button className="btn-confirm" onClick={() => { setCurrentQuestionIndex(0); setQuizAnswers({}); setQuizResult(null); }}>Retake Quiz</button>
+                                    <button className="btn-confirm" style={{ background: '#4facfe' }} onClick={() => setIsReviewingQuiz(true)}>Review Answers</button>
                                 </div>
                             </div>
                         ) : (
@@ -454,13 +803,7 @@ export default function StudentRoom() {
                                             className="btn-confirm" 
                                             style={{ background: quizAnswers[currentQuestionIndex] === undefined ? '#ccc' : '#1dd1a1', cursor: quizAnswers[currentQuestionIndex] === undefined ? 'not-allowed' : 'pointer' }}
                                             disabled={quizAnswers[currentQuestionIndex] === undefined}
-                                            onClick={() => {
-                                                let score = 0;
-                                                activeQuiz.questions.forEach((q, i) => {
-                                                    if (quizAnswers[i] === q.correctOption) score++;
-                                                });
-                                                setQuizResult(score);
-                                            }}
+                                        onClick={handleQuizSubmit}
                                         >
                                             <i className="fas fa-check"></i> Submit Quiz
                                         </button>
@@ -468,6 +811,79 @@ export default function StudentRoom() {
                                 </div>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Classroom Time Attack Modal */}
+            {activeTimeAttack && (
+                <div className="modal-container show" style={{ zIndex: 9999, backdropFilter: 'blur(5px)' }} onClick={() => { if(taGameState !== 'playing') setActiveTimeAttack(null); }}>
+                    <div className="modal-content" style={{ width: '90%', maxWidth: '600px', padding: '30px', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '16px', border: '1px solid #eee', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        {taGameState === 'start' && (
+                            <>
+                                <i className="fas fa-stopwatch" style={{ fontSize: '4rem', color: '#f39c12', margin: '0 auto 15px auto', display: 'block' }}></i>
+                                <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>{activeTimeAttack.title}</h2>
+                                <p style={{ color: '#666', marginBottom: '25px' }}>You have 60 seconds to answer as many chemistry questions as you can. Your highest score will be submitted to your teacher.</p>
+                                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                                    <button className="btn-cancel" onClick={() => setActiveTimeAttack(null)}>Cancel</button>
+                                    <button className="btn-confirm" style={{ background: '#f39c12' }} onClick={startTaGame}>Start Challenge</button>
+                                </div>
+                            </>
+                        )}
+
+                        {taGameState === 'playing' && taQuestion && (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px' }}>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#e74c3c' }}>
+                                        <i className="fas fa-clock"></i> {taTimeLeft}s
+                                    </div>
+                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#1dd1a1' }}>
+                                        <i className="fas fa-check-circle"></i> {taCorrect}
+                                    </div>
+                                </div>
+                                <h3 style={{ fontSize: '1.2rem', color: '#666', marginBottom: '10px', fontWeight: 'normal' }}>{taQuestion.text}</h3>
+                                <h2 style={{ fontSize: '2.5rem', color: '#2d3436', marginBottom: '30px' }}>{taQuestion.subject}</h2>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                    {taOptions.map((opt, i) => (
+                                        <button 
+                                            key={i} 
+                                            onClick={() => checkTaAnswer(opt)}
+                                            className="ta-option-btn"
+                                        >
+                                            {opt}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {taGameState === 'end' && (
+                            <>
+                                <i className="fas fa-flag-checkered" style={{ fontSize: '4rem', color: '#1dd1a1', margin: '0 auto 15px auto', display: 'block' }}></i>
+                                <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>Time's Up!</h2>
+                                <p style={{ color: '#666', fontSize: '1.2rem', marginBottom: '10px' }}>You answered</p>
+                                <h1 style={{ fontSize: '3.5rem', color: '#4facfe', margin: '0 0 25px 0' }}>{taCorrect}</h1>
+                                <p style={{ color: '#1dd1a1', fontWeight: 'bold', marginBottom: '25px' }}><i className="fas fa-check"></i> Score successfully submitted to your teacher.</p>
+                                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                                    <button className="btn-cancel" onClick={() => { setActiveTimeAttack(null); setTaGameState('start'); }}>Close</button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Leave Room Modal */}
+            {isLeaveRoomModalOpen && (
+                <div className="modal-container show" style={{ zIndex: 10000 }} onClick={() => setIsLeaveRoomModalOpen(false)}>
+                    <div className="modal-content" style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <i className="fas fa-sign-out-alt modal-icon-box" style={{ color: '#e74c3c' }}></i>
+                        <h2 style={{ marginBottom: '10px' }}>Leave Class</h2>
+                        <p style={{ color: '#666', marginBottom: '20px' }}>Are you sure you want to leave this class? You will need the class code to join again.</p>
+                        <div className="modal-actions">
+                            <button className="btn-cancel" onClick={() => setIsLeaveRoomModalOpen(false)}>Cancel</button>
+                            <button className="btn-confirm" onClick={handleConfirmLeaveRoom} style={{ backgroundColor: '#e74c3c' }}>Leave</button>
+                        </div>
                     </div>
                 </div>
             )}

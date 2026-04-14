@@ -468,6 +468,7 @@ export default function PeriodicTable() {
                                         scale="0.05 0.05 0.05"
                                         camera-controls
                                         ar
+                                        autoplay
                                         ar-scale="auto"
                                         ar-modes="webxr scene-viewer quick-look"
                                         style={{ width: '100%', height: '100%' }}

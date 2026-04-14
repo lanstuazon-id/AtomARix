@@ -17,12 +17,12 @@
 .dropdown-icon-box { display: contents; }
 .menu-container { position: relative; display: inline-block; flex-shrink: 0; }
 .dropdown-menu { display: none; position: absolute; right: 0; top: 55px; background: white; min-width: 200px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); overflow: hidden; z-index: 10; border: 1px solid #eee; }
-.dropdown-menu.show { display: block; animation: fadeIn 0.2s; }
+.dropdown-menu.show { display: block; animation: dropdownPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; transform-origin: top right; }
 .dropdown-item { padding: 12px 15px; color: #555; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: background 0.2s; font-size: 0.9rem; font-weight: 500; }
 .dropdown-item:hover { background: #f0f2f5; color: #2d3436; }
 .dropdown-item.danger { color: #e74c3c; }
 .dropdown-item.danger:hover { background: #fceae9; color: #c0392b; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes dropdownPop { 0% { opacity: 0; transform: scale(0.8) translateY(-10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 
 /* --- Main Container --- */
 .dashboard-container { padding: 40px 50px; max-width: 1200px; margin: 0 auto; text-align: left; }
@@ -66,8 +66,12 @@
 .room-header p { font-size: 0.9rem; opacity: 0.9; }
 
 .menu-container { position: relative; display: inline-block; flex-shrink: 0; }
-.btn-menu { background: rgba(255, 255, 255, 0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.2s; }
-.btn-menu:hover { background: rgba(255, 255, 255, 0.3); transform: scale(1.1); }
+.room-menu-container .btn-menu { background: transparent; border: none; color: #ffffff; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 1.4rem; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s; position: relative; z-index: 10; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.4)); }
+.room-menu-container .btn-menu:hover { background: rgba(255, 255, 255, 0.25); color: #ffffff; transform: scale(1.15); }
+.room-menu-container .btn-menu:active { transform: scale(0.9); }
+
+/* Add a small buffer zone to catch slight misclicks */
+.room-menu-container { padding: 5px; margin: -5px; }
 
 .room-body { padding: 20px; display: flex; justify-content: space-between; align-items: center; }
 .teacher-info { display: flex; align-items: center; gap: 10px; color: #666; font-size: 0.9rem; }
@@ -75,14 +79,16 @@
 
 /* --- Classroom Card Dropdown Fix --- */
 .room-menu-container .dropdown-menu {
-    min-width: 120px !important;
-    width: 120px !important;
-    padding: 5px 0 !important;
-    border-radius: 10px !important;
+    min-width: 140px !important;
+    width: 140px !important;
+    padding: 8px 0 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
 }
 .room-menu-container .dropdown-item {
-    padding: 10px 15px !important;
-    font-size: 0.85rem !important;
+    padding: 12px 15px !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
 }
 
 .empty-state { text-align: center; padding: 60px 20px; color: #7f8fa6; grid-column: 1 / -1; }

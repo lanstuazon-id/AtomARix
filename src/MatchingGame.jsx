@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './MatchingGame.css';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -48,6 +48,7 @@ export default function MatchingGame() {
     // Interaction State
     const [flippedIndices, setFlippedIndices] = useState([]);
     const [matchedIds, setMatchedIds] = useState([]);
+    const [isLocked, setIsLocked] = useState(false);
     
     // Stats State
     const [moves, setMoves] = useState(0);
@@ -100,6 +101,7 @@ export default function MatchingGame() {
         setMoves(0);
         setTimeElapsed(0);
         setShowGameOver(false);
+        setIsLocked(false);
         
         // Create pairs
         let newCards = [];
@@ -119,8 +121,8 @@ export default function MatchingGame() {
     };
 
     const handleCardClick = (index) => {
-        // Prevent clicking if 2 cards are already flipping, or if it's already matched/flipped
-        if (flippedIndices.length === 2) return;
+        // Prevent clicking if board is locked, or if it's already matched/flipped
+        if (isLocked || flippedIndices.length === 2) return;
         if (flippedIndices.includes(index)) return;
         if (matchedIds.includes(cards[index].id)) return;
 
@@ -132,6 +134,7 @@ export default function MatchingGame() {
         setFlippedIndices(newFlipped);
 
         if (newFlipped.length === 2) {
+            setIsLocked(true);
             setMoves(m => m + 1);
             const card1 = cards[newFlipped[0]];
             const card2 = cards[newFlipped[1]];
@@ -144,6 +147,7 @@ export default function MatchingGame() {
                 const newMatchedIds = [...matchedIds, card1.id];
                 setMatchedIds(newMatchedIds);
                 setFlippedIndices([]);
+                setIsLocked(false);
                 
                 // Check Win
                 if (newMatchedIds.length === currentCategory.length) {
@@ -155,7 +159,8 @@ export default function MatchingGame() {
                 sndError.current.play().catch(e => console.warn(e));
                 setTimeout(() => {
                     setFlippedIndices([]);
-                }, 600); // 600ms delay to see the card before it turns back
+                    setIsLocked(false);
+                }, 500); // 500ms delay for a snappier feel
             }
         }
     };
@@ -203,26 +208,31 @@ export default function MatchingGame() {
         { id: 10, icon: 'fas fa-flask', left: '5%', animDuration: '17s', delay: '9s', size: '2rem' },
     ];
 
+    // Memoize the heavy animated background so it doesn't re-render every second when the timer ticks
+    const renderFloatingBackground = useMemo(() => (
+        <div className="floating-background">
+            {floatingItems.map(item => (
+                <div 
+                    key={item.id} 
+                    className="floating-item" 
+                    style={{ 
+                        left: item.left, 
+                        animationDuration: item.animDuration, 
+                        animationDelay: item.delay,
+                        fontSize: item.size,
+                        fontWeight: item.fontWeight || 'normal'
+                    }}
+                >
+                    {item.icon ? <i className={item.icon}></i> : item.text}
+                </div>
+            ))}
+        </div>
+    ), []);
+
     return (
         <div style={{ position: 'relative' }}>
             {/* Floating Chemistry Background */}
-            <div className="floating-background">
-                {floatingItems.map(item => (
-                    <div 
-                        key={item.id} 
-                        className="floating-item" 
-                        style={{ 
-                            left: item.left, 
-                            animationDuration: item.animDuration, 
-                            animationDelay: item.delay,
-                            fontSize: item.size,
-                            fontWeight: item.fontWeight || 'normal'
-                        }}
-                    >
-                        {item.icon ? <i className={item.icon}></i> : item.text}
-                    </div>
-                ))}
-            </div>
+            {renderFloatingBackground}
             <style>
                 {`
                     .floating-background {

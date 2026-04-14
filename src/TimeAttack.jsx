@@ -215,6 +215,13 @@ export default function TimeAttack() {
                         0% { transform: translateY(0) rotate(0deg); }
                         100% { transform: translateY(-120vh) rotate(360deg); }
                     }
+                    
+                    /* Fix sticky outline/highlight on mobile touch */
+                    .option-btn {
+                        outline: none !important;
+                        -webkit-tap-highlight-color: transparent !important;
+                    }
+                    .option-btn:focus { outline: none !important; }
                 `}
             </style>
             <nav className="navbar">

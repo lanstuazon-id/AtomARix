@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './TeacherRoom.css';
-import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
 const roomColorPresets = [
@@ -18,9 +18,12 @@ export default function TeacherRoom() {
     const navigate = useNavigate();
 
     const [room, setRoom] = useState(null);
-    const [activeTab, setActiveTab] = useState('stream');
+    const [activeTab, setActiveTab] = useState('feed');
     const [posts, setPosts] = useState([]);
     const [classwork, setClasswork] = useState([]);
+    const [students, setStudents] = useState([]);
+    const [teacherAvatar, setTeacherAvatar] = useState('');
+    const [studentSearch, setStudentSearch] = useState('');
 
     // Modal States
     const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -47,30 +50,63 @@ export default function TeacherRoom() {
     const [selectedPost, setSelectedPost] = useState(null);
     const [isEditPostModalOpen, setIsEditPostModalOpen] = useState(false);
     const [isDeletePostModalOpen, setIsDeletePostModalOpen] = useState(false);
+    const [isDeleteCwModalOpen, setIsDeleteCwModalOpen] = useState(false);
+    const [selectedCw, setSelectedCw] = useState(null);
     const [editPostContent, setEditPostContent] = useState('');
     const [editPostType, setEditPostType] = useState('Announcement');
+    
+    // Report States
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [selectedReportCw, setSelectedReportCw] = useState(null);
+    const [expandedStudentId, setExpandedStudentId] = useState(null);
+
+    // Student Management States
+    const [isRemoveStudentModalOpen, setIsRemoveStudentModalOpen] = useState(false);
+    const [studentToRemove, setStudentToRemove] = useState(null);
+
+    // New Format & Link States
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [linkInput, setLinkInput] = useState('');
+    const [linkTarget, setLinkTarget] = useState(null);
 
     // Quiz Builder State
-    const [quizQuestions, setQuizQuestions] = useState([{ question: '', options: ['', '', '', ''], correctOption: 0 }]);
+    const [quizQuestions, setQuizQuestions] = useState([{ id: Date.now().toString(), question: '', options: ['', '', '', ''], correctOption: 0 }]);
+    const [isRemoveQuestionModalOpen, setIsRemoveQuestionModalOpen] = useState(false);
+    const [questionToRemoveIndex, setQuestionToRemoveIndex] = useState(null);
 
     const addQuestion = () => {
-        setQuizQuestions([...quizQuestions, { question: '', options: ['', '', '', ''], correctOption: 0 }]);
+        setQuizQuestions(prev => [...prev, { id: Date.now().toString() + Math.random(), question: '', options: ['', '', '', ''], correctOption: 0 }]);
     };
 
     const removeQuestion = (index) => {
-        setQuizQuestions(quizQuestions.filter((_, i) => i !== index));
+        setQuestionToRemoveIndex(index);
+        setIsRemoveQuestionModalOpen(true);
+    };
+
+    const confirmRemoveQuestion = () => {
+        if (questionToRemoveIndex !== null) {
+            setQuizQuestions(prev => prev.filter((_, i) => i !== questionToRemoveIndex));
+            setIsRemoveQuestionModalOpen(false);
+            setQuestionToRemoveIndex(null);
+        }
     };
 
     const handleQuestionChange = (index, field, value) => {
-        const newQuestions = [...quizQuestions];
-        newQuestions[index][field] = value;
-        setQuizQuestions(newQuestions);
+        setQuizQuestions(prev => {
+            const newQuestions = [...prev];
+            newQuestions[index] = { ...newQuestions[index], [field]: value };
+            return newQuestions;
+        });
     };
 
     const handleOptionChange = (qIndex, oIndex, value) => {
-        const newQuestions = [...quizQuestions];
-        newQuestions[qIndex].options[oIndex] = value;
-        setQuizQuestions(newQuestions);
+        setQuizQuestions(prev => {
+            const newQuestions = [...prev];
+            const newOptions = [...newQuestions[qIndex].options];
+            newOptions[oIndex] = value;
+            newQuestions[qIndex] = { ...newQuestions[qIndex], options: newOptions };
+            return newQuestions;
+        });
     };
 
     useEffect(() => {
@@ -100,6 +136,33 @@ export default function TeacherRoom() {
         return () => unsubscribe();
     }, [roomId, navigate]);
 
+    // Fetch students in this room
+    useEffect(() => {
+        const q = query(collection(db, "users"), where("role", "==", "student"), where("joinedRoomId", "==", roomId));
+        const unsubscribeStudents = onSnapshot(q, (snapshot) => {
+            const studentList = [];
+            snapshot.forEach(doc => {
+                studentList.push({ id: doc.id, ...doc.data() });
+            });
+            setStudents(studentList);
+        });
+        return () => unsubscribeStudents();
+    }, [roomId]);
+
+    // Fetch teacher avatar
+    useEffect(() => {
+        if (room?.teacher) {
+            const unsubscribe = onSnapshot(doc(db, "users", room.teacher), (docSnap) => {
+                if (docSnap.exists()) {
+                    setTeacherAvatar(docSnap.data().avatarUrl || '');
+                }
+            }, (error) => {
+                console.error("Error fetching teacher avatar:", error);
+            });
+            return () => unsubscribe();
+        }
+    }, [room?.teacher]);
+
     // Close dropdown menu when clicking outside
     useEffect(() => {
         function handleClickOutside(event) {
@@ -120,13 +183,13 @@ export default function TeacherRoom() {
 
     // Prevent background scrolling when any modal is open
     useEffect(() => {
-        if (isPostModalOpen || isCwModalOpen || isEditPostModalOpen || isDeletePostModalOpen || previewAttachment) {
+        if (isPostModalOpen || isCwModalOpen || isEditPostModalOpen || isDeletePostModalOpen || isDeleteCwModalOpen || isReportModalOpen || isRemoveStudentModalOpen || previewAttachment || isLinkModalOpen || isRemoveQuestionModalOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
         }
         return () => { document.body.style.overflow = ''; };
-    }, [isPostModalOpen, isCwModalOpen, isEditPostModalOpen, isDeletePostModalOpen, previewAttachment]);
+    }, [isPostModalOpen, isCwModalOpen, isEditPostModalOpen, isDeletePostModalOpen, isDeleteCwModalOpen, isReportModalOpen, isRemoveStudentModalOpen, previewAttachment, isLinkModalOpen, isRemoveQuestionModalOpen]);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -258,36 +321,15 @@ export default function TeacherRoom() {
         }
 
         setIsUploading(true);
-        let attachmentData = null;
 
         try {
-            // Upload File to Cloudinary (if attached)
-            if (attachment && assessmentType === 'custom') {
-                const formData = new FormData();
-                formData.append('file', attachment);
-                formData.append('upload_preset', 'atomarix_uploads'); 
-                
-                const cloudinaryUrl = `https://api.cloudinary.com/v1_1/dht7nou2f/auto/upload`;
-                
-                const response = await fetch(cloudinaryUrl, { method: 'POST', body: formData });
-                const data = await response.json();
-                
-                if (!response.ok) throw new Error(data.error?.message || 'Cloudinary upload failed');
-
-                attachmentData = {
-                    name: attachment.name,
-                    url: data.secure_url,
-                    type: attachment.type
-                };
-            }
-
         const newClasswork = {
             id: Date.now(),
             type: 'assessment',
             assessmentType: assessmentType,
             title: cwTitle,
             desc: cwDesc,
-            attachment: attachmentData,
+                attachment: null,
             questions: assessmentType === 'custom' ? quizQuestions : null,
             timestamp: new Date().toISOString()
         };
@@ -301,7 +343,7 @@ export default function TeacherRoom() {
             setCwDesc('');
             setAttachment(null);
             setAssessmentType('custom');
-            setQuizQuestions([{ question: '', options: ['', '', '', ''], correctOption: 0 }]);
+            setQuizQuestions([{ id: Date.now().toString(), question: '', options: ['', '', '', ''], correctOption: 0 }]);
             setIsCwModalOpen(false);
         } catch (error) {
             console.error("Error creating classwork: ", error);
@@ -311,44 +353,85 @@ export default function TeacherRoom() {
         }
     };
 
-    const handleDeleteClasswork = async (id) => {
-        if (window.confirm("Are you sure you want to delete this classwork?")) {
-            const updatedClasswork = classwork.filter(cw => cw.id !== id);
-            try {
-                const roomRef = doc(db, "teacher_rooms", roomId);
-                await updateDoc(roomRef, { classwork: updatedClasswork });
-            } catch (error) {
-                console.error("Error deleting classwork: ", error);
-                alert("Failed to delete classwork. Please try again.");
-            }
+    const handleConfirmDeleteClasswork = async () => {
+        if (!selectedCw) return;
+        const updatedClasswork = classwork.filter(cw => cw.id !== selectedCw.id);
+        try {
+            const roomRef = doc(db, "teacher_rooms", roomId);
+            await updateDoc(roomRef, { classwork: updatedClasswork });
+            setIsDeleteCwModalOpen(false);
+            setSelectedCw(null);
+        } catch (error) {
+            console.error("Error deleting classwork: ", error);
+            alert("Failed to delete activity. Please try again.");
         }
     };
 
-    const renderStream = () => (
+    const promptRemoveStudent = (studentId, studentName) => {
+        setStudentToRemove({ id: studentId, name: studentName });
+        setIsRemoveStudentModalOpen(true);
+    };
+
+    const handleConfirmRemoveStudent = async () => {
+        if (!studentToRemove) return;
+        try {
+            await updateDoc(doc(db, "users", studentToRemove.id), { joinedRoomId: null });
+            setIsRemoveStudentModalOpen(false);
+            setStudentToRemove(null);
+        } catch (error) {
+            console.error("Error removing student:", error);
+            alert("Failed to remove student. Please try again.");
+        }
+    };
+
+    const renderTextWithFormatting = (text) => {
+        if (!text) return null;
+        const parts = text.split(/(\*\*.*?\*\*|https?:\/\/[^\s]+)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+                return <strong key={i} style={{ color: '#2d3436' }}>{part.slice(2, -2)}</strong>;
+            }
+            if (/^https?:\/\//.test(part)) {
+                return <a key={i} href={part} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#4facfe', textDecoration: 'none', fontWeight: '600' }} onMouseEnter={e => e.target.style.textDecoration='underline'} onMouseLeave={e => e.target.style.textDecoration='none'}>{part}</a>;
+            }
+            return <span key={i}>{part}</span>;
+        });
+    };
+
+    const renderFeed = () => (
         <>
-            <div className="btn-create-post" onClick={() => setIsPostModalOpen(true)}>
-                <div className="avatar"><i className="fas fa-user"></i></div>
-                Upload modules or announce something to your class
+            <div className="modern-create-post" onClick={() => setIsPostModalOpen(true)}>
+                <div className="modern-create-left">
+                    <div className="avatar-gradient"><i className="fas fa-pen"></i></div>
+                    <span className="placeholder-text">What would you like to share with your class?</span>
+                </div>
+                <div className="modern-create-actions">
+                    <div className="action-icon announce" title="Announcement"><i className="fas fa-comment-dots"></i></div>
+                    <div className="action-icon module" title="Module"><i className="fas fa-book"></i></div>
+                    <div className="action-icon attach" title="Attachment"><i className="fas fa-paperclip"></i></div>
+                </div>
             </div>
-            {posts.slice().reverse().map(post => {
+            <div className="masonry-grid">
+                {posts.slice().reverse().map(post => {
                 const pType = post.type || 'Announcement';
                 const pIcon = pType === 'Module' ? 'fa-book' : 'fa-comment-dots';
                 const pColor = pType === 'Module' ? '#4facfe' : '#10ac84';
                 const pBg = pType === 'Module' ? '#eaf4ff' : '#e3fdf5';
 
                 return (
-                <div key={post.id} className="post-card">
+                <div key={post.id} className="post-card" style={{ position: 'relative', zIndex: activePostMenu === post.id ? 50 : 1 }}>
                     <div className="post-icon" style={{ background: pBg, color: pColor }}><i className={`fas ${pIcon}`}></i></div>
                     <div className="post-content">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <h4>{pType}</h4>
                             <div className="menu-container post-menu-container">
-                                <button className="btn-menu" onClick={(e) => { e.stopPropagation(); setActivePostMenu(activePostMenu === post.id ? null : post.id); }}>
+                                <button className="btn-menu" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setActivePostMenu(activePostMenu === post.id ? null : post.id); }}>
                                     <i className="fas fa-ellipsis-v"></i>
                                 </button>
                                 {activePostMenu === post.id && (
-                                    <div className="dropdown-menu show" style={{ right: 0, top: '35px', width: '130px' }} onClick={e => e.stopPropagation()}>
-                                        <div className="dropdown-item" onClick={() => {
+                                    <div className="dropdown-menu show" style={{ right: 0, top: '35px', width: '130px' }} onClick={e => { e.stopPropagation(); e.preventDefault(); }}>
+                                        <div className="dropdown-item" onClick={(e) => {
+                                            e.stopPropagation();
                                             setSelectedPost(post);
                                             setEditPostContent(post.text);
                                             setEditPostType(post.type || 'Announcement');
@@ -357,7 +440,8 @@ export default function TeacherRoom() {
                                         }}>
                                             <i className="fas fa-edit" style={{ color: '#6e45e2', width: '20px' }}></i> Edit
                                         </div>
-                                        <div className="dropdown-item danger" onClick={() => {
+                                        <div className="dropdown-item danger" onClick={(e) => {
+                                            e.stopPropagation();
                                             setSelectedPost(post);
                                             setIsDeletePostModalOpen(true);
                                             setActivePostMenu(null);
@@ -369,7 +453,7 @@ export default function TeacherRoom() {
                             </div>
                         </div>
                         <span>Posted by {post.author} • {new Date(post.timestamp).toLocaleString()}</span>
-                        <p>{post.text}</p>
+                        <p style={{ marginTop: '12px', color: '#2d3436', lineHeight: '1.6', whiteSpace: 'pre-wrap', fontSize: '1.05rem', fontWeight: '500' }}>{renderTextWithFormatting(post.text)}</p>
                         {post.attachment && (
                             <div style={{ marginTop: '15px', padding: '10px 15px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', transition: 'background 0.2s', cursor: 'pointer' }} onClick={() => setPreviewAttachment(post.attachment)}>
                                 <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
@@ -386,16 +470,17 @@ export default function TeacherRoom() {
                     </div>
                 </div>
                 );
-            })}
+                })}
+            </div>
         </>
     );
 
-    const renderClasswork = () => (
-        <>
+    const renderActivities = () => (
+        <div className="masonry-grid">
             {classwork.slice().reverse().map(cw => {
-                const icon = cw.type === 'module' ? 'fa-book' : 'fa-clipboard-check';
-                const color = cw.type === 'module' ? '#4facfe' : '#e74c3c';
-                const bg = cw.type === 'module' ? '#e6f4ff' : '#fceae9';
+                const icon = cw.assessmentType === 'time_attack' ? 'fa-stopwatch' : 'fa-tasks';
+                const color = cw.assessmentType === 'time_attack' ? '#f39c12' : '#e74c3c';
+                const bg = cw.assessmentType === 'time_attack' ? '#fffdf7' : '#fcf3f2';
                 return (
                     <div key={cw.id} className="post-card">
                         <div className="post-icon" style={{ background: bg, color: color }}><i className={`fas ${icon}`}></i></div>
@@ -405,7 +490,10 @@ export default function TeacherRoom() {
                                     {cw.assessmentType === 'time_attack' && <span style={{fontSize: '0.75rem', background: '#f39c12', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-stopwatch"></i> Time Attack</span>}
                                     {cw.assessmentType === 'custom' && cw.questions && <span style={{fontSize: '0.75rem', background: '#e74c3c', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-tasks"></i> Custom Quiz</span>}
                                 </h4>
-                                <button onClick={() => handleDeleteClasswork(cw.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1.1rem' }} title="Delete Classwork"><i className="fas fa-trash"></i></button>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    <button onClick={() => { setSelectedReportCw(cw); setExpandedStudentId(null); setIsReportModalOpen(true); }} style={{ background: '#eaf4ff', border: 'none', color: '#4facfe', cursor: 'pointer', padding: '6px 12px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'} onMouseLeave={e => e.currentTarget.style.background = '#eaf4ff'} title="View Submissions"><i className="fas fa-chart-bar"></i> Report</button>
+                                    <button onClick={() => { setSelectedCw(cw); setIsDeleteCwModalOpen(true); }} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1.1rem' }} title="Delete Activity"><i className="fas fa-trash"></i></button>
+                                </div>
                             </div>
                             <span>Posted by {room.teacherFullName || room.teacher} • {new Date(cw.timestamp).toLocaleString()}</span>
                             <p>{cw.desc}</p>
@@ -426,17 +514,72 @@ export default function TeacherRoom() {
                     </div>
                 );
             })}
-        </>
+        </div>
     );
 
-    const renderPeople = () => (
-        <>
-            <h2 style={{ color: '#6e45e2', borderBottom: '2px solid #6e45e2', paddingBottom: '10px', marginBottom: '20px' }}>Teachers</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', fontSize: '1.1rem', color: '#333' }}>
-                <i className="fas fa-user-circle" style={{ fontSize: '2rem', color: '#aaa' }}></i> {room?.teacherFullName || room?.teacher}
+    const renderMembers = () => {
+        const filteredStudents = students.filter(s => 
+            (s.fullname || s.username).toLowerCase().includes(studentSearch.toLowerCase())
+        );
+
+        return (
+            <div className="post-card">
+                <div className="post-content" style={{ width: '100%' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#6e45e2', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px' }}>Teachers</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: teacherAvatar ? 'transparent' : '#f3f0ff', color: '#6e45e2', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', backgroundImage: teacherAvatar ? `url('${teacherAvatar}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                            {!teacherAvatar && <i className="fas fa-user-shield"></i>}
+                        </div>
+                        <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#2d3436' }}>{room?.teacherFullName || room?.teacher}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '30px', marginBottom: '20px', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px', flexWrap: 'wrap', gap: '15px' }}>
+                        <h3 style={{ margin: 0, color: '#4facfe' }}>Students ({students.length})</h3>
+                        {students.length > 0 && (
+                            <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
+                                <i className="fas fa-search" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#aaa' }}></i>
+                                <input 
+                                    type="text" 
+                                    placeholder="Search students..." 
+                                    value={studentSearch}
+                                    onChange={(e) => setStudentSearch(e.target.value)}
+                                    style={{ width: '100%', padding: '8px 12px 8px 35px', borderRadius: '20px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box', fontSize: '0.95rem' }}
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    {students.length === 0 ? (
+                        <p style={{ color: '#888', textAlign: 'center', padding: '20px 0' }}>Student list will appear here once they join the class.</p>
+                    ) : filteredStudents.length === 0 ? (
+                        <p style={{ color: '#888', textAlign: 'center', padding: '20px 0' }}>No students found matching your search.</p>
+                    ) : (
+                        <div style={{ display: 'grid', gap: '15px' }}>
+                            {filteredStudents.map(student => (
+                                <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px', background: '#fdfdfd', border: '1px solid #eee', borderRadius: '12px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = '#d7ccff'} onMouseLeave={e => e.currentTarget.style.borderColor = '#eee'}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: student.avatarUrl ? 'transparent' : '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', backgroundImage: student.avatarUrl ? `url('${student.avatarUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                                            {!student.avatarUrl && <i className="fas fa-user"></i>}
+                                        </div>
+                                        <span style={{ fontWeight: 600, fontSize: '1.05rem', color: '#2d3436' }}>{student.fullname || student.username}</span>
+                                    </div>
+                                    <button 
+                                        onClick={(e) => { e.preventDefault(); promptRemoveStudent(student.id, student.fullname || student.username); }}
+                                        style={{ background: '#fff0f0', border: 'none', color: '#e74c3c', width: '35px', height: '35px', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'all 0.2s', fontSize: '1rem' }}
+                                        title="Remove Student"
+                                        onMouseEnter={e => { e.currentTarget.style.background = '#e74c3c'; e.currentTarget.style.color = '#fff'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.background = '#fff0f0'; e.currentTarget.style.color = '#e74c3c'; }}
+                                    >
+                                        <i className="fas fa-user-minus"></i>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
-        </>
-    );
+        );
+    };
 
     if (!room) return (
         <div style={{ background: '#f8faff', minHeight: '100vh' }}>
@@ -513,6 +656,152 @@ export default function TeacherRoom() {
                         0% { transform: translateY(0) rotate(0deg); }
                         100% { transform: translateY(-120vh) rotate(360deg); }
                     }
+                    
+                    /* Modern Room Dashboard Redesign */
+                    .modern-room-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 35px 40px;
+                        border-radius: 24px;
+                        color: white;
+                        margin-bottom: 20px;
+                        box-shadow: 0 12px 35px rgba(0,0,0,0.1);
+                        position: relative;
+                        overflow: hidden;
+                        flex-wrap: wrap;
+                        gap: 20px;
+                    }
+                    .header-info {
+                        position: relative;
+                        z-index: 2;
+                    }
+                    .header-info h1 {
+                        font-size: 2.8rem;
+                        margin: 0 0 8px 0;
+                        font-weight: 800;
+                        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    }
+                    .header-info p {
+                        font-size: 1.2rem;
+                        margin: 0;
+                        opacity: 0.9;
+                        font-weight: 500;
+                    }
+                    .header-actions {
+                        position: relative;
+                        z-index: 2;
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(10px);
+                        -webkit-backdrop-filter: blur(10px);
+                        padding: 20px 30px;
+                        border-radius: 16px;
+                        border: 1px solid rgba(255, 255, 255, 0.3);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        min-width: 240px;
+                    }
+                    .modern-feed-container {
+                        max-width: 1000px;
+                        margin: 0 auto;
+                        width: 100%;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 20px;
+                    }
+                    .masonry-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+                        gap: 20px;
+                        align-items: start;
+                        width: 100%;
+                    }
+                    @media (max-width: 768px) {
+                        .modern-room-header { padding: 25px 20px; flex-direction: column; align-items: flex-start; }
+                        .header-actions { width: 100%; min-width: unset; }
+                        .header-info h1 { font-size: 2rem; }
+                        .masonry-grid { grid-template-columns: 1fr; }
+                    }
+
+                    /* 3-Dot Button Pop Animation for Posts */
+                    .btn-menu {
+                        background: transparent;
+                        border: none;
+                        color: #666;
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s, background 0.2s;
+                    }
+                    .btn-menu:hover {
+                        background: rgba(0, 0, 0, 0.05);
+                        color: #2d3436;
+                        transform: scale(1.15);
+                    }
+                    .btn-menu:active {
+                        transform: scale(0.85);
+                    }
+                    
+                    /* Dropdown Menu Pop Animation */
+                    .dropdown-menu.show {
+                        animation: dropdownPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                        transform-origin: top right;
+                    }
+                    @keyframes dropdownPop {
+                        0% { opacity: 0; transform: scale(0.8) translateY(-10px); }
+                        100% { opacity: 1; transform: scale(1) translateY(0); }
+                    }
+                    
+                    /* Modern Create Post Button */
+                    .modern-create-post {
+                        background: #ffffff;
+                        border-radius: 16px;
+                        padding: 15px 20px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        cursor: pointer;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+                        border: 1px solid #eee;
+                        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                        margin-bottom: 20px;
+                    }
+                    .modern-create-post:hover {
+                        box-shadow: 0 8px 25px rgba(110, 69, 226, 0.12);
+                        border-color: #d7ccff;
+                        transform: translateY(-2px);
+                    }
+                    .modern-create-left { display: flex; align-items: center; gap: 15px; }
+                    .avatar-gradient {
+                        width: 45px; height: 45px; border-radius: 12px;
+                        background: linear-gradient(135deg, #6e45e2 0%, #4facfe 100%);
+                        color: white; display: flex; justify-content: center; align-items: center;
+                        font-size: 1.2rem; box-shadow: 0 4px 10px rgba(110, 69, 226, 0.2);
+                    }
+                    .placeholder-text { color: #7f8fa6; font-size: 1.05rem; font-weight: 500; }
+                    .modern-create-actions { display: flex; gap: 10px; }
+                    .action-icon {
+                        width: 40px; height: 40px; border-radius: 50%; background: #f8faff;
+                        color: #a4b0be; display: flex; justify-content: center; align-items: center;
+                        font-size: 1.1rem; transition: all 0.2s;
+                    }
+                    
+                    /* Icon hover colors */
+                    .modern-create-post:hover .action-icon.announce { background: #e3fdf5; color: #10ac84; }
+                    .modern-create-post:hover .action-icon.module { background: #eaf4ff; color: #4facfe; }
+                    .modern-create-post:hover .action-icon.attach { background: #f3f0ff; color: #6e45e2; }
+                    
+                    @media (max-width: 768px) {
+                        .modern-create-actions { display: none; }
+                        .modern-create-post { padding: 12px 15px; }
+                        .placeholder-text { font-size: 0.95rem; }
+                        .avatar-gradient { width: 38px; height: 38px; font-size: 1rem; }
+                    }
                 `}
             </style>
             <nav className="navbar">
@@ -521,80 +810,86 @@ export default function TeacherRoom() {
                     <i className="fas fa-atom"></i>
                 </div>
                 <ul className="nav-links">
-                    <li className={activeTab === 'stream' ? 'active' : ''} onClick={() => setActiveTab('stream')}><i className="fas fa-stream"></i> <span>Stream</span></li>
-                    <li className={activeTab === 'classwork' ? 'active' : ''} onClick={() => setActiveTab('classwork')}><i className="fas fa-clipboard-list"></i> <span>Classwork</span></li>
-                    <li className={activeTab === 'people' ? 'active' : ''} onClick={() => setActiveTab('people')}><i className="fas fa-users"></i> <span>People</span></li>
+                    <li className={activeTab === 'feed' ? 'active' : ''} onClick={() => setActiveTab('feed')}><i className="fas fa-layer-group"></i> <span>Feed</span></li>
+                    <li className={activeTab === 'activities' ? 'active' : ''} onClick={() => setActiveTab('activities')}><i className="fas fa-tasks"></i> <span>Activities</span></li>
+                    <li className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}><i className="fas fa-users"></i> <span>Members</span></li>
                 </ul>
                 <div style={{ width: '130px' }}></div>
             </nav>
 
-            <main className="room-container" style={{ position: 'relative', zIndex: 1 }}>
-                <div className="class-banner" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
-                    <h1>{room.section}</h1>
-                    <p>{room.grade}</p>
-                    <i className="fas fa-flask banner-icon"></i>
-                </div>
-
-                {activeTab === 'classwork' && (
-                    <div className="classwork-summary-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '20px 25px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.02)', border: '1px solid #eee', marginBottom: '25px', flexWrap: 'wrap', gap: '20px' }}>
-                        <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+            <main className="room-container" style={{ position: 'relative', zIndex: 1, padding: '30px 20px 50px 20px', maxWidth: '1200px', margin: '0 auto' }}>
+                <div className="modern-room-header" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
+                    <div className="header-info">
+                        {activeTab === 'members' ? (
+                            <>
+                                <h1>Class Members</h1>
+                                <p>View who students are in this class here.</p>
+                            </>
+                        ) : activeTab === 'activities' ? (
+                            <>
+                                <h1>Class Activities</h1>
+                                <p>Assign a quiz or create a new activity here.</p>
+                            </>
+                        ) : (
+                            <>
+                                <h1>{room.section}</h1>
+                                <p>{room.grade}</p>
+                            </>
+                        )}
+                    </div>
+                    
+                    {activeTab === 'feed' && (
+                        <div className="header-actions">
+                            <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold', opacity: 0.9 }}>Class Code</p>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-book"></i></div>
-                                <div>
-                                    <p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Modules</p>
-                                    <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#2d3436' }}>{classwork.filter(cw => cw.type === 'module').length}</p>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#fceae9', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-clipboard-check"></i></div>
-                                <div>
-                                    <p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Assessments</p>
-                                    <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#2d3436' }}>{classwork.filter(cw => cw.type === 'assessment').length}</p>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', borderLeft: '2px solid #f0f2f5', paddingLeft: '30px' }}>
-                                <div>
-                                    <p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Total Items</p>
-                                    <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#6e45e2' }}>{classwork.length}</p>
-                                </div>
+                                <p style={{ fontSize: '2.2rem', fontWeight: '800', margin: 0, letterSpacing: '3px', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+                                    {room.classCode || roomId.substring(roomId.length - 6).toUpperCase()}
+                                </p>
+                                <button 
+                                    onClick={handleCopyCode} 
+                                    style={{ background: isCopied ? '#1dd1a1' : 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem', width: '45px', height: '45px', borderRadius: '12px', transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                                    title="Copy Class Code"
+                                >
+                                    <i className={isCopied ? "fas fa-check" : "far fa-copy"}></i>
+                                </button>
                             </div>
                         </div>
-                        <button className="btn-primary" onClick={() => setIsCwModalOpen(true)}><i className="fas fa-plus"></i> Create</button>
-                    </div>
-                )}
+                    )}
+                    <i className={`fas ${activeTab === 'members' ? 'fa-users' : activeTab === 'activities' ? 'fa-tasks' : 'fa-flask'}`} style={{ position: 'absolute', right: '-20px', bottom: '-40px', fontSize: '14rem', opacity: 0.1, transform: 'rotate(-15deg)' }}></i>
+                </div>
 
-                <div className="content-layout">
-                    <aside className="side-panel">
-                        {(activeTab === 'stream' || activeTab === 'classwork') && (
-                            <div className="info-box">
-                                <h3>Class Code</h3>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
-                                    <p style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#6e45e2', letterSpacing: '2px', margin: 0 }}>
-                                        {room.classCode || roomId.substring(roomId.length - 6).toUpperCase()}
-                                    </p>
-                                    <button 
-                                        onClick={handleCopyCode} 
-                                        style={{ background: isCopied ? '#e3fdf5' : '#f0f2f5', border: 'none', color: isCopied ? '#10ac84' : '#888', cursor: 'pointer', fontSize: '1.1rem', width: '40px', height: '40px', borderRadius: '10px', transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
-                                        title="Copy Class Code"
-                                    >
-                                        <i className={isCopied ? "fas fa-check" : "far fa-copy"}></i>
-                                    </button>
+                <div className="modern-feed-container">
+                    {activeTab === 'activities' && (
+                        <div className="classwork-summary-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '20px 25px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', border: '1px solid #eee', marginBottom: '10px', flexWrap: 'wrap', gap: '20px' }}>
+                            <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#fcf3f2', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-tasks"></i></div>
+                                    <div>
+                                        <p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Custom Quizzes</p>
+                                        <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#2d3436' }}>{classwork.filter(cw => cw.assessmentType === 'custom').length}</p>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#fffdf7', color: '#f39c12', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-stopwatch"></i></div>
+                                    <div>
+                                        <p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Time Attacks</p>
+                                        <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#2d3436' }}>{classwork.filter(cw => cw.assessmentType === 'time_attack').length}</p>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', borderLeft: '2px solid #f0f2f5', paddingLeft: '30px' }}>
+                                    <div>
+                                        <p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Total Activities</p>
+                                        <p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#6e45e2' }}>{classwork.length}</p>
+                                    </div>
                                 </div>
                             </div>
-                        )}
-                        {activeTab === 'people' && (
-                            <div className="info-box" style={{ textAlign: 'center' }}>
-                                <i className="fas fa-users" style={{ fontSize: '3rem', color: '#e1e1e1', marginBottom: '10px' }}></i>
-                                <h3 style={{ marginBottom: '5px' }}>Class Roster</h3>
-                                <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>Manage your students and co-teachers here.</p>
-                            </div>
-                        )}
-                    </aside>
-                    <section className="main-panel">
-                        {activeTab === 'stream' && renderStream()}
-                        {activeTab === 'classwork' && renderClasswork()}
-                        {activeTab === 'people' && renderPeople()}
-                    </section>
+                            <button className="btn-primary" onClick={() => setIsCwModalOpen(true)} style={{ borderRadius: '12px' }}><i className="fas fa-plus"></i> Create</button>
+                        </div>
+                    )}
+                    
+                        {activeTab === 'feed' && renderFeed()}
+                        {activeTab === 'activities' && renderActivities()}
+                        {activeTab === 'members' && renderMembers()}
                 </div>
             </main>
 
@@ -644,16 +939,8 @@ export default function TeacherRoom() {
                                 <button type="button" title="Attach file" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                                     <i className="fas fa-paperclip"></i>
                                 </button>
-                                <button type="button" title="Add link" onClick={() => { 
-                                    const url = window.prompt("Enter the URL to share:"); 
-                                    if (url) setPostContent(prev => prev + (prev.endsWith(' ') ? '' : ' ') + url + ' '); 
-                                }}>
+                                    <button type="button" title="Add link" onClick={() => { setLinkTarget('create'); setLinkInput(''); setIsLinkModalOpen(true); }}>
                                     <i className="fas fa-link"></i>
-                                </button>
-                                <button type="button" title="Format text" onClick={() => {
-                                    setPostContent(prev => prev + (prev.endsWith(' ') ? '' : ' ') + '**bold text** ');
-                                }}>
-                                    <i className="fas fa-bold"></i>
                                 </button>
                                 </div>
                                 <div className="modal-actions" style={{ marginTop: 0 }}>
@@ -676,7 +963,7 @@ export default function TeacherRoom() {
                         <form onSubmit={handleCreateClasswork}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
                                 <div 
-                                    onClick={() => { setAssessmentType('time_attack'); setCwTitle('Time Attack Challenge'); setCwDesc('Play the Time Attack mode and try to beat the high score!'); setAttachment(null); }}
+                                    onClick={() => { setAssessmentType('time_attack'); setCwTitle(''); setCwDesc(''); setAttachment(null); }}
                                     style={{ padding: '20px', border: assessmentType === 'time_attack' ? '2px solid #f39c12' : '2px solid #eee', borderRadius: '12px', cursor: 'pointer', background: assessmentType === 'time_attack' ? '#fffdf7' : '#fff', transition: 'all 0.2s', textAlign: 'center' }}
                                 >
                                     <i className="fas fa-stopwatch" style={{ fontSize: '2rem', color: '#f39c12', marginBottom: '10px' }}></i>
@@ -701,40 +988,28 @@ export default function TeacherRoom() {
                             </div>
 
                             {assessmentType === 'custom' && (
-                                <>
-                                <div className="input-group">
-                                    {!attachment ? (
-                                        <button type="button" onClick={() => fileInputRef.current?.click()} style={{ width: '100%', padding: '12px', background: '#f8f9fa', border: '1px dashed #ccc', borderRadius: '8px', color: '#666', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: '600', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#6e45e2'; e.currentTarget.style.color = '#6e45e2'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#ccc'; e.currentTarget.style.color = '#666'; }}>
-                                            <i className="fas fa-paperclip"></i> Attach File Reference (Optional)
-                                        </button>
-                                    ) : (
-                                        <div style={{ padding: '10px 15px', background: '#f8f9fa', border: '1px solid #e1e1e1', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.9rem', color: '#333', display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                <i className={`fas ${attachment.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`} style={{ color: '#6e45e2', fontSize: '1.2rem' }}></i> 
-                                                {attachment.name}
-                                            </span>
-                                            <button type="button" onClick={() => setAttachment(null)} style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1.1rem' }}><i className="fas fa-times"></i></button>
-                                        </div>
-                                    )}
-                                </div>
                                 
-                                <div className="quiz-builder" style={{ marginTop: '20px', borderTop: '2px solid #f0f2f5', paddingTop: '20px', marginBottom: '20px' }}>
+                                <div className="quiz-builder" style={{ marginTop: '5px', marginBottom: '20px' }}>
                                     <h3 style={{ color: '#2d3436', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <i className="fas fa-question-circle" style={{ color: '#e74c3c' }}></i> Quiz Questions
                                     </h3>
                                     {quizQuestions.map((q, qIndex) => (
-                                        <div key={qIndex} style={{ background: '#fdfdfd', padding: '15px', borderRadius: '12px', border: '1px solid #e1e1e1', marginBottom: '15px', position: 'relative', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' }}>
-                                            {quizQuestions.length > 1 && (
-                                                <button type="button" onClick={() => removeQuestion(qIndex)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1.1rem' }} title="Remove Question"><i className="fas fa-trash-alt"></i></button>
-                                            )}
-                                            <div className="input-group" style={{ marginBottom: '15px', paddingRight: quizQuestions.length > 1 ? '30px' : '0' }}>
+                                        <div key={q.id || qIndex} style={{ background: '#fdfdfd', padding: '15px', borderRadius: '12px', border: '1px solid #e1e1e1', marginBottom: '15px', position: 'relative', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' }}>
+                                            <div style={{ position: 'absolute', top: '15px', right: '15px', display: 'flex', gap: '12px', zIndex: 10 }}>
+                                                {quizQuestions.length > 1 && (
+                                                    <button type="button" onClick={(e) => { e.preventDefault(); removeQuestion(qIndex); }} style={{ background: '#fff0f0', border: 'none', color: '#e74c3c', width: '35px', height: '35px', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'all 0.2s', fontSize: '1rem' }} title="Remove Question" onMouseEnter={e => { e.currentTarget.style.background = '#e74c3c'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff0f0'; e.currentTarget.style.color = '#e74c3c'; }}>
+                                                        <i className="fas fa-trash-alt" style={{ pointerEvents: 'none' }}></i>
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="input-group" style={{ marginBottom: '15px', paddingRight: '90px' }}>
                                                 <input type="text" value={q.question} onChange={e => handleQuestionChange(qIndex, 'question', e.target.value)} placeholder={`Question ${qIndex + 1}`} required style={{ fontWeight: 'bold', fontSize: '1.05rem', border: 'none', borderBottom: '2px solid #ddd', borderRadius: 0, background: 'transparent', padding: '10px 0' }} />
                                             </div>
                                             <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '8px', fontWeight: '600' }}>Select the correct answer:</p>
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                                 {q.options.map((opt, oIndex) => (
                                                     <div key={oIndex} style={{ display: 'flex', alignItems: 'center', background: '#fff', border: q.correctOption === oIndex ? '2px solid #1dd1a1' : '1px solid #ddd', borderRadius: '8px', padding: '5px 10px', transition: 'all 0.2s', boxShadow: q.correctOption === oIndex ? '0 2px 8px rgba(29, 209, 161, 0.2)' : 'none' }}>
-                                                        <input type="radio" name={`correct-${qIndex}`} checked={q.correctOption === oIndex} onChange={() => handleQuestionChange(qIndex, 'correctOption', oIndex)} style={{ marginRight: '8px', cursor: 'pointer', accentColor: '#1dd1a1', width: '18px', height: '18px' }} />
+                                                        <input type="radio" name={`correct-${q.id}`} checked={q.correctOption === oIndex} onChange={() => handleQuestionChange(qIndex, 'correctOption', oIndex)} style={{ marginRight: '8px', cursor: 'pointer', accentColor: '#1dd1a1', width: '18px', height: '18px' }} />
                                                         <input type="text" value={opt} onChange={e => handleOptionChange(qIndex, oIndex, e.target.value)} placeholder={`Option ${String.fromCharCode(65 + oIndex)}`} required style={{ border: 'none', outline: 'none', width: '100%', background: 'transparent', fontSize: '0.95rem' }} />
                                                     </div>
                                                 ))}
@@ -745,7 +1020,6 @@ export default function TeacherRoom() {
                                         <i className="fas fa-plus"></i> Add Another Question
                                     </button>
                                 </div>
-                                </>
                             )}
 
                             <div className="modal-actions">
@@ -795,16 +1069,8 @@ export default function TeacherRoom() {
                                     <button type="button" title="Attach file" onClick={() => alert("Editing attachments will be supported in a future update!")}>
                                         <i className="fas fa-paperclip"></i>
                                     </button>
-                                    <button type="button" title="Add link" onClick={() => { 
-                                        const url = window.prompt("Enter the URL to share:"); 
-                                        if (url) setEditPostContent(prev => prev + (prev.endsWith(' ') ? '' : ' ') + url + ' '); 
-                                    }}>
+                                        <button type="button" title="Add link" onClick={() => { setLinkTarget('edit'); setLinkInput(''); setIsLinkModalOpen(true); }}>
                                         <i className="fas fa-link"></i>
-                                    </button>
-                                    <button type="button" title="Format text" onClick={() => {
-                                        setEditPostContent(prev => prev + (prev.endsWith(' ') ? '' : ' ') + '**bold text** ');
-                                    }}>
-                                        <i className="fas fa-bold"></i>
                                     </button>
                                 </div>
                                 <div className="modal-actions" style={{ marginTop: 0 }}>
@@ -827,6 +1093,135 @@ export default function TeacherRoom() {
                         <div className="modal-actions">
                             <button className="btn-cancel" onClick={() => setIsDeletePostModalOpen(false)}>Cancel</button>
                             <button className="btn-confirm" onClick={handleConfirmDeletePost} style={{ backgroundColor: '#e74c3c' }}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Classwork/Activity Modal */}
+            {isDeleteCwModalOpen && selectedCw && (
+                <div className="modal-container show" onClick={() => setIsDeleteCwModalOpen(false)}>
+                    <div className="modal-content" style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <i className="fas fa-exclamation-triangle modal-icon-box" style={{ color: '#e74c3c' }}></i>
+                        <h2 style={{ marginBottom: '10px' }}>Delete Activity</h2>
+                        <p style={{ color: '#666', marginBottom: '20px' }}>Are you sure you want to delete <strong>{selectedCw.title}</strong>? This action cannot be undone.</p>
+                        <div className="modal-actions">
+                            <button className="btn-cancel" onClick={() => setIsDeleteCwModalOpen(false)}>Cancel</button>
+                            <button className="btn-confirm" onClick={handleConfirmDeleteClasswork} style={{ backgroundColor: '#e74c3c' }}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Activity Submissions Report Modal */}
+            {isReportModalOpen && selectedReportCw && (
+                <div className="modal-container show" onClick={() => setIsReportModalOpen(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px' }}>
+                            <h2 style={{ margin: 0, color: '#2d3436' }}><i className="fas fa-chart-bar" style={{ color: '#4facfe', marginRight: '10px' }}></i> Submissions</h2>
+                            <button className="close-modal" onClick={() => setIsReportModalOpen(false)} style={{ position: 'static' }}>&times;</button>
+                        </div>
+                        <p style={{ color: '#666', marginBottom: '20px', fontWeight: '600', fontSize: '1.1rem' }}>{selectedReportCw.title}</p>
+
+                        {!selectedReportCw.submissions || selectedReportCw.submissions.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#888' }}>
+                                <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#e1e1e1', marginBottom: '15px' }}></i>
+                                <p>No students have submitted this activity yet.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                {selectedReportCw.submissions.sort((a,b) => b.score - a.score).map((sub, idx) => (
+                                    <div key={idx} style={{ background: '#fdfdfd', border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden' }}>
+                                        <div 
+                                            onClick={() => setExpandedStudentId(expandedStudentId === sub.studentId ? null : sub.studentId)}
+                                            style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: expandedStudentId === sub.studentId ? '#f8faff' : 'transparent', transition: 'background 0.2s' }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                                                    {sub.studentName.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <span style={{ fontWeight: '600', color: '#2d3436', display: 'block', fontSize: '1.05rem' }}>{sub.studentName}</span>
+                                                    <span style={{ fontSize: '0.85rem', color: '#888' }}>Submitted: {new Date(sub.timestamp).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: sub.score >= sub.total / 2 ? '#1dd1a1' : '#e74c3c' }}>{sub.score}/{sub.total}</span>
+                                                    <span style={{ fontSize: '0.8rem', color: '#888', display: 'block', textTransform: 'uppercase', fontWeight: '600' }}>Score</span>
+                                                </div>
+                                                {(selectedReportCw.assessmentType === 'custom' || selectedReportCw.assessmentType === 'time_attack') && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: expandedStudentId === sub.studentId ? '#fff' : '#4facfe', background: expandedStudentId === sub.studentId ? '#4facfe' : '#eaf4ff', padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', transition: 'all 0.2s' }}>
+                                                        View Details <i className={`fas fa-chevron-${expandedStudentId === sub.studentId ? 'up' : 'down'}`}></i>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {expandedStudentId === sub.studentId && selectedReportCw.assessmentType === 'custom' && (
+                                            <div style={{ padding: '20px', borderTop: '1px solid #eee', background: '#fff' }}>
+                                                <h4 style={{ margin: '0 0 15px 0', color: '#555' }}>Detailed Breakdown</h4>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                    {selectedReportCw.questions.map((q, qIdx) => {
+                                                        const studentAnsIdx = sub.answers ? sub.answers[qIdx] : null;
+                                                        const isCorrect = studentAnsIdx === q.correctOption;
+                                                        return (
+                                                            <div key={qIdx} style={{ padding: '12px', borderRadius: '8px', background: isCorrect ? '#f0fdf4' : '#fff0f0', border: `1px solid ${isCorrect ? '#bbf7d0' : '#fecaca'}` }}>
+                                                                <p style={{ margin: '0 0 8px 0', fontWeight: '600', color: '#333' }}>{qIdx + 1}. {q.question}</p>
+                                                                <div style={{ fontSize: '0.95rem', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                                    <span style={{ color: isCorrect ? '#16a34a' : '#ef4444', fontWeight: '500' }}>
+                                                                        <i className={`fas ${isCorrect ? 'fa-check-circle' : 'fa-times-circle'}`} style={{ marginRight: '6px' }}></i>
+                                                                        Student's Answer: {studentAnsIdx !== null && studentAnsIdx !== undefined ? q.options[studentAnsIdx] : <em>No answer</em>}
+                                                                    </span>
+                                                                    {!isCorrect && (
+                                                                        <span style={{ color: '#16a34a', fontWeight: '500' }}>
+                                                                            <i className="fas fa-check-circle" style={{ marginRight: '6px' }}></i>
+                                                                            Correct Answer: {q.options[q.correctOption]}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {expandedStudentId === sub.studentId && selectedReportCw.assessmentType === 'time_attack' && (
+                                            <div style={{ padding: '20px', borderTop: '1px solid #eee', background: '#fff' }}>
+                                                <h4 style={{ margin: '0 0 15px 0', color: '#555' }}>Performance Summary</h4>
+                                                <div style={{ display: 'flex', gap: '20px' }}>
+                                                    <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                                                        <i className="fas fa-check-circle" style={{ fontSize: '2rem', color: '#16a34a', marginBottom: '10px' }}></i>
+                                                        <h3 style={{ margin: 0, color: '#16a34a', fontSize: '1.5rem' }}>{sub.score}</h3>
+                                                        <p style={{ margin: 0, color: '#15803d', fontWeight: '600' }}>Correct Answers</p>
+                                                    </div>
+                                                    <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: '#fff0f0', border: '1px solid #fecaca', textAlign: 'center' }}>
+                                                        <i className="fas fa-times-circle" style={{ fontSize: '2rem', color: '#ef4444', marginBottom: '10px' }}></i>
+                                                        <h3 style={{ margin: 0, color: '#ef4444', fontSize: '1.5rem' }}>{sub.wrong || 0}</h3>
+                                                        <p style={{ margin: 0, color: '#b91c1c', fontWeight: '600' }}>Wrong Answers</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Remove Student Modal */}
+            {isRemoveStudentModalOpen && studentToRemove && (
+                <div className="modal-container show" onClick={() => setIsRemoveStudentModalOpen(false)}>
+                    <div className="modal-content" style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <i className="fas fa-user-minus modal-icon-box" style={{ color: '#e74c3c' }}></i>
+                        <h2 style={{ marginBottom: '10px' }}>Remove Student</h2>
+                        <p style={{ color: '#666', marginBottom: '20px' }}>Are you sure you want to remove <strong>{studentToRemove.name}</strong> from this class?</p>
+                        <div className="modal-actions">
+                            <button className="btn-cancel" onClick={() => setIsRemoveStudentModalOpen(false)}>Cancel</button>
+                            <button className="btn-confirm" onClick={handleConfirmRemoveStudent} style={{ backgroundColor: '#e74c3c' }}>Remove</button>
                         </div>
                     </div>
                 </div>
@@ -872,6 +1267,53 @@ export default function TeacherRoom() {
                             ) : (
                                 <iframe src={previewAttachment.url} title={previewAttachment.name} width="100%" height="100%" style={{ border: 'none', opacity: isPreviewLoading ? 0 : 1, transition: 'opacity 0.3s', position: 'relative', zIndex: 2, background: 'white' }} onLoad={() => setIsPreviewLoading(false)}></iframe>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Link Modal */}
+            {isLinkModalOpen && (
+                <div className="modal-container show" style={{ zIndex: 1100 }} onClick={() => setIsLinkModalOpen(false)}>
+                    <div className="modal-content" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+                        <h2 style={{ marginBottom: '15px', color: '#2d3436' }}>
+                            <i className="fas fa-link" style={{ color: '#4facfe', marginRight: '10px' }}></i>
+                            Add Link
+                        </h2>
+                        <div className="input-group">
+                            <label>URL Address</label>
+                            <input 
+                                type="url" 
+                                placeholder="https://example.com" 
+                                value={linkInput} 
+                                onChange={e => setLinkInput(e.target.value)} 
+                                autoFocus
+                            />
+                        </div>
+                        <div className="modal-actions">
+                            <button type="button" className="btn-cancel" onClick={() => setIsLinkModalOpen(false)}>Cancel</button>
+                            <button type="button" className="btn-confirm" style={{ background: '#4facfe' }} onClick={() => {
+                                if (!linkInput.trim()) return;
+                                const url = linkInput.trim();
+                                if (linkTarget === 'create') setPostContent(prev => prev + (prev.endsWith(' ') || prev === '' ? '' : ' ') + url + ' ');
+                                else setEditPostContent(prev => prev + (prev.endsWith(' ') || prev === '' ? '' : ' ') + url + ' ');
+                                setIsLinkModalOpen(false);
+                            }}>Add Link</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Remove Question Modal */}
+            {isRemoveQuestionModalOpen && (
+                <div className="modal-container show" style={{ zIndex: 10000 }} onClick={() => setIsRemoveQuestionModalOpen(false)}>
+                    <div className="modal-content" style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <i className="fas fa-trash-alt modal-icon-box" style={{ color: '#e74c3c' }}></i>
+                        <h2 style={{ marginBottom: '10px' }}>Remove Question</h2>
+                        <p style={{ color: '#666', marginBottom: '20px' }}>Are you sure you want to remove this question? This action cannot be undone.</p>
+                        <div className="modal-actions">
+                            <button type="button" className="btn-cancel" onClick={() => setIsRemoveQuestionModalOpen(false)}>Cancel</button>
+                            <button type="button" className="btn-confirm" onClick={confirmRemoveQuestion} style={{ backgroundColor: '#e74c3c' }}>Remove</button>
                         </div>
                     </div>
                 </div>

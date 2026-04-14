@@ -705,20 +705,31 @@ export default function TeacherDashboard() {
                             <div 
                                 key={room.id} 
                                 className="room-card" 
-                                onClick={() => navigate(`/teacher-room/${room.id}`)}
+                                style={{ zIndex: activeRoomMenu === room.id ? 50 : 1 }}
                             >
-                                <div className="room-header" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
+                                {/* Clickable overlay for card navigation to completely prevent 3-dot menu conflicts */}
+                                <div 
+                                    className="card-click-overlay"
+                                    onClick={() => navigate(`/teacher-room/${room.id}`)}
+                                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1, cursor: 'pointer', borderRadius: '16px' }}
+                                />
+                                
+                                <div className="room-header" style={{ position: 'relative', zIndex: 10, pointerEvents: 'none', background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
                                     <div className="room-header-text">
                                         <h2>{room.section}</h2>
                                         <p>{room.grade}</p>
                                     </div>
-                                    <div className="menu-container room-menu-container">
-                                        <button className="btn-menu" onClick={(e) => { e.stopPropagation(); setActiveRoomMenu(activeRoomMenu === room.id ? null : room.id); }}>
-                                            <i className="fas fa-ellipsis-v"></i>
+                                    <div 
+                                        className="menu-container room-menu-container" 
+                                        style={{ pointerEvents: 'auto' }}
+                                    >
+                                        <button type="button" className="btn-menu" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveRoomMenu(activeRoomMenu === room.id ? null : room.id); }}>
+                                            <i className="fas fa-ellipsis-v" style={{ pointerEvents: 'none' }}></i>
                                         </button>
                                         {activeRoomMenu === room.id && (
-                                            <div className="dropdown-menu show" style={{ right: 0, top: '40px', width: '150px' }} onClick={e => e.stopPropagation()}>
-                                                <div className="dropdown-item" onClick={() => {
+                                            <div className="dropdown-menu show" style={{ right: 0, top: '50px', width: '150px' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                                <div className="dropdown-item" onClick={(e) => {
+                                                    e.stopPropagation();
                                                     setSelectedRoom(room);
                                                     setEditRoomSection(room.section);
                                                     setEditRoomGrade(room.grade);
@@ -728,7 +739,8 @@ export default function TeacherDashboard() {
                                                 }}>
                                                     <i className="fas fa-edit" style={{ color: '#6e45e2', width: '20px' }}></i> Edit
                                                 </div>
-                                                <div className="dropdown-item danger" onClick={() => {
+                                                <div className="dropdown-item danger" onClick={(e) => {
+                                                    e.stopPropagation();
                                                     setSelectedRoom(room);
                                                     setIsDeleteRoomModalOpen(true);
                                                     setActiveRoomMenu(null);
@@ -739,7 +751,7 @@ export default function TeacherDashboard() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="room-body">
+                                <div className="room-body" style={{ position: 'relative', zIndex: 2, pointerEvents: 'none' }}>
                                     <div className="teacher-info">
                                         <div className="teacher-icon"><i className="fas fa-user"></i></div>
                                         <span>{room.teacherFullName || room.teacher}</span>

@@ -375,7 +375,7 @@ export default function Login() {
                     <button className={`toggle-btn ${!isLoginView ? 'active' : ''}`} onClick={() => setIsLoginView(false)}>Register</button>
                 </div>
                 <div className="form-card">
-                    <h2 id="formTitle">{isLoginView ? 'Hi There, Welcome!' : 'Create Account'}</h2>
+                    <h2 id="formTitle">{isLoginView ? 'Hi there, Welcome!' : 'Create Account'}</h2>
                     <p id="formSubtitle">{isLoginView ? 'Login to continue your learning journey' : 'Join us and start your learning journey today!'}</p>
                     <form id="authForm" onSubmit={handleFormSubmit}>
                         <div id="dynamicFields">{renderFormFields()}</div>
