@@ -517,7 +517,6 @@ export default function Laboratory() {
                                     <div className="element-model-box" style={{ width: '100%', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
                                         <model-viewer
                                             src={`/assets/models/${getModelFilename(resultData.res.name)}.glb`}
-                                            ios-src={`/assets/models/${getModelFilename(resultData.res.name)}.usdz`}
                                             alt={`3D model of ${resultData.res.name}`}
                                             auto-rotate
                                             rotation-per-second="45deg"
