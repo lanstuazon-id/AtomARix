@@ -119,22 +119,28 @@ export default function Laboratory() {
         e.dataTransfer.setData('sym', sym);
     };
 
+    const addToFlask = (sym) => {
+        sndDrop.current.currentTime = 0; 
+        sndDrop.current.play().catch(e => console.warn(e));
+        
+        // Provide haptic feedback for mobile users
+        if (navigator.vibrate) {
+            navigator.vibrate(40);
+        }
+        
+        setCurrentFlask(prev => {
+            const newFlask = [...prev, sym];
+            // Update visual level (max 50% before mixing)
+            setFlaskState({ height: Math.min(newFlask.length * 10, 50), color: '#e0e4e8', mixed: false });
+            return newFlask;
+        });
+    };
+
     const handleDrop = (e) => {
         e.preventDefault();
         setIsDragOver(false);
         const sym = e.dataTransfer.getData('sym');
-        
-        if (sym) {
-            sndDrop.current.currentTime = 0; 
-            sndDrop.current.play().catch(e => console.warn(e));
-            
-            setCurrentFlask(prev => {
-                const newFlask = [...prev, sym];
-                // Update visual level (max 50% before mixing)
-                setFlaskState({ height: Math.min(newFlask.length * 10, 50), color: '#e0e4e8', mixed: false });
-                return newFlask;
-            });
-        }
+        if (sym) addToFlask(sym);
     };
 
     const clearFlask = () => {
@@ -266,6 +272,17 @@ export default function Laboratory() {
         setTimeout(() => { if (container) container.innerHTML = ''; }, 2000);
     };
 
+    const getFlaskFormula = () => {
+        if (currentFlask.length === 0) return "";
+        const counts = {};
+        currentFlask.forEach(s => counts[symToProper(s)] = (counts[symToProper(s)] || 0) + 1);
+        return Object.entries(counts).map(([s, c]) => `${s}${c > 1 ? c : ''}`).join('');
+    };
+
+    const symToProper = (s) => {
+        return baseElements.find(el => el.sym === s)?.sym || s;
+    };
+
     // --- AR Logic ---
     const isMobileDevice = () => {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -358,6 +375,59 @@ export default function Laboratory() {
                         0% { transform: translateY(0) rotate(0deg); }
                         100% { transform: translateY(-120vh) rotate(360deg); }
                     }
+
+                    /* Mobile UX Layout Improvements */
+                    @media (max-width: 850px) {
+                        .lab-layout {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 15px;
+                        }
+                        
+                        /* Keeps the flask and controls at the top while scrolling elements */
+                        .experiment-panel {
+                            position: sticky;
+                            top: 70px; /* Aligned below the navbar */
+                            z-index: 100;
+                            background: white !important;
+                            padding: 15px !important;
+                            border-radius: 20px !important;
+                            box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
+                            margin-bottom: 5px !important;
+                            border: 1px solid #eee;
+                        }
+
+                        .experiment-panel h2 { font-size: 1.1rem !important; }
+                        .experiment-panel .btn-secondary { padding: 5px 10px !important; font-size: 0.75rem !important; }
+                        
+                        /* Compact flask for mobile height constraints */
+                        .flask-dropzone {
+                            transform: scale(0.7);
+                            margin: -35px 0 20px 0 !important;
+                        }
+
+                        .dropzone-wrapper { margin: 5px 0 !important; }
+
+                        .heat-toggle-btn, .pour-toggle-btn {
+                            padding: 8px 12px !important;
+                            font-size: 0.8rem !important;
+                        }
+
+                        .inventory-panel {
+                            background: #fff;
+                            border-radius: 20px;
+                            padding: 20px;
+                        }
+
+                        .hero-banner {
+                            padding: 15px 20px !important;
+                            min-height: unset !important;
+                            margin-bottom: 10px !important;
+                        }
+                        .hero-banner h1 { font-size: 1.3rem !important; margin: 0 !important; }
+                        .hero-banner p { display: none; }
+                        .hero-icon { font-size: 1.5rem !important; }
+                    }
                 `}
             </style>
             <nav className="navbar">
@@ -385,7 +455,7 @@ export default function Laboratory() {
                 <div className="lab-layout">
                     <div className="inventory-panel">
                         <h3 style={{ color: '#2d3436', borderBottom: '2px solid #f0f0f0', paddingBottom: '10px' }}>Element Inventory</h3>
-                        <p style={{ color: '#7f8fa6', fontSize: '0.9rem', marginTop: '10px' }}>Drag elements into the flask</p>
+                        <p style={{ color: '#7f8fa6', fontSize: '0.9rem', marginTop: '10px' }}>Tap or drag elements into the flask</p>
                         <div className="inventory-search">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" value={inventorySearch} onChange={e => setInventorySearch(e.target.value)} placeholder="Search by name or symbol..." />
@@ -393,7 +463,17 @@ export default function Laboratory() {
                         </div>
                         <div className="inventory-grid">
                             {baseElements.filter(el => el.name.toLowerCase().includes(inventorySearch.toLowerCase()) || el.sym.toLowerCase().includes(inventorySearch.toLowerCase())).map(el => (
-                                <div key={el.sym} className="element-drag" draggable onDragStart={(e) => handleDragStart(e, el.sym)} title={el.name} style={{ borderColor: el.color }}>
+                                <div 
+                                    key={el.sym} 
+                                    className="element-drag" 
+                                    draggable 
+                                    onDragStart={(e) => handleDragStart(e, el.sym)} 
+                                    onClick={() => addToFlask(el.sym)}
+                                    title={el.name} 
+                                    style={{ borderColor: el.color, cursor: 'pointer' }}
+                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                >
                                     {el.sym}
                                 </div>
                             ))}
@@ -407,7 +487,18 @@ export default function Laboratory() {
                         </div>
                         
                         <div className="dropzone-wrapper" style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%', margin: '20px 0' }}>
-                            <div className={`flask-dropzone ${isDragOver ? 'dragover' : ''}`} onDrop={handleDrop} onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={() => setIsDragOver(false)} style={{ margin: '0 0 65px 0' }}>
+                            <div 
+                                className={`flask-dropzone ${isDragOver ? 'dragover' : ''} ${resultData.type === 'failed' && showResultModal ? 'shake-animation' : ''}`} 
+                                onDrop={handleDrop} 
+                                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} 
+                                onDragLeave={() => setIsDragOver(false)} 
+                                style={{ margin: '0 0 65px 0', boxShadow: isHeating ? '0 0 25px rgba(255, 107, 107, 0.4)' : 'none', transition: 'box-shadow 0.5s ease' }}
+                            >
+                                {currentFlask.length > 0 && !flaskState.mixed && (
+                                    <div style={{ position: 'absolute', top: '-40px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(110, 69, 226, 0.1)', color: '#6e45e2', padding: '4px 12px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', border: '1px solid rgba(110, 69, 226, 0.2)' }}>
+                                        {getFlaskFormula()}
+                                    </div>
+                                )}
                                 <div className={`flask-liquid ${isHeating ? 'boiling' : ''}`} style={{ height: `${flaskState.height}%`, backgroundColor: flaskState.color }}></div>
                                 <div className="beaker-markings">
                                     <div className="mark"><span className="mark-text">250</span></div><div className="mark"></div>

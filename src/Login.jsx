@@ -22,40 +22,85 @@ export default function Login() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
 
+    // Token state — tracks whether the token came from a URL invite link
+    const [tokenFromUrl, setTokenFromUrl] = useState(false);
+
     // Modal state
     const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'error' });
 
-    // Check for remembered user on component mount
+    // On mount: check for invite token in URL, then check remembered user
     useEffect(() => {
-        const savedUser = localStorage.getItem('rememberedUser');
-        const savedRole = localStorage.getItem('rememberedRole');
-        if (savedUser) {
-            if (savedRole === 'teacher') {
-                setFullname(savedUser);
-                setRole('teacher');
-            } else {
-                setUsername(savedUser);
-                setRole('student');
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get('token');
+
+        if (urlToken) {
+            // Pre-fill token, switch to register view, lock role to teacher
+            setTeacherCode(urlToken);
+            setTokenFromUrl(true);
+            setIsLoginView(false);
+            setRole('teacher');
+        } else {
+            // Normal remembered-user logic
+            const savedUser = localStorage.getItem('rememberedUser');
+            const savedRole = localStorage.getItem('rememberedRole');
+            if (savedUser) {
+                if (savedRole === 'teacher') {
+                    setFullname(savedUser);
+                    setRole('teacher');
+                } else {
+                    setUsername(savedUser);
+                    setRole('student');
+                }
+                setRememberMe(true);
             }
-            setRememberMe(true);
         }
     }, []);
 
+    // ─── Token validator ───────────────────────────────────────────────────────
+    const validateInviteToken = async (token) => {
+        const tokenRef = doc(db, 'teacherInvites', token.trim());
+        const tokenSnap = await getDoc(tokenRef);
+
+        if (!tokenSnap.exists()) {
+            return { valid: false, message: 'Invalid invite token. Please request a new one from your admin.' };
+        }
+
+        const data = tokenSnap.data();
+
+        if (data.used) {
+            return { valid: false, message: 'This invite token has already been used.' };
+        }
+
+        if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
+            return { valid: false, message: 'This invite token has expired. Please request a new one.' };
+        }
+
+        return { valid: true };
+    };
+
+    // ─── Mark token as used after successful registration ─────────────────────
+    const markTokenUsed = async (token, usedByUsername) => {
+        const tokenRef = doc(db, 'teacherInvites', token.trim());
+        await setDoc(tokenRef, {
+            used: true,
+            usedBy: usedByUsername,
+            usedAt: new Date().toISOString()
+        }, { merge: true });
+    };
+
+    // ─── Form submit ──────────────────────────────────────────────────────────
     const handleFormSubmit = async (e) => {
         e.preventDefault();
-        
+
         const actualUsername = (role === 'teacher' ? fullname : username).trim();
         // Create a dummy email for Firebase Auth since it requires an email format
         const authEmail = `${actualUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
 
         if (isLoginView) {
-            // Show loading immediately BEFORE Firebase requests
             setModal({ show: true, title: 'Authenticating...', message: 'Checking credentials...', type: 'loading' });
             try {
-                // Authenticate with Firebase
                 await signInWithEmailAndPassword(auth, authEmail, password);
 
-                // Fetch user details from Firestore
                 const userRef = doc(db, "users", actualUsername);
                 const userSnap = await getDoc(userRef);
 
@@ -66,6 +111,11 @@ export default function Login() {
 
                 const userData = userSnap.data();
 
+                // Block deactivated accounts 
+                if (userData.active === false) {
+                    setModal({ show: true, title: 'Access Denied', message: 'Your account has been deactivated. Please contact your admin.', type: 'error' });
+                    return;
+                }
                 sessionStorage.setItem('loggedInUser', userData.username);
                 sessionStorage.setItem('userRole', userData.role);
                 sessionStorage.setItem('userFullname', userData.fullname);
@@ -79,14 +129,9 @@ export default function Login() {
                 }
 
                 setModal({ show: true, title: 'Success!', message: 'Logging you in...', type: 'loading' });
-                
                 setTimeout(() => {
-                    if (userData.role === 'teacher') {
-                        navigate('/dashboard');
-                    } else {
-                        navigate('/home');
-                    }
-                }, 500); // Reduced delay since they already waited for network
+                    navigate(userData.role === 'teacher' ? '/dashboard' : '/home');
+                }, 500);
             } catch (error) {
                 console.error("Firebase Login Error:", error.code, error.message);
                 let errorMessage = `Invalid username or password. (${error.code})`;
@@ -95,8 +140,10 @@ export default function Login() {
                 if (error.code === 'auth/configuration-not-found') errorMessage = 'Firebase Authentication is not set up. Please click "Get Started" in the Auth tab of your Firebase console.';
                 setModal({ show: true, title: 'Login Failed', message: errorMessage, type: 'error' });
             }
-        } else { // Registration logic
+        } else {
+            // ── Registration ──────────────────────────────────────────────────
             setPasswordError('');
+
             if (password.length < 8) {
                 setPasswordError("Password must be at least 8 characters long.");
                 return;
@@ -106,22 +153,27 @@ export default function Login() {
                 return;
             }
 
+            // Validate invite token for teacher registrations
             if (role === 'teacher') {
-                const VALID_TEACHER_CODE = "CHEM2026";
-                if (teacherCode !== VALID_TEACHER_CODE) {
-                    setModal({ show: true, title: 'Registration Failed', message: 'Invalid Teacher Access Code.', type: 'error' });
+                if (!teacherCode.trim()) {
+                    setModal({ show: true, title: 'Registration Failed', message: 'Please enter your invite token. Ask your admin for one.', type: 'error' });
+                    return;
+                }
+
+                setModal({ show: true, title: 'Validating token...', message: 'Checking your invite token...', type: 'loading' });
+                const tokenCheck = await validateInviteToken(teacherCode);
+
+                if (!tokenCheck.valid) {
+                    setModal({ show: true, title: 'Registration Failed', message: tokenCheck.message, type: 'error' });
                     return;
                 }
             }
 
-            // Show loading immediately BEFORE Firebase requests
             setModal({ show: true, title: 'Creating Account...', message: 'Setting up your profile...', type: 'loading' });
-            
+
             try {
-                // Create account in Firebase Auth
                 await createUserWithEmailAndPassword(auth, authEmail, password);
 
-                // Save user profile details in Firestore
                 const userRef = doc(db, "users", actualUsername);
                 await setDoc(userRef, {
                     fullname: fullname,
@@ -130,11 +182,16 @@ export default function Login() {
                     createdAt: new Date().toISOString()
                 }, { merge: true });
 
+                // Mark the invite token as used so it cannot be reused
+                if (role === 'teacher') {
+                    await markTokenUsed(teacherCode, actualUsername);
+                }
+
                 setModal({ show: true, title: 'Account Created!', message: 'Redirecting to login...', type: 'loading' });
                 setTimeout(() => {
                     setModal({ show: false, title: '', message: '', type: '' });
                     setIsLoginView(true);
-                }, 800); // Reduced delay
+                }, 800);
             } catch (error) {
                 console.error("Firebase Registration Error:", error.code, error.message);
                 let errorMessage = `Error: ${error.message}`;
@@ -147,27 +204,35 @@ export default function Login() {
         }
     };
 
+    // ─── OAuth (Google, etc.) ─────────────────────────────────────────────────
     const handleOAuth = async (provider) => {
-        // Enforce teacher access code during registration
-        if (!isLoginView && role === 'teacher' && teacherCode !== "CHEM2026") {
-            setModal({ show: true, title: 'Registration Failed', message: 'Invalid Teacher Access Code.', type: 'error' });
-            return;
+        // Validate invite token for teacher OAuth registrations
+        if (!isLoginView && role === 'teacher') {
+            if (!teacherCode.trim()) {
+                setModal({ show: true, title: 'Registration Failed', message: 'Please enter your invite token before signing in with Google.', type: 'error' });
+                return;
+            }
+
+            setModal({ show: true, title: 'Validating token...', message: 'Checking your invite token...', type: 'loading' });
+            const tokenCheck = await validateInviteToken(teacherCode);
+
+            if (!tokenCheck.valid) {
+                setModal({ show: true, title: 'Registration Failed', message: tokenCheck.message, type: 'error' });
+                return;
+            }
         }
 
         try {
             const result = await signInWithPopup(auth, provider);
-            
-            // Show loading while syncing to Firestore
+
             setModal({ show: true, title: 'Authenticating...', message: 'Syncing your profile...', type: 'loading' });
             const user = result.user;
-            
-            // Use UID as the document ID for OAuth users to ensure it's completely unique
+
             const userRef = doc(db, "users", user.uid);
             const userSnap = await getDoc(userRef);
 
             let userData;
             if (!userSnap.exists()) {
-                // Registration: First time logging in with this provider
                 userData = {
                     fullname: user.displayName || 'AtomARix User',
                     username: user.uid,
@@ -175,8 +240,12 @@ export default function Login() {
                     createdAt: new Date().toISOString()
                 };
                 await setDoc(userRef, userData);
+
+                // Mark the invite token as used for new OAuth teacher accounts
+                if (role === 'teacher') {
+                    await markTokenUsed(teacherCode, user.uid);
+                }
             } else {
-                // Login: User already exists
                 userData = userSnap.data();
             }
 
@@ -187,7 +256,7 @@ export default function Login() {
             setModal({ show: true, title: 'Success!', message: 'Logging you in...', type: 'loading' });
             setTimeout(() => {
                 navigate(userData.role === 'teacher' ? '/dashboard' : '/home');
-            }, 500); // Reduced delay
+            }, 500);
         } catch (error) {
             console.error("OAuth Error:", error.code, error.message);
             let errorMessage = `Authentication failed. (${error.code})`;
@@ -197,22 +266,33 @@ export default function Login() {
         }
     };
 
+    // ─── Form field renderer ──────────────────────────────────────────────────
     const renderFormFields = () => {
         const roleSelectorJSX = (
             <div className="input-group">
                 <label>I am a:</label>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-                    <button type="button" onClick={() => setRole('student')} style={{ flex: 1, padding: '12px', border: role === 'student' ? '2px solid #4facfe' : '1px solid #e1e1e1', backgroundColor: role === 'student' ? '#eaf4ff' : '#f8f9fa', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', color: role === 'student' ? '#4facfe' : '#666', transition: 'all 0.2s' }}>
+                    <button
+                        type="button"
+                        onClick={() => setRole('student')}
+                        style={{ flex: 1, padding: '12px', border: role === 'student' ? '2px solid #4facfe' : '1px solid #e1e1e1', backgroundColor: role === 'student' ? '#eaf4ff' : '#f8f9fa', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', color: role === 'student' ? '#4facfe' : '#666', transition: 'all 0.2s' }}
+                    >
                         <i className="fas fa-user-graduate" style={{ marginRight: '8px' }}></i> Student
                     </button>
-                    <button type="button" onClick={() => setRole('teacher')} style={{ flex: 1, padding: '12px', border: role === 'teacher' ? '2px solid #6e45e2' : '1px solid #e1e1e1', backgroundColor: role === 'teacher' ? '#f3f0ff' : '#f8f9fa', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', color: role === 'teacher' ? '#6e45e2' : '#666', transition: 'all 0.2s' }}>
+                    <button
+                        type="button"
+                        onClick={() => setRole('teacher')}
+                        // Lock role selector if token came from an invite URL
+                        disabled={tokenFromUrl}
+                        style={{ flex: 1, padding: '12px', border: role === 'teacher' ? '2px solid #6e45e2' : '1px solid #e1e1e1', backgroundColor: role === 'teacher' ? '#f3f0ff' : '#f8f9fa', borderRadius: '10px', cursor: tokenFromUrl ? 'default' : 'pointer', fontWeight: '600', color: role === 'teacher' ? '#6e45e2' : '#666', transition: 'all 0.2s' }}
+                    >
                         <i className="fas fa-chalkboard-teacher" style={{ marginRight: '8px' }}></i> Teacher
                     </button>
                 </div>
             </div>
         );
 
-        // Calculate Password Strength for Registration
+        // Password strength for registration
         let strengthScore = 0;
         if (password) {
             if (password.length > 5) strengthScore += 1;
@@ -220,7 +300,6 @@ export default function Login() {
             if (/\d/.test(password)) strengthScore += 1;
             if (/[A-Z]/.test(password) || /[^A-Za-z0-9]/.test(password)) strengthScore += 1;
         }
-        // If there's a password, give it a minimum width of 15% so the red bar is visible
         const strengthWidth = password ? `${Math.max(15, (strengthScore / 4) * 100)}%` : '0%';
         const strengthColor = strengthScore <= 1 ? '#ff4b2b' : strengthScore === 2 ? '#feca57' : strengthScore === 3 ? '#1dd1a1' : '#10ac84';
 
@@ -259,6 +338,8 @@ export default function Login() {
                 </>
             );
         }
+
+        // ── Registration fields ───────────────────────────────────────────────
         return (
             <>
                 <div className="input-group">
@@ -269,7 +350,41 @@ export default function Login() {
                     </div>
                 </div>
                 {roleSelectorJSX}
-                {role === 'teacher' && <div className="input-group"><label htmlFor="teacherCode">Teacher Access Code</label><input type="text" id="teacherCode" value={teacherCode} onChange={e => setTeacherCode(e.target.value)} placeholder="Enter your access code" required /></div>}
+
+                {/* Invite token field — shown only for teacher registration */}
+                {role === 'teacher' && (
+                    <div className="input-group">
+                        <label htmlFor="teacherCode">
+                            Invite Token
+                            {tokenFromUrl && (
+                                <span style={{ marginLeft: '8px', fontSize: '12px', color: '#10ac84', fontWeight: 500 }}>
+                                    <i className="fas fa-check-circle" style={{ marginRight: '4px' }}></i>Token applied from invite link
+                                </span>
+                            )}
+                        </label>
+                        <div className="input-icon-wrapper">
+                            <input
+                                type="text"
+                                id="teacherCode"
+                                value={teacherCode}
+                                onChange={e => setTeacherCode(e.target.value)}
+                                placeholder="e.g. TK-A3F9X2"
+                                readOnly={tokenFromUrl}
+                                style={tokenFromUrl ? { backgroundColor: '#f0fff8', color: '#10ac84', cursor: 'default' } : {}}
+                                required
+                            />
+                            {!tokenFromUrl && teacherCode && (
+                                <i className="fas fa-times-circle clear-icon" onClick={() => setTeacherCode('')} title="Clear"></i>
+                            )}
+                        </div>
+                        {!tokenFromUrl && (
+                            <small style={{ color: '#999', marginTop: '4px', display: 'block' }}>
+                                Ask your admin for an invite token or link.
+                            </small>
+                        )}
+                    </div>
+                )}
+
                 {role === 'student' && (
                     <div className="input-group">
                         <label htmlFor="username">Username</label>
@@ -279,6 +394,7 @@ export default function Login() {
                         </div>
                     </div>
                 )}
+
                 <div className="input-group">
                     <label htmlFor="password">Create Password</label>
                     <div className="password-wrapper">
@@ -301,7 +417,7 @@ export default function Login() {
         );
     };
 
-    // Array of floating items (icons and text) for the animated background
+    // ─── Floating chemistry background ────────────────────────────────────────
     const floatingItems = [
         { id: 1, icon: 'fas fa-atom', left: '10%', animDuration: '15s', delay: '0s', size: '3rem' },
         { id: 2, icon: 'fas fa-flask', left: '30%', animDuration: '20s', delay: '2s', size: '2.5rem' },
@@ -320,12 +436,12 @@ export default function Login() {
             {/* Floating Chemistry Background */}
             <div className="floating-background">
                 {floatingItems.map(item => (
-                    <div 
-                        key={item.id} 
-                        className="floating-item" 
-                        style={{ 
-                            left: item.left, 
-                            animationDuration: item.animDuration, 
+                    <div
+                        key={item.id}
+                        className="floating-item"
+                        style={{
+                            left: item.left,
+                            animationDuration: item.animDuration,
                             animationDelay: item.delay,
                             fontSize: item.size,
                             fontWeight: item.fontWeight || 'normal'

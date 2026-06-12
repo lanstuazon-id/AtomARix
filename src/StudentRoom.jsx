@@ -227,7 +227,7 @@ export default function StudentRoom() {
         ];
         
         const qType = qTypes[Math.floor(Math.random() * qTypes.length)];
-        setTaQuestion(qType);
+        setTaQuestion({ ...qType, elName: el.name });
 
         let newOptions = [qType.correct];
         while (newOptions.length < 4) {
@@ -842,6 +842,16 @@ export default function StudentRoom() {
                                     </div>
                                 </div>
                                 <h3 style={{ fontSize: '1.2rem', color: '#666', marginBottom: '10px', fontWeight: 'normal' }}>{taQuestion.text}</h3>
+                                {taQuestion.text.includes('atomic number') && (
+                                    <div className="question-image-container" style={{ width: '130px', height: '130px', margin: '0 auto 15px', borderRadius: '12px', overflow: 'hidden', border: '3px solid #f0f2f5', background: '#fff', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+                                        <img 
+                                            src={`/assets/elements/${taQuestion.elName.toLowerCase()}.jpg`} 
+                                            alt={taQuestion.elName} 
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            onError={(e) => e.target.parentElement.style.display = 'none'}
+                                        />
+                                    </div>
+                                )}
                                 <h2 style={{ fontSize: '2.5rem', color: '#2d3436', marginBottom: '30px' }}>{taQuestion.subject}</h2>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                     {taOptions.map((opt, i) => (

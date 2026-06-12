@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './PeriodicTable.css';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -127,6 +127,7 @@ const elementData = {
 
 export default function PeriodicTable() {
     const navigate = useNavigate();
+    const location = useLocation();
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
     const storageKey = `learnedElements_${currentUser}`;
 
@@ -139,6 +140,7 @@ export default function PeriodicTable() {
     const [learningFilter, setLearningFilter] = useState('none'); // 'none', 'learned', 'not-learned'
     const [isExpandedTable, setIsExpandedTable] = useState(false);
     const [showDesktopAr, setShowDesktopAr] = useState(false);
+    const [reviewElements, setReviewElements] = useState(location.state?.highlightElements || []);
     const [qrUrl, setQrUrl] = useState('');
 
     // Auto-scroll to highlighted element in full screen mode
@@ -254,6 +256,12 @@ export default function PeriodicTable() {
             } else {
                 opacity = '0.15';
             }
+        } else if (reviewElements.length > 0) {
+            if (reviewElements.includes(symbol)) {
+                highlighted = true;
+            } else {
+                opacity = '0.15';
+            }
         } else if (learningFilter !== 'none') {
             const isLearned = learnedElements.has(symbol);
             if ((learningFilter === 'learned' && isLearned) || (learningFilter === 'not-learned' && !isLearned)) {
@@ -272,6 +280,7 @@ export default function PeriodicTable() {
         setActiveCategory(category);
         setLearningFilter('none');
         setSearchTerm('');
+        setReviewElements([]);
     };
 
     const handleLearningFilterClick = (type) => {
@@ -279,12 +288,14 @@ export default function PeriodicTable() {
         setLearningFilter(newFilter);
         setActiveCategory('all');
         setSearchTerm('');
+        setReviewElements([]);
     };
 
     const handleSearchChange = (e) => {
         setSearchTerm(e.target.value);
         setLearningFilter('none');
         setActiveCategory('all');
+        setReviewElements([]);
     };
 
     const filterCategories = ["all", "alkali-metal", "alkaline-earth", "nonmetal", "noble-gas", "transition-metal", "post-transition", "metalloid", "lanthanide", "actinide"];
@@ -375,6 +386,15 @@ export default function PeriodicTable() {
                             {searchTerm && <i className="fas fa-times clear-search-icon" style={{ display: 'block' }} onClick={() => setSearchTerm('')} title="Clear Search"></i>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            {reviewElements.length > 0 && (
+                                <button 
+                                    className="learn-filter-btn" 
+                                    style={{ background: '#6e45e2', color: 'white', borderColor: '#6e45e2' }}
+                                    onClick={() => setReviewElements([])}
+                                >
+                                    <i className="fas fa-times-circle"></i> Clear Review
+                                </button>
+                            )}
                             <div className="learn-filters" style={{ display: 'flex', gap: '10px' }}>
                                 <button className={`learn-filter-btn ${learningFilter === 'learned' ? 'active-learned' : ''}`} onClick={() => handleLearningFilterClick('learned')}><i className="fas fa-check-circle"></i> Learned</button>
                                 <button className={`learn-filter-btn ${learningFilter === 'not-learned' ? 'active-not-learned' : ''}`} onClick={() => handleLearningFilterClick('not-learned')}><i className="fas fa-circle"></i> Not Yet Learned</button>

@@ -5,21 +5,42 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
 const elements = [
-    { sym: 'H', name: 'Hydrogen', n: 1 }, { sym: 'He', name: 'Helium', n: 2 }, { sym: 'Li', name: 'Lithium', n: 3 },
-    { sym: 'Be', name: 'Beryllium', n: 4 }, { sym: 'B', name: 'Boron', n: 5 }, { sym: 'C', name: 'Carbon', n: 6 },
-    { sym: 'N', name: 'Nitrogen', n: 7 }, { sym: 'O', name: 'Oxygen', n: 8 }, { sym: 'F', name: 'Fluorine', n: 9 },
-    { sym: 'Ne', name: 'Neon', n: 10 }, { sym: 'Na', name: 'Sodium', n: 11 }, { sym: 'Mg', name: 'Magnesium', n: 12 },
-    { sym: 'Al', name: 'Aluminium', n: 13 }, { sym: 'Si', name: 'Silicon', n: 14 }, { sym: 'P', name: 'Phosphorus', n: 15 },
-    { sym: 'S', name: 'Sulfur', n: 16 }, { sym: 'Cl', name: 'Chlorine', n: 17 }, { sym: 'Ar', name: 'Argon', n: 18 },
-    { sym: 'K', name: 'Potassium', n: 19 }, { sym: 'Ca', name: 'Calcium', n: 20 }, { sym: 'Fe', name: 'Iron', n: 26 },
-    { sym: 'Cu', name: 'Copper', n: 29 }, { sym: 'Zn', name: 'Zinc', n: 30 }, { sym: 'Ag', name: 'Silver', n: 47 },
-    { sym: 'Au', name: 'Gold', n: 79 }, { sym: 'Hg', name: 'Mercury', n: 80 }, { sym: 'Pb', name: 'Lead', n: 82 },
-    { sym: 'U', name: 'Uranium', n: 92 }, { sym: 'Pt', name: 'Platinum', n: 78 }, { sym: 'Ni', name: 'Nickel', n: 28 }
+    { sym: 'H', name: 'Hydrogen', n: 1, cat: 'nonmetal', fact: 'The most abundant element in the universe' },
+    { sym: 'He', name: 'Helium', n: 2, cat: 'noble-gas', fact: 'Inhaling it makes your voice high-pitched' },
+    { sym: 'Li', name: 'Lithium', n: 3, cat: 'alkali-metal', fact: 'The lightest metal, used in phone batteries' },
+    { sym: 'Be', name: 'Beryllium', n: 4, cat: 'alkaline-earth', fact: 'Used in aerospace and high-tech equipment' },
+    { sym: 'B', name: 'Boron', n: 5, cat: 'metalloid', fact: 'Used in heat-resistant glass like Pyrex' },
+    { sym: 'C', name: 'Carbon', n: 6, cat: 'nonmetal', fact: 'The basic building block for all life on Earth' },
+    { sym: 'N', name: 'Nitrogen', n: 7, cat: 'nonmetal', fact: 'Makes up about 78% of the air we breathe' },
+    { sym: 'O', name: 'Oxygen', n: 8, cat: 'nonmetal', fact: 'The gas essential for humans to breathe' },
+    { sym: 'F', name: 'Fluorine', n: 9, cat: 'nonmetal', fact: 'The most reactive element, found in toothpaste' },
+    { sym: 'Ne', name: 'Neon', n: 10, cat: 'noble-gas', fact: 'Glows reddish-orange in bright advertising signs' },
+    { sym: 'Na', name: 'Sodium', n: 11, cat: 'alkali-metal', fact: 'A soft metal that explodes when it touches water' },
+    { sym: 'Mg', name: 'Magnesium', n: 12, cat: 'alkaline-earth', fact: 'Burns with a blindingly bright white light' },
+    { sym: 'Al', name: 'Aluminium', n: 13, cat: 'post-transition', fact: 'Lightweight metal used in soda cans and foil' },
+    { sym: 'Si', name: 'Silicon', n: 14, cat: 'metalloid', fact: 'The main ingredient in computer chips and sand' },
+    { sym: 'P', name: 'Phosphorus', n: 15, cat: 'nonmetal', fact: 'Used in match heads and fertilizers' },
+    { sym: 'S', name: 'Sulfur', n: 16, cat: 'nonmetal', fact: 'A yellow element that smells like rotten eggs' },
+    { sym: 'Cl', name: 'Chlorine', n: 17, cat: 'nonmetal', fact: 'Used to keep swimming pools clean' },
+    { sym: 'Ar', name: 'Argon', n: 18, cat: 'noble-gas', fact: 'An inert gas used inside incandescent light bulbs' },
+    { sym: 'K', name: 'Potassium', n: 19, cat: 'alkali-metal', fact: 'Vital nutrient found in bananas' },
+    { sym: 'Ca', name: 'Calcium', n: 20, cat: 'alkaline-earth', fact: 'Essential for strong bones and teeth' },
+    { sym: 'Fe', name: 'Iron', n: 26, cat: 'transition-metal', fact: 'Main ingredient in steel and found in blood' },
+    { sym: 'Cu', name: 'Copper', n: 29, cat: 'transition-metal', fact: 'Red metal used in electrical wiring' },
+    { sym: 'Zn', name: 'Zinc', n: 30, cat: 'transition-metal', fact: 'Used to galvanize steel to prevent rust' },
+    { sym: 'Ag', name: 'Silver', n: 47, cat: 'transition-metal', fact: 'The best conductor of electricity' },
+    { sym: 'Au', name: 'Gold', n: 79, cat: 'transition-metal', fact: 'The most malleable metal, valued for jewelry' },
+    { sym: 'Hg', name: 'Mercury', n: 80, cat: 'transition-metal', fact: 'A liquid metal used in old thermometers' },
+    { sym: 'Pb', name: 'Lead', n: 82, cat: 'post-transition', fact: 'Dense metal effective at blocking radiation' },
+    { sym: 'U', name: 'Uranium', n: 92, cat: 'actinide', fact: 'Fuel used in nuclear power plants' },
+    { sym: 'Pt', name: 'Platinum', n: 78, cat: 'transition-metal', fact: 'Rare metal used in catalytic converters' },
+    { sym: 'Ni', name: 'Nickel', n: 28, cat: 'transition-metal', fact: 'Commonly used in stainless steel and coins' }
 ];
 
 export default function TimeAttack() {
     const navigate = useNavigate();
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
+    const containerRef = useRef(null);
     const highScoreKey = `timeAttackBestCorrect_${currentUser}`;
     const srsKey = `timeAttackSRS_${currentUser}`;
 
@@ -33,6 +54,7 @@ export default function TimeAttack() {
     const [currentElement, setCurrentElement] = useState(null);
     const [question, setQuestion] = useState({ text: '', subject: '', correct: '' });
     const [options, setOptions] = useState([]);
+    const [lastElementSym, setLastElementSym] = useState('');
     const [answeredState, setAnsweredState] = useState({ selected: null, isAnswering: false });
     
     // Tracking State
@@ -49,20 +71,41 @@ export default function TimeAttack() {
         setElementWeights(initWeights);
     }, [srsKey]);
 
-    // Sync high score from cloud in real-time
+    // Handle Scroll Locking and Fullscreen cleanup
+    useEffect(() => {
+        if (gameState === 'playing') {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [gameState]);
+
+    // Sync high score and SRS progress from cloud in real-time
     useEffect(() => {
         const userRef = doc(db, "users", currentUser);
         const unsubscribe = onSnapshot(userRef, (userSnap) => {
-            if (userSnap.exists() && userSnap.data().timeAttackBestCorrect !== undefined) {
-                const cloudScore = userSnap.data().timeAttackBestCorrect;
-                const localScore = parseInt(localStorage.getItem(highScoreKey) || '0', 10);
-                if (cloudScore > localScore) {
-                    localStorage.setItem(highScoreKey, cloudScore.toString());
+            if (userSnap.exists()) {
+                const data = userSnap.data();
+                
+                // Sync High Score
+                if (data.timeAttackBestCorrect !== undefined) {
+                    const cloudScore = data.timeAttackBestCorrect;
+                    const localScore = parseInt(localStorage.getItem(highScoreKey) || '0', 10);
+                    if (cloudScore > localScore) {
+                        localStorage.setItem(highScoreKey, cloudScore.toString());
+                    }
+                }
+
+                // Sync SRS Weights
+                if (data.timeAttackSRS) {
+                    localStorage.setItem(srsKey, JSON.stringify(data.timeAttackSRS));
+                    setElementWeights(data.timeAttackSRS);
                 }
             }
-        }, (e) => console.error("Error syncing time attack score:", e));
+        }, (e) => console.error("Error syncing time attack data:", e));
         return () => unsubscribe();
-    }, [currentUser, highScoreKey]);
+    }, [currentUser, highScoreKey, srsKey]);
 
     // Timer Logic
     useEffect(() => {
@@ -86,23 +129,36 @@ export default function TimeAttack() {
     };
 
     const generateQuestion = (weights) => {
-        const el = getNextElementBySRS(weights);
+        let el = getNextElementBySRS(weights);
+        
+        // Avoid immediate repetition of the same element
+        if (el.sym === lastElementSym && elements.length > 1) {
+            el = getNextElementBySRS(weights);
+        }
         setCurrentElement(el);
+        setLastElementSym(el.sym);
         
         const qTypes = [
             { text: "What is the symbol for", subject: el.name, correct: el.sym, field: 'sym' },
             { text: "Which element has the symbol", subject: el.sym, correct: el.name, field: 'name' },
             { text: "What is the atomic number of", subject: el.name, correct: el.n.toString(), field: 'n' },
-            { text: "Which element has atomic number", subject: el.n.toString(), correct: el.name, field: 'name' }
+            { text: "Which element has atomic number", subject: el.n.toString(), correct: el.name, field: 'name' },
+            { text: "Identify the element described:", subject: el.fact, correct: el.name, field: 'name' },
+            { text: "Identify the category of this element:", subject: el.name, correct: el.cat.replace('-', ' '), field: 'cat' }
         ];
         
         const qType = qTypes[Math.floor(Math.random() * qTypes.length)];
         setQuestion(qType);
 
-        let newOptions = [qType.correct];
+        let newOptions = [{ value: qType.correct, name: el.name }];
         while (newOptions.length < 4) {
-            let rVal = elements[Math.floor(Math.random() * elements.length)][qType.field].toString();
-            if (!newOptions.includes(rVal)) newOptions.push(rVal);
+            const randomEl = elements[Math.floor(Math.random() * elements.length)];
+            let rVal = randomEl[qType.field].toString();
+            if (qType.field === 'cat') rVal = rVal.replace('-', ' ');
+            
+            if (!newOptions.find(o => o.value === rVal)) {
+                newOptions.push({ value: rVal, name: randomEl.name });
+            }
         }
 
         // Shuffle options
@@ -120,6 +176,13 @@ export default function TimeAttack() {
         setTimeLeft(60);
         setGameState('playing');
         generateQuestion(elementWeights);
+
+        // Attempt to go Fullscreen for focus
+        if (containerRef.current?.requestFullscreen) {
+            containerRef.current.requestFullscreen().catch(err => {
+                console.warn(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        }
     };
 
     const checkAnswer = (selectedAns) => {
@@ -131,10 +194,12 @@ export default function TimeAttack() {
 
         if (isCorrect) {
             setCorrectAnswers(prev => prev + 1);
-            newWeights[currentElement.sym] = Math.max(1, newWeights[currentElement.sym] - 3);
+            // Reduce priority significantly if correct
+            newWeights[currentElement.sym] = Math.max(1, Math.floor(newWeights[currentElement.sym] * 0.6));
         } else {
             setWrongAnswers(prev => prev + 1);
-            newWeights[currentElement.sym] += 10;
+            // Increase priority significantly if wrong
+            newWeights[currentElement.sym] = Math.min(100, newWeights[currentElement.sym] + 20);
             setElementsToReview(prev => new Set(prev).add(currentElement.sym));
         }
         
@@ -152,9 +217,21 @@ export default function TimeAttack() {
     const endGame = () => {
         setGameState('end');
         const existingHighScore = parseInt(localStorage.getItem(highScoreKey) || '0');
+        
+        const updateData = {
+            timeAttackSRS: elementWeights
+        };
+
         if (correctAnswers > existingHighScore) {
             localStorage.setItem(highScoreKey, correctAnswers);
-            setDoc(doc(db, "users", currentUser), { timeAttackBestCorrect: correctAnswers }, { merge: true }).catch(e => console.error(e));
+            updateData.timeAttackBestCorrect = correctAnswers;
+        }
+
+        setDoc(doc(db, "users", currentUser), updateData, { merge: true }).catch(e => console.error(e));
+        
+        // Exit Fullscreen on game end
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(e => console.warn(e));
         }
     };
 
@@ -173,7 +250,7 @@ export default function TimeAttack() {
     ];
 
     return (
-        <div style={{ position: 'relative' }}>
+        <div ref={containerRef} style={{ position: 'relative', background: '#f8faff', minHeight: '100vh' }}>
             {/* Floating Chemistry Background */}
             <div className="floating-background">
                 {floatingItems.map(item => (
@@ -224,27 +301,31 @@ export default function TimeAttack() {
                     .option-btn:focus { outline: none !important; }
                 `}
             </style>
-            <nav className="navbar">
-                <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
-                <ul className="nav-links">
-                    <li onClick={() => navigate('/home')}><i className="fas fa-home"></i> <span>Home</span></li>
-                    <li onClick={() => navigate('/periodic-table')}><i className="fas fa-th"></i> <span>Periodic Table</span></li>
-                    <li onClick={() => navigate('/laboratory')}><i className="fas fa-flask"></i> <span>Laboratory</span></li>
-                    <li onClick={() => navigate('/matchinggame')}><i className="fas fa-puzzle-piece"></i> <span>Matching Game</span></li>
-                    <li className="active"><i className="fas fa-stopwatch"></i> <span>Time Attack</span></li>
-                    <li onClick={() => navigate('/achievements')}><i className="fas fa-trophy"></i> <span>Achievements</span></li>
-                </ul>
-                <div style={{ width: '130px' }}></div>
-            </nav>
+            {gameState !== 'playing' && (
+                <nav className="navbar">
+                    <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
+                    <ul className="nav-links">
+                        <li onClick={() => navigate('/home')}><i className="fas fa-home"></i> <span>Home</span></li>
+                        <li onClick={() => navigate('/periodic-table')}><i className="fas fa-th"></i> <span>Periodic Table</span></li>
+                        <li onClick={() => navigate('/laboratory')}><i className="fas fa-flask"></i> <span>Laboratory</span></li>
+                        <li onClick={() => navigate('/matchinggame')}><i className="fas fa-puzzle-piece"></i> <span>Matching Game</span></li>
+                        <li className="active"><i className="fas fa-stopwatch"></i> <span>Time Attack</span></li>
+                        <li onClick={() => navigate('/achievements')}><i className="fas fa-trophy"></i> <span>Achievements</span></li>
+                    </ul>
+                    <div style={{ width: '130px' }}></div>
+                </nav>
+            )}
 
-            <main className="timeattack-container" style={{ position: 'relative', zIndex: 1 }}>
-                <div className="hero-banner timeattack-banner">
-                    <div className="hero-text">
-                        <h1>Time Attack ⏱️</h1>
-                        <p>Answer as many chemistry questions as you can in 60 seconds!</p>
+            <main className="timeattack-container" style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', minHeight: gameState === 'playing' ? '100vh' : 'auto' }}>
+                {gameState !== 'playing' && (
+                    <div className="hero-banner timeattack-banner">
+                        <div className="hero-text">
+                            <h1>Time Attack ⏱️</h1>
+                            <p>Answer as many chemistry questions as you can in 60 seconds!</p>
+                        </div>
+                        <div className="hero-icon"><i className="fas fa-bolt"></i></div>
                     </div>
-                    <div className="hero-icon"><i className="fas fa-bolt"></i></div>
-                </div>
+                )}
 
                 <div className="game-header">
                     <div className="stats" style={{ width: '120px' }}>
@@ -261,7 +342,7 @@ export default function TimeAttack() {
                     </div>
                 </div>
 
-                <div className="game-area">
+                <div className="game-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
                     {gameState === 'start' && (
                         <div className="start-screen">
                             <h2 style={{ color: '#2d3436' }}>Ready for the challenge?</h2>
@@ -274,16 +355,35 @@ export default function TimeAttack() {
                         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <div className="question-box">
                                 <p>{question.text}</p>
-                                <h2>{question.subject}</h2>
+                                {currentElement && (question.text.includes('atomic number') || (question.field !== 'name' && isNaN(question.subject))) && (
+                                    <div className="question-image-container" style={{ width: '140px', height: '140px', margin: '0 auto 15px', borderRadius: '15px', overflow: 'hidden', border: '4px solid #f0f2f5', background: '#fff', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
+                                        <img 
+                                            src={`/assets/elements/${currentElement.name.toLowerCase()}.jpg`} 
+                                            alt={currentElement.name} 
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            onError={(e) => e.target.parentElement.style.display = 'none'}
+                                        />
+                                    </div>
+                                )}
+                                <h2 style={{ fontSize: question.subject.length > 20 ? '1.8rem' : '3.5rem', lineHeight: '1.2' }}>{question.subject}</h2>
                             </div>
                             <div className="options-grid">
                                 {options.map(opt => {
                                     let btnClass = "option-btn";
                                     if (answeredState.isAnswering) {
-                                        if (opt === question.correct) btnClass += " correct";
-                                        else if (opt === answeredState.selected) btnClass += " wrong";
+                                        if (opt.value === question.correct) btnClass += " correct";
+                                        else if (opt.value === answeredState.selected) btnClass += " wrong";
                                     }
-                                    return <button key={opt} disabled={answeredState.isAnswering} className={btnClass} onClick={() => checkAnswer(opt)}>{opt}</button>;
+                                    return (
+                                        <button 
+                                            key={opt.value} 
+                                            disabled={answeredState.isAnswering} 
+                                            className={btnClass} 
+                                            onClick={() => checkAnswer(opt.value)}
+                                        >
+                                            {opt.value}
+                                        </button>
+                                    );
                                 })}
                             </div>
                         </div>
@@ -300,7 +400,12 @@ export default function TimeAttack() {
                                     </div>
                                 </div>
                             )}
-                            <button className="btn-start" style={{ marginTop: '20px' }} onClick={startGame}>Play Again</button>
+                            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '20px', width: '100%' }}>
+                                <button className="btn-start" onClick={startGame}>Play Again</button>
+                                {elementsToReview.size > 0 && (
+                                    <button className="btn-start" style={{ background: '#6e45e2' }} onClick={() => navigate('/periodic-table', { state: { highlightElements: Array.from(elementsToReview) } })}>Review Elements</button>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
