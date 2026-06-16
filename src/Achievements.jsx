@@ -4,6 +4,20 @@ import './Achievements.css';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
+// XP Levels (mirrors Laboratory.jsx)
+const LEVELS = [
+    { name: 'Apprentice',       minXp: 0    },
+    { name: 'Chemist',          minXp: 200  },
+    { name: 'Senior Chemist',   minXp: 500  },
+    { name: 'Master Chemist',   minXp: 1000 },
+    { name: 'Professor',        minXp: 2000 },
+];
+const getLevel = (xp) => {
+    let level = LEVELS[0];
+    for (const l of LEVELS) { if (xp >= l.minXp) level = l; }
+    return level;
+};
+
 export default function Achievements() {
     const navigate = useNavigate();
     
@@ -11,7 +25,9 @@ export default function Achievements() {
         learned: 0,
         compounds: 0,
         timeAttack: 0,
-        matching: 999
+        matching: 999,
+        labXp: 0,
+        labBadges: [],
     });
     const [progressWidth, setProgressWidth] = useState(0);
 
@@ -25,7 +41,7 @@ export default function Achievements() {
         let matchingGameScore = parseInt(localStorage.getItem(`matchingGameBestScore_${userName}`), 10);
         if (isNaN(matchingGameScore) || matchingGameScore <= 0) matchingGameScore = 999;
 
-        setStats({ learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore });
+        setStats(prev => ({ ...prev, learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore }));
 
         // Sync with Firestore in real-time
         const userRef = doc(db, "users", userName);
@@ -39,13 +55,16 @@ export default function Achievements() {
                 const cloudMatching = data.matchingGameBestScore;
                 matchingGameScore = (cloudMatching !== undefined && cloudMatching > 0) ? cloudMatching : matchingGameScore;
 
-                setStats({ learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore });
+                setStats(prev => ({ ...prev, learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore }));
                 
                 // Update local storage to match cloud
                 if (data.learnedElements) localStorage.setItem(`learnedElements_${userName}`, JSON.stringify(data.learnedElements));
                 if (data.discoveredCompounds) localStorage.setItem(`discoveredCompounds_${userName}`, JSON.stringify(data.discoveredCompounds));
                 if (data.timeAttackBestCorrect !== undefined) localStorage.setItem(`timeAttackBestCorrect_${userName}`, timeAttackScore.toString());
                 if (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0) localStorage.setItem(`matchingGameBestScore_${userName}`, matchingGameScore.toString());
+                const labXp = data.labXp || 0;
+                const labBadges = data.labBadges || [];
+                setStats(prev => ({ ...prev, labXp, labBadges }));
             }
         }, (e) => {
             console.error("Error fetching cloud stats:", e);
@@ -61,7 +80,15 @@ export default function Achievements() {
         { id: 'scholar', title: 'Dedicated Scholar', desc: 'Read about and learn at least 50 different elements in the Periodic Table.', icon: 'fa-book-open', bg: 'bg-purple', unlocked: stats.learned >= 50 },
         { id: 'brainiac', title: 'Brainiac', desc: 'Complete the Matching Game in 20 moves or less.', icon: 'fa-brain', bg: 'bg-orange', unlocked: stats.matching <= 20 },
         { id: 'scientist', title: 'Mad Scientist', desc: 'Successfully create 5 different chemical compounds in the Virtual Laboratory.', icon: 'fa-vial', bg: 'bg-green', unlocked: stats.compounds >= 5 },
-        { id: 'demon', title: 'Speed Demon', desc: 'Answer 10 or more questions correctly in a single round of Time Attack.', icon: 'fa-stopwatch', bg: 'bg-red', unlocked: stats.timeAttack >= 10 }
+        { id: 'demon', title: 'Speed Demon', desc: 'Answer 10 or more questions correctly in a single round of Time Attack.', icon: 'fa-stopwatch', bg: 'bg-red', unlocked: stats.timeAttack >= 10 },
+        // ── Lab badges ──
+        { id: 'lab-first',      title: 'First Discovery',   desc: 'Discover your first compound in the Virtual Laboratory.', icon: 'fa-vial', bg: 'bg-blue',   unlocked: (stats.labBadges || []).includes('lab-first')      },
+        { id: 'lab-water',      title: 'Hydration Expert',  desc: 'Discover Water (H₂O) in the Laboratory.',                icon: 'fa-tint', bg: 'bg-blue',   unlocked: (stats.labBadges || []).includes('lab-water')      },
+        { id: 'lab-toxic',      title: 'Danger Zone',       desc: 'Discover 3 toxic or dangerous compounds.',               icon: 'fa-skull-crossbones', bg: 'bg-red',    unlocked: (stats.labBadges || []).includes('lab-toxic')      },
+        { id: 'lab-pyromaniac', title: 'Pyromaniac',        desc: 'Use the Bunsen burner 10 times.',                        icon: 'fa-fire', bg: 'bg-orange', unlocked: (stats.labBadges || []).includes('lab-pyromaniac') },
+        { id: 'lab-mad',        title: 'Mad Scientist',     desc: 'Discover 15 different compounds.',                       icon: 'fa-flask', bg: 'bg-purple', unlocked: (stats.labBadges || []).includes('lab-mad')        },
+        { id: 'lab-master',     title: 'Master Chemist',    desc: 'Discover all 36 compounds in the Laboratory.',           icon: 'fa-medal', bg: 'bg-gold',   unlocked: (stats.labBadges || []).includes('lab-master')     },
+        { id: 'lab-speed',      title: 'Speed Mixer',       desc: 'Discover 5 compounds in a single lab session.',          icon: 'fa-bolt',  bg: 'bg-green',  unlocked: (stats.labBadges || []).includes('lab-speed')      },
     ];
 
     const unlockedCount = badges.filter(b => b.unlocked).length;
@@ -165,6 +192,28 @@ export default function Achievements() {
                         <div className="progress-bar-fill" style={{ width: `${progressWidth}%` }}></div>
                     </div>
                 </div>
+
+                {/* ── Lab XP Level Bar ── */}
+                {stats.labXp > 0 && (() => {
+                    const currentLevel = getLevel(stats.labXp);
+                    const nextLevel = LEVELS.find(l => l.minXp > stats.labXp) || null;
+                    const progress = nextLevel ? ((stats.labXp - currentLevel.minXp) / (nextLevel.minXp - currentLevel.minXp)) * 100 : 100;
+                    return (
+                        <div style={{ background: '#1e1e2e', borderRadius: '14px', padding: '18px 24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: '1.8rem' }}>⚗️</div>
+                            <div style={{ flex: 1, minWidth: '140px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                    <span style={{ color: '#a29bfe', fontWeight: '700', fontSize: '0.95rem' }}>Lab Level: {currentLevel.name}</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>{stats.labXp} XP {nextLevel ? `/ ${nextLevel.minXp}` : '(MAX)'}</span>
+                                </div>
+                                <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #6e45e2, #4facfe)', borderRadius: '99px' }}></div>
+                                </div>
+                            </div>
+                            {nextLevel && <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Next: <span style={{ color: '#a29bfe' }}>{nextLevel.name}</span></div>}
+                        </div>
+                    );
+                })()}
 
                 <div className="achievements-grid">
                     {badges.map(badge => (

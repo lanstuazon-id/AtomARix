@@ -142,7 +142,7 @@ export default function TeacherRoom() {
 
                 const extractResult = await generateQuiz({
                     payload: {
-                        model: 'claude-sonnet-4-20250514',
+                        model: 'claude-sonnet-4-6',
                         max_tokens: 1000,
                         messages: [{
                             role: 'user',
@@ -161,7 +161,7 @@ export default function TeacherRoom() {
             if (!lessonContent) throw new Error('No content to generate from. Upload a PDF or paste your lesson text.');
 
             // Step 2: Generate quiz questions
-            const prompt = `You are a professional quiz generator for a chemistry classroom. Based on the lesson content below, generate exactly ${aiQuestionCount} multiple-choice questions.
+            const prompt = `You are a professional quiz generator for a Grade 7-8 chemistry classroom. Based on the lesson content below, generate exactly ${aiQuestionCount} multiple-choice questions.
 
 LESSON CONTENT:
 ${lessonContent}
@@ -169,16 +169,17 @@ ${lessonContent}
 STRICT OUTPUT RULES:
 - Respond with ONLY a valid JSON array. No markdown, no backticks, no preamble, no extra text whatsoever.
 - Each item must have exactly these fields: "question" (string), "options" (array of exactly 4 strings), "correctOption" (integer 0-3)
-- Make questions test comprehension, not just memorization.
-- Vary difficulty from easy to challenging.
+- Questions must be appropriate for Grade 7-8 students (ages 12-14).
+- Use simple, clear language that is easy to understand.
+- Avoid overly technical jargon unless it is part of the lesson.
+- Vary difficulty from easy to moderate — avoid very hard questions.
 - All 4 options must be plausible and relevant.
 
 Example format:
 [{"question":"What is the chemical formula for water?","options":["H2O2","H2O","HO","H3O"],"correctOption":1}]`;
-
             const quizResult = await generateQuiz({
                 payload: {
-                    model: 'claude-sonnet-4-20250514',
+                    model: 'claude-sonnet-4-6',
                     max_tokens: 1000,
                     messages: [{ role: 'user', content: prompt }]
                 }
@@ -451,7 +452,7 @@ Example format:
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <h4>{cw.title}
                                     {cw.assessmentType === 'time_attack' && <span style={{fontSize: '0.75rem', background: '#f39c12', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-stopwatch"></i> Time Attack</span>}
-                                    {cw.assessmentType === 'custom' && cw.questions && <span style={{fontSize: '0.75rem', background: '#e74c3c', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-tasks"></i> Custom Quiz</span>}
+                                    {cw.assessmentType === 'custom' && cw.questions && <span style={{fontSize: '0.75rem', background: '#e74c3c', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-tasks"></i> Generated Quiz</span>}
                                 </h4>
                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                     <button onClick={() => { setSelectedReportCw(cw); setExpandedStudentId(null); setIsReportModalOpen(true); }} style={{ background: '#eaf4ff', border: 'none', color: '#4facfe', cursor: 'pointer', padding: '6px 12px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'} onMouseLeave={e => e.currentTarget.style.background = '#eaf4ff'} title="View Submissions"><i className="fas fa-chart-bar"></i> Report</button>
@@ -585,6 +586,30 @@ Example format:
                 .ai-question-card:hover{border-color:#d7ccff}
                 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
                 .ai-generating-pulse{background:linear-gradient(90deg,#f0f2f5 25%,#e8eaf0 50%,#f0f2f5 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;height:20px;margin-bottom:8px}
+
+                /* Create Assessment Enhanced Layout */
+                .cw-modal-container {
+                    display: flex;
+                    gap: 30px;
+                    align-items: flex-start;
+                }
+                .cw-modal-left {
+                    flex: 0 0 360px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 15px;
+                }
+                .cw-modal-right {
+                    flex: 1;
+                    border-left: 1px solid #eee;
+                    padding-left: 30px;
+                    min-height: 400px;
+                }
+                @media (max-width: 950px) {
+                    .cw-modal-container { flex-direction: column; }
+                    .cw-modal-left { flex: none; width: 100%; }
+                    .cw-modal-right { border-left: none; padding-left: 0; width: 100%; min-height: unset; }
+                }
             `}</style>
 
             <nav className="navbar">
@@ -620,7 +645,7 @@ Example format:
                             <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#fcf3f2', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-tasks"></i></div>
-                                    <div><p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Custom Quizzes</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#2d3436' }}>{classwork.filter(cw => cw.assessmentType === 'custom').length}</p></div>
+                                    <div><p style={{ margin: 0, color: '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Generated Quizzes</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#2d3436' }}>{classwork.filter(cw => cw.assessmentType === 'custom').length}</p></div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#fffdf7', color: '#f39c12', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-stopwatch"></i></div>
@@ -685,82 +710,110 @@ Example format:
             {/* ── Create Classwork Modal ── */}
             {isCwModalOpen && (
                 <div className="modal-container show" onClick={() => { setIsCwModalOpen(false); resetAiState(); }}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <h2 style={{ marginBottom: '20px' }}>Create Assessment</h2>
-                        <form onSubmit={handleCreateClasswork}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                                <div onClick={() => { setAssessmentType('time_attack'); setCwTitle(''); setCwDesc(''); setAttachment(null); resetAiState(); }} style={{ padding: '20px', border: assessmentType === 'time_attack' ? '2px solid #f39c12' : '2px solid #eee', borderRadius: '12px', cursor: 'pointer', background: assessmentType === 'time_attack' ? '#fffdf7' : '#fff', transition: 'all 0.2s', textAlign: 'center' }}>
-                                    <i className="fas fa-stopwatch" style={{ fontSize: '2rem', color: '#f39c12', marginBottom: '10px' }}></i>
-                                    <h3 style={{ color: '#2d3436', marginBottom: '5px', fontSize: '1.1rem' }}>Time Attack</h3>
-                                    <p style={{ color: '#666', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>Assign the built-in fast-paced chemistry quiz game.</p>
-                                </div>
-                                <div onClick={() => { setAssessmentType('custom'); setCwTitle(''); setCwDesc(''); }} style={{ padding: '20px', border: assessmentType === 'custom' ? '2px solid #6e45e2' : '2px solid #eee', borderRadius: '12px', cursor: 'pointer', background: assessmentType === 'custom' ? '#f8f5ff' : '#fff', transition: 'all 0.2s', textAlign: 'center' }}>
-                                    <i className="fas fa-robot" style={{ fontSize: '2rem', color: '#6e45e2', marginBottom: '10px' }}></i>
-                                    <h3 style={{ color: '#2d3436', marginBottom: '5px', fontSize: '1.1rem' }}>Generate Quiz</h3>
-                                    <p style={{ color: '#666', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>Generate questions from your PDF or lesson notes.</p>
-                                </div>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '1200px', width: '98vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+                        <form onSubmit={handleCreateClasswork} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                            <div style={{ padding: '20px 30px', borderBottom: '1px solid #eee', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <h2 style={{ margin: 0 }}>Create Assessment</h2>
+                                <button type="button" className="close-modal" onClick={() => { setIsCwModalOpen(false); resetAiState(); }} style={{ position: 'static', fontSize: '2rem', padding: '0 5px' }}>&times;</button>
                             </div>
-                            <div className="input-group"><input type="text" value={cwTitle} onChange={e => setCwTitle(e.target.value)} placeholder="Assessment Title (e.g., Chapter 1 Quiz)" required /></div>
-                            <div className="input-group"><textarea value={cwDesc} onChange={e => setCwDesc(e.target.value)} rows="3" placeholder="Instructions (Optional)"></textarea></div>
+                            
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '30px', minHeight: 0 }}>
+                                <div className="cw-modal-container" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+                                    {/* Left Column: Metadata and Selection */}
+                                    <div className="cw-modal-left">
+                                        <div style={{ marginBottom: '10px' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: '#888', textTransform: 'uppercase' }}>1. Basic Information</label>
+                                            <div className="input-group" style={{ marginBottom: '12px' }}><input type="text" value={cwTitle} onChange={e => setCwTitle(e.target.value)} placeholder="Assessment Title (e.g., Chapter 1 Quiz)" required /></div>
+                                            <div className="input-group"><textarea value={cwDesc} onChange={e => setCwDesc(e.target.value)} rows="3" placeholder="Instructions (Optional)"></textarea></div>
+                                        </div>
 
-                            {/* ── AI Quiz Generator ── */}
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: '#888', textTransform: 'uppercase' }}>2. Assessment Type</label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                <div onClick={() => { setAssessmentType('time_attack'); setCwTitle(''); setCwDesc(''); setAttachment(null); resetAiState(); }} style={{ padding: '15px', border: assessmentType === 'time_attack' ? '2px solid #f39c12' : '1px solid #eee', borderRadius: '12px', cursor: 'pointer', background: assessmentType === 'time_attack' ? '#fffdf7' : '#fff', transition: 'all 0.2s' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                                        <i className="fas fa-stopwatch" style={{ fontSize: '1.2rem', color: '#f39c12' }}></i>
+                                                        <h3 style={{ color: '#2d3436', margin: 0, fontSize: '1rem' }}>Time Attack</h3>
+                                                    </div>
+                                                    <p style={{ color: '#666', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' }}>Fast-paced chemistry quiz game.</p>
+                                                </div>
+                                                <div onClick={() => { setAssessmentType('custom'); setCwTitle(''); setCwDesc(''); }} style={{ padding: '15px', border: assessmentType === 'custom' ? '2px solid #6e45e2' : '1px solid #eee', borderRadius: '12px', cursor: 'pointer', background: assessmentType === 'custom' ? '#f8f5ff' : '#fff', transition: 'all 0.2s' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                                        <i className="fas fa-robot" style={{ fontSize: '1.2rem', color: '#6e45e2' }}></i>
+                                                        <h3 style={{ color: '#2d3436', margin: 0, fontSize: '1rem' }}>Generate Quiz</h3>
+                                                    </div>
+                                                    <p style={{ color: '#666', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' }}>AI questions from your material.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column: Quiz Generator Content */}
+                                    <div className="cw-modal-right">
                             {assessmentType === 'custom' && (
-                                <div style={{ marginTop: '5px', marginBottom: '20px' }}>
+                                            <div style={{ marginTop: '0' }}>
                                     <h3 style={{ color: '#2d3436', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}><i className="fas fa-robot" style={{ color: '#6e45e2' }}></i>Quiz Generator</h3>
 
                                     {!aiGenerated && (
                                         <div className="ai-upload-zone">
-                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                                                <i className="fas fa-magic" style={{ fontSize: '1.8rem', color: '#6e45e2' }}></i>
-                                                <span style={{ fontWeight: '700', fontSize: '1.05rem', color: '#2d3436' }}>Upload a PDF or paste your lesson</span>
-                                            </div>
-                                            <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '20px', marginTop: 0 }}>The AI will instantly generate multiple-choice questions from your material.</p>
+                                            {!isAiGenerating ? (
+                                                <>
+                                                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                                                        <i className="fas fa-magic" style={{ fontSize: '1.8rem', color: '#6e45e2' }}></i>
+                                                        <span style={{ fontWeight: '700', fontSize: '1.05rem', color: '#2d3436' }}>Upload a PDF or paste your lesson</span>
+                                                    </div>
+                                                    <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '20px', marginTop: 0 }}>The AI will instantly generate multiple-choice questions from your material.</p>
 
-                                            <input type="file" accept="application/pdf" id="ai-pdf-input" style={{ display: 'none' }} onChange={(e) => { const file = e.target.files[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { alert('PDF too large! Max 10MB.'); return; } setAiPdfFile(file); e.target.value = ''; }} />
-                                            <label htmlFor="ai-pdf-input" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', background: '#f3f0ff', color: '#6e45e2', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', marginBottom: '12px', fontSize: '0.95rem', border: '1px solid #d7ccff', transition: 'all 0.2s' }}>
-                                                <i className="fas fa-file-pdf"></i>{aiPdfFile ? 'Change PDF' : 'Choose PDF'}
-                                            </label>
+                                                    <input type="file" accept="application/pdf" id="ai-pdf-input" style={{ display: 'none' }} onChange={(e) => { const file = e.target.files[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { alert('PDF too large! Max 10MB.'); return; } setAiPdfFile(file); e.target.value = ''; }} />
+                                                    <label htmlFor="ai-pdf-input" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', background: '#f3f0ff', color: '#6e45e2', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', marginBottom: '12px', fontSize: '0.95rem', border: '1px solid #d7ccff', transition: 'all 0.2s' }}>
+                                                        <i className="fas fa-file-pdf"></i>{aiPdfFile ? 'Change PDF' : 'Choose PDF'}
+                                                    </label>
 
-                                            {aiPdfFile && (
-                                                <div style={{ margin: '0 auto 14px auto', padding: '8px 14px', background: '#f3f0ff', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#6e45e2', fontWeight: '600', fontSize: '0.88rem', border: '1px solid #d7ccff' }}>
-                                                    <i className="fas fa-file-pdf"></i>
-                                                    <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{aiPdfFile.name}</span>
-                                                    <button type="button" onClick={() => setAiPdfFile(null)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1rem', padding: 0, lineHeight: 1 }}><i className="fas fa-times"></i></button>
-                                                </div>
-                                            )}
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '10px 0 14px 0' }}>
-                                                <div style={{ flex: 1, height: '1px', background: '#e1e1e1' }}></div>
-                                                <span style={{ color: '#aaa', fontSize: '0.85rem', fontWeight: '600' }}>or paste text</span>
-                                                <div style={{ flex: 1, height: '1px', background: '#e1e1e1' }}></div>
-                                            </div>
-
-                                            <textarea value={aiLessonText} onChange={e => setAiLessonText(e.target.value)} placeholder="Paste your lesson, module, or notes here..." rows="5" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #d7ccff', resize: 'vertical', fontSize: '0.95rem', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', marginBottom: '16px', background: '#fff', transition: 'border-color 0.2s' }} onFocus={e => e.target.style.borderColor = '#6e45e2'} onBlur={e => e.target.style.borderColor = '#d7ccff'} />
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', justifyContent: 'center' }}>
-                                                <label style={{ color: '#555', fontWeight: '600', fontSize: '0.9rem' }}>Number of questions:</label>
-                                                <div style={{ display: 'flex', gap: '6px' }}>
-                                                    {[3, 5, 8, 10, 15].map(n => (
-                                                        <button key={n} type="button" onClick={() => setAiQuestionCount(n)} style={{ width: '38px', height: '38px', border: aiQuestionCount === n ? '2px solid #6e45e2' : '1px solid #ddd', borderRadius: '8px', background: aiQuestionCount === n ? '#f3f0ff' : '#fff', color: aiQuestionCount === n ? '#6e45e2' : '#555', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>{n}</button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <button type="button" className="ai-generate-btn" onClick={handleGenerateAiQuiz} disabled={isAiGenerating || (!aiPdfFile && !aiLessonText.trim())}>
-                                                {isAiGenerating ? <><i className="fas fa-circle-notch fa-spin"></i> Generating {aiQuestionCount} questions...</> : <><i className="fas fa-magic"></i> Generate Quiz with AI</>}
-                                            </button>
-
-                                            {isAiGenerating && (
-                                                <div style={{ marginTop: '20px', textAlign: 'left' }}>
-                                                    {[...Array(3)].map((_, i) => (
-                                                        <div key={i} style={{ padding: '15px', borderRadius: '12px', border: '1px solid #e1e1e1', marginBottom: '10px', background: '#fff' }}>
-                                                            <div className="ai-generating-pulse" style={{ width: '80%' }}></div>
-                                                            <div className="ai-generating-pulse" style={{ width: '60%' }}></div>
-                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
-                                                                {[...Array(4)].map((_, j) => <div key={j} className="ai-generating-pulse" style={{ height: '36px', marginBottom: 0 }}></div>)}
-                                                            </div>
+                                                    {aiPdfFile && (
+                                                        <div style={{ margin: '0 auto 14px auto', padding: '8px 14px', background: '#f3f0ff', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#6e45e2', fontWeight: '600', fontSize: '0.88rem', border: '1px solid #d7ccff' }}>
+                                                            <i className="fas fa-file-pdf"></i>
+                                                            <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{aiPdfFile.name}</span>
+                                                            <button type="button" onClick={() => setAiPdfFile(null)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1rem', padding: 0, lineHeight: 1 }}><i className="fas fa-times"></i></button>
                                                         </div>
-                                                    ))}
+                                                    )}
+
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '10px 0 14px 0' }}>
+                                                        <div style={{ flex: 1, height: '1px', background: '#e1e1e1' }}></div>
+                                                        <span style={{ color: '#aaa', fontSize: '0.85rem', fontWeight: '600' }}>or paste text</span>
+                                                        <div style={{ flex: 1, height: '1px', background: '#e1e1e1' }}></div>
+                                                    </div>
+
+                                                    <textarea value={aiLessonText} onChange={e => setAiLessonText(e.target.value)} placeholder="Paste your lesson, module, or notes here..." rows="5" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #d7ccff', resize: 'vertical', fontSize: '0.95rem', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', marginBottom: '16px', background: '#fff', transition: 'border-color 0.2s' }} onFocus={e => e.target.style.borderColor = '#6e45e2'} onBlur={e => e.target.style.borderColor = '#d7ccff'} />
+
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', justifyContent: 'center' }}>
+                                                        <label style={{ color: '#555', fontWeight: '600', fontSize: '0.9rem' }}>Number of questions:</label>
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            {[3, 5, 8, 10, 15].map(n => (
+                                                                <button key={n} type="button" onClick={() => setAiQuestionCount(n)} style={{ width: '38px', height: '38px', border: aiQuestionCount === n ? '2px solid #6e45e2' : '1px solid #ddd', borderRadius: '8px', background: aiQuestionCount === n ? '#f3f0ff' : '#fff', color: aiQuestionCount === n ? '#6e45e2' : '#555', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>{n}</button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <button type="button" className="ai-generate-btn" onClick={handleGenerateAiQuiz} disabled={isAiGenerating || (!aiPdfFile && !aiLessonText.trim())}>
+                                                        <i className="fas fa-magic"></i> Generate Quiz with AI
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <div style={{ textAlign: 'center', padding: '20px' }}>
+                                                    <i className="fas fa-magic fa-spin" style={{ fontSize: '3.5rem', color: '#6e45e2', marginBottom: '20px', display: 'block' }}></i>
+                                                    <h3 style={{ color: '#2d3436', marginBottom: '10px' }}>Generating your chemistry quiz...</h3>
+                                                    <p style={{ color: '#888', maxWidth: '400px', margin: '0 auto 30px' }}>Our AI is analyzing your material and crafting {aiQuestionCount} unique questions just for your class.</p>
+                                                    <div style={{ textAlign: 'left' }}>
+                                                        {[...Array(3)].map((_, i) => (
+                                                            <div key={i} style={{ padding: '15px', borderRadius: '12px', border: '1px solid #e1e1e1', marginBottom: '10px', background: '#fff' }}>
+                                                                <div className="ai-generating-pulse" style={{ width: '80%' }}></div>
+                                                                <div className="ai-generating-pulse" style={{ width: '60%' }}></div>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
+                                                                    {[...Array(4)].map((_, j) => <div key={j} className="ai-generating-pulse" style={{ height: '36px', marginBottom: 0 }}></div>)}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -799,9 +852,18 @@ Example format:
                                     )}
                                 </div>
                             )}
+                                        {assessmentType === 'time_attack' && (
+                                            <div style={{ textAlign: 'center', paddingTop: '60px', color: '#888' }}>
+                                                <i className="fas fa-stopwatch" style={{ fontSize: '4rem', opacity: 0.2, marginBottom: '20px' }}></i>
+                                                <p style={{ fontSize: '1.1rem' }}>Students will participate in the built-in Time Attack challenge.</p>
+                                                <p style={{ fontSize: '0.9rem' }}>No further configuration required.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
 
-                            <div className="modal-actions">
-                                <button type="button" className="btn-cancel" onClick={() => { setIsCwModalOpen(false); resetAiState(); }}>Cancel</button>
+                            <div className="modal-actions" style={{ padding: '20px 30px', borderTop: '1px solid #eee', margin: 0, flexShrink: 0 }}>
                                 <button type="submit" className={`btn-confirm ${isUploading || (assessmentType === 'custom' && !aiGenerated) ? 'disabled' : ''}`} disabled={isUploading || (assessmentType === 'custom' && !aiGenerated)} title={assessmentType === 'custom' && !aiGenerated ? 'Generate questions first' : ''}>{isUploading ? 'Posting...' : 'Post'}</button>
                             </div>
                         </form>

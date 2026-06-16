@@ -98,7 +98,9 @@ export default function TeacherDashboard() {
     const [editRoomSection, setEditRoomSection] = useState('');
     const [editRoomGrade, setEditRoomGrade] = useState('');
     const [editRoomColor, setEditRoomColor] = useState('purple');
-    const [dashboardStats, setDashboardStats] = useState({ totalStudents: 0, topPerformer: '-', totalRooms: 0 });
+    const [dashboardStats, setDashboardStats] = useState({ totalStudents: 0, topPerformer: '-', totalRooms: 0, avgScore: 0 });
+    const [roomStudentCounts, setRoomStudentCounts] = useState({});
+    const [leaderboard, setLeaderboard] = useState([]);
 
     useEffect(() => {
         if (!userName) return;
@@ -135,12 +137,28 @@ export default function TeacherDashboard() {
                 let studentCount = 0;
                 let topScore = -1;
                 let topStudent = '-';
+                let totalScore = 0;
+                let scoredStudents = 0;
+                const countsPerRoom = {};
+                const leaderboardList = [];
 
-                usersSnap.forEach(doc => {
-                    const data = doc.data();
+                myRoomIds.forEach(id => { countsPerRoom[id] = 0; });
+
+                usersSnap.forEach(docSnap => {
+                    const data = docSnap.data();
                     if (myRoomIds.includes(data.joinedRoomId)) {
                         studentCount++;
+                        countsPerRoom[data.joinedRoomId] = (countsPerRoom[data.joinedRoomId] || 0) + 1;
                         const score = data.timeAttackBestCorrect || 0;
+                        if (score > 0) {
+                            totalScore += score;
+                            scoredStudents++;
+                            leaderboardList.push({
+                                name: data.fullname || data.username || 'Unknown',
+                                score,
+                                room: myRooms.find(r => r.id === data.joinedRoomId)?.section || '—'
+                            });
+                        }
                         if (score > topScore) {
                             topScore = score;
                             topStudent = data.fullname || data.username || '-';
@@ -148,10 +166,16 @@ export default function TeacherDashboard() {
                     }
                 });
 
+                leaderboardList.sort((a, b) => b.score - a.score);
+                const avgScore = scoredStudents > 0 ? Math.round(totalScore / scoredStudents) : 0;
+
+                setRoomStudentCounts(countsPerRoom);
+                setLeaderboard(leaderboardList.slice(0, 5));
                 setDashboardStats({
                     totalStudents: studentCount,
                     topPerformer: topScore > 0 ? `${topStudent} (${topScore} pts)` : '-',
-                    totalRooms: myRooms.length
+                    totalRooms: myRooms.length,
+                    avgScore
                 });
             } catch (error) {
                 console.error("Error fetching students for stats: ", error);
@@ -663,28 +687,127 @@ export default function TeacherDashboard() {
                 </div>
 
                 {activeTab === 'overview' && (
-                    <div className="stats-overview">
-                        <div className="stat-card">
-                            <div className="stat-icon purple"><i className="fas fa-users"></i></div>
-                            <div className="stat-info">
-                                <h3>Total Students</h3>
-                                <p>{dashboardStats.totalStudents}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+                        {/* ── Row 1: Stat Cards ── */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                            {[
+                                { icon: 'fa-users',           color: '#6e45e2', bg: '#f3f0ff', label: 'Total Students',  value: dashboardStats.totalStudents },
+                                { icon: 'fa-chalkboard',      color: '#4facfe', bg: '#eaf4ff', label: 'Active Rooms',    value: dashboardStats.totalRooms },
+                                { icon: 'fa-trophy',          color: '#ff9f43', bg: '#fff5e6', label: 'Top Score',       value: dashboardStats.topPerformer !== '-' ? dashboardStats.topPerformer.match(/\((\d+) pts\)/)?.[1] + ' pts' || dashboardStats.topPerformer : '—' },
+                                { icon: 'fa-chart-line',      color: '#1dd1a1', bg: '#eafff7', label: 'Avg Score',       value: dashboardStats.avgScore > 0 ? `${dashboardStats.avgScore} pts` : '—' },
+                            ].map(card => (
+                                <div key={card.label} style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #eee', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', borderTop: `4px solid ${card.color}`, display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                    <div style={{ width: '46px', height: '46px', borderRadius: '12px', background: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <i className={`fas ${card.icon}`} style={{ color: card.color, fontSize: '1.2rem' }}></i>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '22px', fontWeight: '800', color: '#1a1a2e', lineHeight: 1 }}>{card.value}</div>
+                                        <div style={{ fontSize: '12px', color: '#888', marginTop: '4px', fontWeight: '500' }}>{card.label}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* ── Row 2: Classroom Summary Cards ── */}
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1a1a2e' }}>
+                                    <i className="fas fa-chalkboard-teacher" style={{ color: '#6e45e2', marginRight: '8px' }}></i>Classroom Summary
+                                </h3>
+                                <button
+                                    onClick={() => setActiveTab('classrooms')}
+                                    style={{ background: 'none', border: 'none', color: '#6e45e2', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+                                >
+                                    View All →
+                                </button>
+                            </div>
+                            {isLoading ? (
+                                <div style={{ color: '#aaa', fontSize: '14px' }}>Loading classrooms…</div>
+                            ) : rooms.length === 0 ? (
+                                <div style={{ background: '#fff', borderRadius: '14px', padding: '30px', textAlign: 'center', border: '1px dashed #e0e0e0', color: '#aaa' }}>
+                                    <i className="fas fa-folder-open" style={{ fontSize: '2rem', marginBottom: '10px', display: 'block' }}></i>
+                                    No classrooms yet. Create one from the Classrooms tab.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px' }}>
+                                    {rooms.map(room => {
+                                        const preset = roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'));
+                                        const studentCount = roomStudentCounts[room.id] || 0;
+                                        return (
+                                            <div
+                                                key={room.id}
+                                                onClick={() => navigate(`/teacher-room/${room.id}`)}
+                                                style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid #eee', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'transform 0.2s', background: '#fff' }}
+                                                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                                                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                                            >
+                                                <div style={{ background: preset?.bg, padding: '16px', height: '56px', display: 'flex', alignItems: 'flex-end' }}>
+                                                    <div style={{ color: '#fff' }}>
+                                                        <div style={{ fontWeight: '800', fontSize: '15px', lineHeight: 1.2 }}>{room.section}</div>
+                                                        <div style={{ fontSize: '12px', opacity: 0.85 }}>{room.grade}</div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#555', fontSize: '13px' }}>
+                                                        <i className="fas fa-user-graduate" style={{ color: '#6e45e2', fontSize: '12px' }}></i>
+                                                        <span><strong>{studentCount}</strong> student{studentCount !== 1 ? 's' : ''}</span>
+                                                    </div>
+                                                    <div style={{ fontSize: '11px', background: '#f3f0ff', color: '#6e45e2', padding: '3px 10px', borderRadius: '20px', fontWeight: '700', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                                                        {room.classCode}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Row 3: Top 5 Leaderboard ── */}
+                        <div>
+                            <h3 style={{ margin: '0 0 14px', fontSize: '16px', fontWeight: '700', color: '#1a1a2e' }}>
+                                <i className="fas fa-medal" style={{ color: '#ff9f43', marginRight: '8px' }}></i>Top 5 Performers
+                            </h3>
+                            <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #eee', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                                {leaderboard.length === 0 ? (
+                                    <div style={{ padding: '30px', textAlign: 'center', color: '#aaa' }}>
+                                        <i className="fas fa-trophy" style={{ fontSize: '2rem', marginBottom: '10px', display: 'block', color: '#ffe0a3' }}></i>
+                                        No scores recorded yet. Students need to play Time Attack first.
+                                    </div>
+                                ) : (
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                                        <thead>
+                                            <tr style={{ background: '#f8f9fa' }}>
+                                                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888', fontWeight: '700', fontSize: '12px' }}>Rank</th>
+                                                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888', fontWeight: '700', fontSize: '12px' }}>Student</th>
+                                                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888', fontWeight: '700', fontSize: '12px' }}>Classroom</th>
+                                                <th style={{ padding: '12px 16px', textAlign: 'right', color: '#888', fontWeight: '700', fontSize: '12px' }}>Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {leaderboard.map((entry, i) => {
+                                                const medals = ['🥇', '🥈', '🥉'];
+                                                const rankColors = ['#ff9f43', '#b0b8c1', '#cd7f32'];
+                                                return (
+                                                    <tr key={i} style={{ borderTop: '1px solid #f0f0f0', background: i === 0 ? '#fffdf5' : '#fff' }}>
+                                                        <td style={{ padding: '12px 16px', fontWeight: '700', color: rankColors[i] || '#555' }}>
+                                                            {medals[i] || `#${i + 1}`}
+                                                        </td>
+                                                        <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1a1a2e' }}>{entry.name}</td>
+                                                        <td style={{ padding: '12px 16px', color: '#666' }}>
+                                                            <span style={{ background: '#f3f0ff', color: '#6e45e2', padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{entry.room}</span>
+                                                        </td>
+                                                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#1dd1a1', fontSize: '15px' }}>{entry.score} pts</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                )}
                             </div>
                         </div>
-                        <div className="stat-card">
-                            <div className="stat-icon orange"><i className="fas fa-chalkboard"></i></div>
-                            <div className="stat-info">
-                                <h3>Active Rooms</h3>
-                                <p>{dashboardStats.totalRooms}</p>
-                            </div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-icon green"><i className="fas fa-trophy"></i></div>
-                            <div className="stat-info">
-                                <h3>Top Performer</h3>
-                                <p>{dashboardStats.topPerformer}</p>
-                            </div>
-                        </div>
+
                     </div>
                 )}
 

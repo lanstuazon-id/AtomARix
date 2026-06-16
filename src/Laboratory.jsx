@@ -1,22 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Laboratory.css';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
+// group: 'nonmetal' | 'metal' | 'noble' | 'metalloid' | 'halogen' | 'alkali' | 'alkaline'
 const baseElements = [
-    { sym: 'H', color: '#48dbfb', name: 'Hydrogen' }, { sym: 'He', color: '#1dd1a1', name: 'Helium' },
-    { sym: 'Li', color: '#ff9f43', name: 'Lithium' }, { sym: 'C', color: '#a29bfe', name: 'Carbon' },
-    { sym: 'N', color: '#48dbfb', name: 'Nitrogen' }, { sym: 'O', color: '#1dd1a1', name: 'Oxygen' },
-    { sym: 'F', color: '#48dbfb', name: 'Fluorine' }, { sym: 'Na', color: '#ff9f43', name: 'Sodium' },
-    { sym: 'Mg', color: '#ff6b6b', name: 'Magnesium' }, { sym: 'S', color: '#48dbfb', name: 'Sulfur' },
-    { sym: 'Cl', color: '#48dbfb', name: 'Chlorine' }, { sym: 'K', color: '#ff9f43', name: 'Potassium' },
-    { sym: 'Ca', color: '#ff6b6b', name: 'Calcium' }, { sym: 'Fe', color: '#ffe066', name: 'Iron' },
-    { sym: 'Cu', color: '#ffe066', name: 'Copper' }, { sym: 'Zn', color: '#ffe066', name: 'Zinc' },
-    { sym: 'Ag', color: '#ffe066', name: 'Silver' }, { sym: 'Au', color: '#ffe066', name: 'Gold' },
-    { sym: 'Al', color: '#ced4da', name: 'Aluminium' }, { sym: 'P', color: '#48dbfb', name: 'Phosphorus' },
-    { sym: 'Br', color: '#48dbfb', name: 'Bromine' }
+    { sym: 'H',  num: 1,  name: 'Hydrogen',   group: 'nonmetal'  },
+    { sym: 'He', num: 2,  name: 'Helium',      group: 'noble'     },
+    { sym: 'Li', num: 3,  name: 'Lithium',     group: 'alkali'    },
+    { sym: 'C',  num: 6,  name: 'Carbon',      group: 'nonmetal'  },
+    { sym: 'N',  num: 7,  name: 'Nitrogen',    group: 'nonmetal'  },
+    { sym: 'O',  num: 8,  name: 'Oxygen',      group: 'nonmetal'  },
+    { sym: 'F',  num: 9,  name: 'Fluorine',    group: 'halogen'   },
+    { sym: 'Na', num: 11, name: 'Sodium',      group: 'alkali'    },
+    { sym: 'Mg', num: 12, name: 'Magnesium',   group: 'alkaline'  },
+    { sym: 'Al', num: 13, name: 'Aluminium',   group: 'metal'     },
+    { sym: 'P',  num: 15, name: 'Phosphorus',  group: 'nonmetal'  },
+    { sym: 'S',  num: 16, name: 'Sulfur',      group: 'nonmetal'  },
+    { sym: 'Cl', num: 17, name: 'Chlorine',    group: 'halogen'   },
+    { sym: 'K',  num: 19, name: 'Potassium',   group: 'alkali'    },
+    { sym: 'Ca', num: 20, name: 'Calcium',     group: 'alkaline'  },
+    { sym: 'Fe', num: 26, name: 'Iron',        group: 'metal'     },
+    { sym: 'Cu', num: 29, name: 'Copper',      group: 'metal'     },
+    { sym: 'Zn', num: 30, name: 'Zinc',        group: 'metal'     },
+    { sym: 'Br', num: 35, name: 'Bromine',     group: 'halogen'   },
+    { sym: 'Ag', num: 47, name: 'Silver',      group: 'metal'     },
+    { sym: 'Au', num: 79, name: 'Gold',        group: 'metal'     },
 ];
+
+// Color palette per group — bg, text, accent
+const GROUP_COLORS = {
+    nonmetal: { bg: '#e6f1fb', text: '#0c447c', accent: '#185fa5' },
+    noble:    { bg: '#e1f5ee', text: '#085041', accent: '#0f6e56' },
+    alkali:   { bg: '#faeeda', text: '#633806', accent: '#854f0b' },
+    alkaline: { bg: '#faece7', text: '#711813', accent: '#993c1d' },
+    halogen:  { bg: '#fbeaf0', text: '#4b1528', accent: '#993556' },
+    metal:    { bg: '#f1efe8', text: '#2c2c2a', accent: '#5f5e5a' },
+    metalloid:{ bg: '#eaf3de', text: '#173404', accent: '#3b6d11' },
+};
 
 const recipes = {
     "H,H,O": { name: "Water", formula: "H₂O", icon: "💧", desc: "Essential for all known forms of life.", color: "#74b9ff" },
@@ -58,6 +80,78 @@ const recipes = {
     "Br,Na": { name: "Sodium Bromide", formula: "NaBr", icon: "💊", desc: "Widely used as an anticonvulsant and a sedative.", color: "#f1f2f6" }
 };
 
+// ── XP & Level config ────────────────────────────────────────────────────────
+const LEVELS = [
+    { name: 'Apprentice',       minXp: 0    },
+    { name: 'Chemist',          minXp: 200  },
+    { name: 'Senior Chemist',   minXp: 500  },
+    { name: 'Master Chemist',   minXp: 1000 },
+    { name: 'Professor',        minXp: 2000 },
+];
+
+const getLevel = (xp) => {
+    let level = LEVELS[0];
+    for (const l of LEVELS) { if (xp >= l.minXp) level = l; }
+    return level;
+};
+
+const getNextLevel = (xp) => {
+    for (const l of LEVELS) { if (xp < l.minXp) return l; }
+    return null;
+};
+
+// ── Lab badges (extends Achievements page) ───────────────────────────────────
+const LAB_BADGES = [
+    { id: 'lab-first',     title: 'First Discovery',  icon: '🔬', bg: 'bg-blue',   desc: 'Discover your first compound',          check: (d, s) => d >= 1  },
+    { id: 'lab-water',     title: 'Hydration Expert', icon: '💧', bg: 'bg-blue',   desc: 'Discover Water (H₂O)',                  check: (d, s, f) => f.has('H₂O') },
+    { id: 'lab-toxic',     title: 'Danger Zone',      icon: '☠️', bg: 'bg-red',    desc: 'Discover 3 toxic/dangerous compounds',  check: (d, s, f) => ['CO','H₂S','HF','HNO₃'].filter(x => f.has(x)).length >= 3 },
+    { id: 'lab-pyromaniac',title: 'Pyromaniac',       icon: '🔥', bg: 'bg-orange', desc: 'Use the Bunsen burner 10 times',         check: (d, s, f, b) => b >= 10 },
+    { id: 'lab-mad',       title: 'Mad Scientist',    icon: '🧪', bg: 'bg-purple', desc: 'Discover 15 compounds',                  check: (d) => d >= 15 },
+    { id: 'lab-master',    title: 'Master Chemist',   icon: '🏅', bg: 'bg-gold',   desc: 'Discover all 36 compounds',              check: (d) => d >= 36 },
+    { id: 'lab-speed',     title: 'Speed Mixer',      icon: '⚡', bg: 'bg-green',  desc: 'Discover 5 compounds in one session',    check: (d, sess) => sess >= 5 },
+];
+
+// ── Daily challenge pool ─────────────────────────────────────────────────────
+const DAILY_CHALLENGES = [
+    { key: 'H,H,O',         clue: 'Combine 2 Hydrogen atoms with 1 Oxygen atom',         xp: 150 },
+    { key: 'Cl,Na',          clue: 'Mix a halogen with an alkali metal to make a salt',    xp: 150 },
+    { key: 'H,H,H,N',        clue: 'A cleaning gas made of Nitrogen and 3 Hydrogens',      xp: 200 },
+    { key: 'C,O,O',          clue: 'A greenhouse gas — needs heat! Carbon + 2 Oxygens',    xp: 200 },
+    { key: 'H,H,S',          clue: 'Smells like rotten eggs — Sulfur + 2 Hydrogens',       xp: 150 },
+    { key: 'Cl,H',           clue: 'A single Chlorine with a single Hydrogen',              xp: 100 },
+    { key: 'Fe,Fe,O,O,O',    clue: 'What happens when Iron meets Oxygen? (needs heat)',     xp: 250 },
+    { key: 'O,O,O',          clue: '3 Oxygen atoms protect us from UV rays',                xp: 200 },
+    { key: 'H,Na,O',         clue: 'An alkali metal + Hydrogen + Oxygen = soap maker',      xp: 200 },
+    { key: 'C,H,H,H,H',      clue: 'Natural gas — Carbon with 4 Hydrogens',                xp: 150 },
+];
+
+
+// ── Recipe categories ─────────────────────────────────────────────────────────
+const CATEGORIES = [
+    { id: 'all',    label: 'All',    icon: '🧪' },
+    { id: 'acid',   label: 'Acids',  icon: '⚗️' },
+    { id: 'oxide',  label: 'Oxides', icon: '🔵' },
+    { id: 'salt',   label: 'Salts',  icon: '🧂' },
+    { id: 'gas',    label: 'Gases',  icon: '💨' },
+    { id: 'other',  label: 'Other',  icon: '🔬' },
+];
+
+const getCategory = (name) => {
+    const n = name.toLowerCase();
+    if (n.includes('acid'))                          return 'acid';
+    if (n.includes('oxide'))                         return 'oxide';
+    if (n.includes('chloride') || n.includes('sulfate') || n.includes('nitrate') ||
+        n.includes('bromide')  || n.includes('carbonate') || n.includes('hydroxide') ||
+        n.includes('bicarbonate') || n.includes('fluoride'))  return 'salt';
+    if (n.includes('dioxide') || n.includes('monoxide') || n.includes('gas') ||
+        n.includes('ozone')   || n.includes('ammonia') || n.includes('methane') ||
+        n.includes('hydrogen sulfide') || n.includes('nitrous') || n.includes('nitrogen dioxide'))
+                                                     return 'gas';
+    return 'other';
+};
+
+
+
 export default function Laboratory() {
     const navigate = useNavigate();
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
@@ -66,6 +160,7 @@ export default function Laboratory() {
     // State
     const [inventorySearch, setInventorySearch] = useState('');
     const [recipeSearch, setRecipeSearch] = useState('');
+    const [recipeCategory, setRecipeCategory] = useState('all');
     const [currentFlask, setCurrentFlask] = useState([]);
     const [flaskState, setFlaskState] = useState({ height: 0, color: 'transparent', mixed: false });
     const [isHeating, setIsHeating] = useState(false);
@@ -73,6 +168,17 @@ export default function Laboratory() {
     const [discoveredCompounds, setDiscoveredCompounds] = useState(
         new Set(JSON.parse(localStorage.getItem(discoveredCompoundsKey)) || [])
     );
+
+    // ── Gamification state ──────────────────────────────────────────────────
+    const [xp, setXp] = useState(0);
+    const [xpToast, setXpToast] = useState(null);           // { amount, label }
+    const [badgeToast, setBadgeToast] = useState(null);      // { title, icon, bg }
+    const [hintsLeft, setHintsLeft] = useState(3);
+    const [currentHint, setCurrentHint] = useState(null);
+    const [showHint, setShowHint] = useState(false);
+    const [dailyChallenge, setDailyChallenge] = useState(null);
+    const [dailyDone, setDailyDone] = useState(false);
+    const [sessionDiscoveries, setSessionDiscoveries] = useState(0);
 
     // Modals
     const [showRecipeModal, setShowRecipeModal] = useState(false);
@@ -151,6 +257,17 @@ export default function Laboratory() {
         if (isHeating) setIsHeating(false);
     };
 
+    const removeFromFlask = (idx) => {
+        setCurrentFlask(prev => {
+            const newFlask = prev.filter((_, i) => i !== idx);
+            setFlaskState({ height: Math.min(newFlask.length * 10, 50), color: '#e0e4e8', mixed: false });
+            return newFlask;
+        });
+        sndDrop.current.currentTime = 0;
+        sndDrop.current.play().catch(e => console.warn(e));
+    };
+
+
     const pourLiquid = () => {
         if (flaskState.mixed) {
             if (flaskState.height > 0) {
@@ -169,6 +286,20 @@ export default function Laboratory() {
                 sndDrop.current.currentTime = 0; sndDrop.current.play().catch(e => console.warn(e));
             }
         }
+    };
+
+
+    // ── Add all recipe elements directly to flask ────────────────────────────
+    const addRecipeToFlask = (key) => {
+        const elements = key.split(',');
+        setCurrentFlask([]);
+        setFlaskState({ height: 0, color: 'transparent', mixed: false });
+        setTimeout(() => {
+            elements.forEach((sym, i) => {
+                setTimeout(() => addToFlask(sym), i * 80);
+            });
+        }, 50);
+        setShowRecipeModal(false);
     };
 
     const mixElements = () => {
@@ -204,13 +335,35 @@ export default function Laboratory() {
                 createParticles('success', particlesContainerRef.current);
                 createParticles('sparkles', modalEffectsRef.current);
                 
-                // Save discovery
-                if (!discoveredCompounds.has(res.formula)) {
-                    const newSet = new Set(discoveredCompounds).add(res.formula);
+                // Save discovery + gamification
+                const isNewDiscovery = !discoveredCompounds.has(res.formula);
+                const newSet = new Set(discoveredCompounds);
+                if (isNewDiscovery) {
+                    newSet.add(res.formula);
                     setDiscoveredCompounds(newSet);
                     const newArray = [...newSet];
                     localStorage.setItem(discoveredCompoundsKey, JSON.stringify(newArray));
                     setDoc(doc(db, "users", currentUser), { discoveredCompounds: newArray }, { merge: true }).catch(e => console.error(e));
+
+                    // XP: heat-required = 150, normal = 100 for new discovery
+                    const earnedXp = res.requiresHeat ? 150 : 100;
+                    awardXp(earnedXp, `New: ${res.name}!`);
+
+                    // Daily challenge check
+                    const mixKey2 = [...currentFlask].sort().join(',');
+                    if (dailyChallenge && mixKey2 === dailyChallenge.key && !dailyDone) {
+                        const todayKey = new Date().toISOString().slice(0, 10);
+                        setDailyDone(true);
+                        awardXp(dailyChallenge.xp, '🌟 Daily Challenge Complete!');
+                        setDoc(doc(db, 'users', currentUser), { dailyChallengeDate: todayKey }, { merge: true }).catch(e => console.error(e));
+                    }
+
+                    const newSession = sessionDiscoveries + 1;
+                    setSessionDiscoveries(newSession);
+                    checkBadges(newSet, newSession, 0);
+                } else {
+                    // Repeat discovery = less XP
+                    awardXp(10, `${res.name} (already known)`);
                 }
                 
                 sndSuccess.current.currentTime = 0; sndSuccess.current.play().catch(e => console.warn(e));
@@ -302,6 +455,108 @@ export default function Laboratory() {
         setShowDesktopAr(true);
     };
 
+    // ── Load XP, hints, daily challenge from Firestore on mount ────────────────
+    useEffect(() => {
+        const loadGamification = async () => {
+            try {
+                const userSnap = await getDoc(doc(db, 'users', currentUser));
+                if (userSnap.exists()) {
+                    const data = userSnap.data();
+                    setXp(data.labXp || 0);
+                    // Hints reset daily
+                    const today = new Date().toDateString();
+                    if (data.hintResetDate === today) {
+                        setHintsLeft(data.hintsLeft ?? 3);
+                    } else {
+                        setHintsLeft(3);
+                        setDoc(doc(db, 'users', currentUser), { hintsLeft: 3, hintResetDate: today }, { merge: true });
+                    }
+                    // Daily challenge
+                    const todayKey = new Date().toISOString().slice(0, 10);
+                    const challengeIdx = new Date().getDate() % DAILY_CHALLENGES.length;
+                    setDailyChallenge(DAILY_CHALLENGES[challengeIdx]);
+                    setDailyDone(data.dailyChallengeDate === todayKey);
+                }
+            } catch (e) { console.error(e); }
+        };
+        loadGamification();
+    }, [currentUser]);
+
+    // ── XP toast auto-dismiss ────────────────────────────────────────────────
+    useEffect(() => {
+        if (xpToast) {
+            const t = setTimeout(() => setXpToast(null), 2500);
+            return () => clearTimeout(t);
+        }
+    }, [xpToast]);
+
+    // ── Badge toast auto-dismiss ─────────────────────────────────────────────
+    useEffect(() => {
+        if (badgeToast) {
+            const t = setTimeout(() => setBadgeToast(null), 4000);
+            return () => clearTimeout(t);
+        }
+    }, [badgeToast]);
+
+    // ── Award XP helper ──────────────────────────────────────────────────────
+    const awardXp = (amount, label) => {
+        setXp(prev => {
+            const newXp = prev + amount;
+            setDoc(doc(db, 'users', currentUser), { labXp: newXp }, { merge: true }).catch(e => console.error(e));
+            return newXp;
+        });
+        setXpToast({ amount, label });
+    };
+
+    // ── Check and award lab badges ───────────────────────────────────────────
+    const checkBadges = (newDiscoveredSet, newSessionCount, burnerUses) => {
+        const earnedKey = `labBadges_${currentUser}`;
+        const alreadyEarned = new Set(JSON.parse(localStorage.getItem(earnedKey)) || []);
+        const newlyEarned = [];
+
+        LAB_BADGES.forEach(badge => {
+            if (!alreadyEarned.has(badge.id) &&
+                badge.check(newDiscoveredSet.size, newSessionCount, newDiscoveredSet, burnerUses)) {
+                alreadyEarned.add(badge.id);
+                newlyEarned.push(badge);
+            }
+        });
+
+        if (newlyEarned.length > 0) {
+            localStorage.setItem(earnedKey, JSON.stringify([...alreadyEarned]));
+            // Show toast for first newly earned badge
+            setBadgeToast(newlyEarned[0]);
+            // Save to Firestore
+            setDoc(doc(db, 'users', currentUser), {
+                labBadges: [...alreadyEarned]
+            }, { merge: true }).catch(e => console.error(e));
+        }
+    };
+
+    // ── Hint system ──────────────────────────────────────────────────────────
+    const useHint = () => {
+        if (hintsLeft <= 0) return;
+        // Find a random undiscovered compound and reveal one element
+        const undiscovered = Object.entries(recipes).filter(([key]) => {
+            const formula = recipes[key].formula;
+            return !discoveredCompounds.has(formula);
+        });
+        if (undiscovered.length === 0) {
+            setCurrentHint("🎉 You've discovered all compounds!");
+            setShowHint(true);
+            return;
+        }
+        const [key, rec] = undiscovered[Math.floor(Math.random() * undiscovered.length)];
+        const elements = key.split(',');
+        const revealed = elements[Math.floor(Math.random() * elements.length)];
+        const el = baseElements.find(e => e.sym === revealed);
+        setCurrentHint(`Try using ${el?.name || revealed} (${revealed}) — it's part of a compound you haven't found yet!`);
+        setShowHint(true);
+        const newHints = hintsLeft - 1;
+        setHintsLeft(newHints);
+        setDoc(doc(db, 'users', currentUser), { hintsLeft: newHints }, { merge: true }).catch(e => console.error(e));
+    };
+
     // Auto-open compound if linked from a QR code
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -376,6 +631,50 @@ export default function Laboratory() {
                         100% { transform: translateY(-120vh) rotate(360deg); }
                     }
 
+                    /* Laboratory Header Height Reduction */
+                    .hero-banner {
+                        padding: 20px 30px !important;
+                        min-height: 110px !important;
+                    }
+                    .hero-banner h1 { font-size: 1.8rem !important; margin-bottom: 4px !important; }
+                    .hero-banner p { font-size: 0.95rem !important; }
+
+                    /* Lab Toolbar Buttons Styling */
+                    .lab-toolbar {
+                        display: flex;
+                        gap: 12px;
+                        width: 100%;
+                        margin-top: 20px;
+                    }
+                    .lab-toolbar-btn {
+                        flex: 1;
+                        padding: 12px 20px;
+                        border-radius: 12px;
+                        border: none;
+                        font-weight: 700;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 10px;
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                        font-family: inherit;
+                        font-size: 0.95rem;
+                    }
+                    .lab-toolbar-btn.clear {
+                        background: rgba(255, 255, 255, 0.05);
+                        color: #ff7675;
+                        border: 1px solid rgba(255, 118, 117, 0.2);
+                    }
+                    .lab-toolbar-btn.clear:hover { background: rgba(255, 118, 117, 0.15); border-color: #ff7675; }
+                    .lab-toolbar-btn.mix {
+                        background: linear-gradient(135deg, #6e45e2 0%, #4facfe 100%);
+                        color: white;
+                        box-shadow: 0 4px 15px rgba(110, 69, 226, 0.3);
+                    }
+                    .lab-toolbar-btn.mix:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(110, 69, 226, 0.4); }
+                    .lab-toolbar-btn:active { transform: scale(0.95); }
+
                     /* Mobile UX Layout Improvements */
                     @media (max-width: 850px) {
                         .lab-layout {
@@ -389,12 +688,12 @@ export default function Laboratory() {
                             position: sticky;
                             top: 70px; /* Aligned below the navbar */
                             z-index: 100;
-                            background: white !important;
+                            background: #1e1e2e !important;
                             padding: 15px !important;
                             border-radius: 20px !important;
-                            box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important;
+                            box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
                             margin-bottom: 5px !important;
-                            border: 1px solid #eee;
+                            border: 1px solid #2d2d3f !important;
                         }
 
                         .experiment-panel h2 { font-size: 1.1rem !important; }
@@ -444,6 +743,41 @@ export default function Laboratory() {
             </nav>
 
             <main className="dashboard-container" style={{ position: 'relative', zIndex: 1 }}>
+
+                {/* ── XP Toast ── */}
+                {xpToast && (
+                    <div style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 9999, background: 'linear-gradient(135deg, #6e45e2, #4facfe)', color: '#fff', padding: '12px 20px', borderRadius: '14px', fontWeight: '700', fontSize: '1rem', boxShadow: '0 8px 24px rgba(110,69,226,0.4)', animation: 'popIn 0.3s ease', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '1.3rem' }}>⭐</span>
+                        +{xpToast.amount} XP — {xpToast.label}
+                    </div>
+                )}
+
+                {/* ── Badge Toast ── */}
+                {badgeToast && (
+                    <div style={{ position: 'fixed', top: '140px', right: '20px', zIndex: 9999, background: '#fff', border: '2px solid #6e45e2', padding: '14px 20px', borderRadius: '16px', fontWeight: '700', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', animation: 'popIn 0.3s ease', maxWidth: '280px' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#6e45e2', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>🏅 Badge Unlocked!</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '1.8rem' }}>{badgeToast.icon}</span>
+                            <div>
+                                <div style={{ color: '#1a1a2e', fontSize: '0.95rem' }}>{badgeToast.title}</div>
+                                <div style={{ color: '#888', fontSize: '0.75rem', fontWeight: '400' }}>{badgeToast.desc}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Hint modal ── */}
+                {showHint && (
+                    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ background: '#fff', borderRadius: '20px', padding: '32px', maxWidth: '360px', textAlign: 'center', boxShadow: '0 16px 40px rgba(0,0,0,0.2)' }}>
+                            <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>💡</div>
+                            <h3 style={{ color: '#1a1a2e', marginBottom: '12px' }}>Lab Hint</h3>
+                            <p style={{ color: '#555', lineHeight: '1.6', marginBottom: '20px' }}>{currentHint}</p>
+                            <button className="btn-primary" onClick={() => setShowHint(false)} style={{ width: '100%' }}>Got it!</button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="hero-banner">
                     <div className="hero-text">
                         <h1>Virtual Laboratory ⚗️</h1>
@@ -453,49 +787,101 @@ export default function Laboratory() {
                 </div>
 
                 <div className="lab-layout">
+                    {/* ── Inventory Panel ── */}
                     <div className="inventory-panel">
-                        <h3 style={{ color: '#2d3436', borderBottom: '2px solid #f0f0f0', paddingBottom: '10px' }}>Element Inventory</h3>
-                        <p style={{ color: '#7f8fa6', fontSize: '0.9rem', marginTop: '10px' }}>Tap or drag elements into the flask</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f0f0f0', paddingBottom: '12px', marginBottom: '14px' }}>
+                            <h3 style={{ color: '#2d3436', margin: 0, fontSize: '1rem', fontWeight: '700' }}>Element Inventory</h3>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    className="btn-secondary"
+                                    style={{ padding: '6px 14px', fontSize: '0.8rem', background: hintsLeft > 0 ? '#fffbea' : '#f0f0f0', borderColor: hintsLeft > 0 ? '#f6c90e' : '#ddd', color: hintsLeft > 0 ? '#856404' : '#aaa' }}
+                                    onClick={useHint}
+                                    title={hintsLeft > 0 ? `Use a hint (${hintsLeft} left today)` : 'No hints left today'}
+                                >
+                                    💡 Hint ({hintsLeft})
+                                </button>
+                                <button className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.8rem' }} onClick={() => { setShowRecipeModal(true); sndOpen.current.currentTime = 0; sndOpen.current.play().catch(e=>e); }}>
+                                    <i className="fas fa-book"></i> Guide
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Discovery progress bar */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '0.8rem', color: '#7f8fa6', fontWeight: '600' }}>Compounds discovered</span>
+                                <span style={{ fontSize: '0.8rem', color: '#6e45e2', fontWeight: '700' }}>{discoveredCompounds.size} / {Object.keys(recipes).length}</span>
+                            </div>
+                            <div style={{ height: '7px', background: '#f0f0f0', borderRadius: '99px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${(discoveredCompounds.size / Object.keys(recipes).length) * 100}%`, background: 'linear-gradient(90deg, #6e45e2, #4facfe)', borderRadius: '99px', transition: 'width 0.6s ease' }}></div>
+                            </div>
+                        </div>
+
+                        {/* Group legend */}
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                            {Object.entries(GROUP_COLORS).map(([group, c]) => (
+                                <span key={group} style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', background: c.bg, color: c.accent, fontWeight: '700', textTransform: 'capitalize' }}>{group}</span>
+                            ))}
+                        </div>
+
+                        <p style={{ color: '#7f8fa6', fontSize: '0.82rem', margin: '0 0 12px' }}>Tap or drag elements into the flask</p>
                         <div className="inventory-search">
                             <i className="fas fa-search search-icon"></i>
                             <input type="text" value={inventorySearch} onChange={e => setInventorySearch(e.target.value)} placeholder="Search by name or symbol..." />
                             {inventorySearch && <i className="fas fa-times clear-search-icon" style={{ display: 'block' }} onClick={() => setInventorySearch('')}></i>}
                         </div>
-                        <div className="inventory-grid">
-                            {baseElements.filter(el => el.name.toLowerCase().includes(inventorySearch.toLowerCase()) || el.sym.toLowerCase().includes(inventorySearch.toLowerCase())).map(el => (
-                                <div 
-                                    key={el.sym} 
-                                    className="element-drag" 
-                                    draggable 
-                                    onDragStart={(e) => handleDragStart(e, el.sym)} 
-                                    onClick={() => addToFlask(el.sym)}
-                                    title={el.name} 
-                                    style={{ borderColor: el.color, cursor: 'pointer' }}
-                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                                >
-                                    {el.sym}
+
+                        <div className="inventory-grid" style={{ marginTop: '14px' }}>
+                            {baseElements
+                                .filter(el => el.name.toLowerCase().includes(inventorySearch.toLowerCase()) || el.sym.toLowerCase().includes(inventorySearch.toLowerCase()))
+                                .map(el => {
+                                    const gc = GROUP_COLORS[el.group] || GROUP_COLORS.metal;
+                                    return (
+                                        <div
+                                            key={el.sym}
+                                            className="element-drag"
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, el.sym)}
+                                            onClick={() => addToFlask(el.sym)}
+                                            title={`${el.name} (${el.group})`}
+                                            style={{ background: gc.bg, borderColor: gc.accent, width: '62px', height: '70px', flexDirection: 'column', gap: '1px', padding: '4px 2px', position: 'relative', cursor: 'pointer' }}
+                                        >
+                                            <span style={{ fontSize: '0.6rem', color: gc.accent, alignSelf: 'flex-start', paddingLeft: '4px', lineHeight: 1 }}>{el.num}</span>
+                                            <span style={{ fontSize: '1.3rem', fontWeight: '800', color: gc.text, lineHeight: 1 }}>{el.sym}</span>
+                                            <span style={{ fontSize: '0.55rem', color: gc.accent, textAlign: 'center', lineHeight: 1.2, maxWidth: '58px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{el.name}</span>
+                                        </div>
+                                    );
+                                })
+                            }
+                            {inventorySearch && baseElements.filter(el => el.name.toLowerCase().includes(inventorySearch.toLowerCase()) || el.sym.toLowerCase().includes(inventorySearch.toLowerCase())).length === 0 && (
+                                <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#aaa', fontSize: '0.85rem', padding: '20px 0' }}>
+                                    <i className="fas fa-search" style={{ display: 'block', fontSize: '1.5rem', marginBottom: '8px', opacity: 0.4 }}></i>
+                                    No elements found
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
 
-                    <div className="experiment-panel">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '2px solid #f0f0f0', paddingBottom: '15px' }}>
-                            <h2 style={{ color: '#2d3436' }}>Experiment Station</h2>
-                            <button className="btn-secondary" onClick={() => { setShowRecipeModal(true); sndOpen.current.currentTime = 0; sndOpen.current.play().catch(e=>e); }}><i className="fas fa-book"></i> Experiment Guide</button>
+                    {/* ── Experiment Panel (dark lab bench) ── */}
+                    <div className="experiment-panel" style={{ background: '#1e1e2e', borderColor: '#2d2d3f' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '14px', marginBottom: '4px' }}>
+                            <h2 style={{ color: '#fff', margin: 0, fontSize: '1rem', fontWeight: '700' }}>⚗️ Experiment Station</h2>
+                            <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: '600' }}>
+                                {currentFlask.length > 0 ? `${currentFlask.length} element${currentFlask.length !== 1 ? 's' : ''} added` : 'Flask is empty'}
+                            </span>
                         </div>
-                        
-                        <div className="dropzone-wrapper" style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%', margin: '20px 0' }}>
-                            <div 
-                                className={`flask-dropzone ${isDragOver ? 'dragover' : ''} ${resultData.type === 'failed' && showResultModal ? 'shake-animation' : ''}`} 
-                                onDrop={handleDrop} 
-                                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }} 
-                                onDragLeave={() => setIsDragOver(false)} 
-                                style={{ margin: '0 0 65px 0', boxShadow: isHeating ? '0 0 25px rgba(255, 107, 107, 0.4)' : 'none', transition: 'box-shadow 0.5s ease' }}
+
+
+                        <div className="dropzone-wrapper" style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%', margin: '16px 0' }}>
+                            <div
+                                className={`flask-dropzone ${isDragOver ? 'dragover' : ''} ${resultData.type === 'failed' && showResultModal ? 'shake-animation' : ''}`}
+                                onDrop={handleDrop}
+                                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                                onDragLeave={() => setIsDragOver(false)}
+                                style={{ margin: '0 0 65px 0', boxShadow: isHeating ? '0 0 30px rgba(255,107,107,0.5), 0 0 60px rgba(255,107,107,0.2)' : 'none', transition: 'box-shadow 0.5s ease', borderColor: 'rgba(180,190,200,0.4)' }}
                             >
                                 {currentFlask.length > 0 && !flaskState.mixed && (
-                                    <div style={{ position: 'absolute', top: '-40px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(110, 69, 226, 0.1)', color: '#6e45e2', padding: '4px 12px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', whiteSpace: 'nowrap', border: '1px solid rgba(110, 69, 226, 0.2)' }}>
+                                    <div style={{ position: 'absolute', top: '-38px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(110,69,226,0.2)', color: '#a29bfe', padding: '3px 12px', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem', whiteSpace: 'nowrap', border: '1px solid rgba(110,69,226,0.35)' }}>
                                         {getFlaskFormula()}
                                     </div>
                                 )}
@@ -506,8 +892,26 @@ export default function Laboratory() {
                                     <div className="mark"><span className="mark-text">50</span></div>
                                 </div>
                                 <div className="particles-container" ref={particlesContainerRef}></div>
-                                <div className="added-elements">
-                                    {currentFlask.map((sym, idx) => <div key={idx} className="added-element">{sym}</div>)}
+                                <div className="added-elements" style={{ zIndex: 3, marginBottom: '20px' }}>
+                                    {currentFlask.map((sym, idx) => {
+                                        const el = baseElements.find(e => e.sym === sym);
+                                        const gc = el ? GROUP_COLORS[el.group] : GROUP_COLORS.metal;
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className="added-element"
+                                                style={{ background: gc.bg, border: `2px solid ${gc.accent}`, color: gc.text, borderRadius: '99px', width: 'auto', padding: '0 10px', gap: '5px', fontSize: '0.85rem', height: '34px', display: 'flex', alignItems: 'center' }}
+                                            >
+                                                <span style={{ fontWeight: '800' }}>{sym}</span>
+                                                {!flaskState.mixed && (
+                                                    <span
+                                                        onClick={(e) => { e.stopPropagation(); removeFromFlask(idx); }}
+                                                        style={{ fontSize: '0.7rem', opacity: 0.6, cursor: 'pointer', lineHeight: 1, marginLeft: '2px' }}
+                                                    >✕</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                                 <div className="bunsen-burner">
                                     <div className={`flame ${isHeating ? 'active' : ''}`}></div>
@@ -515,51 +919,123 @@ export default function Laboratory() {
                                     <div className="burner-base"></div>
                                 </div>
                             </div>
-                            
-                            <button className="pour-toggle-btn" onClick={pourLiquid} title="Pour Liquid / Undo"><i className="fas fa-fill-drip"></i> <span>Pour</span></button>
-                            <button className={`heat-toggle-btn ${isHeating ? 'active' : ''}`} onClick={() => setIsHeating(!isHeating)} title="Toggle Bunsen Burner"><i className="fas fa-power-off"></i> <span>Burner: {isHeating ? 'ON' : 'OFF'}</span></button>
+
+                            <button className="pour-toggle-btn" onClick={pourLiquid} title="Pour / Undo last element"><i className="fas fa-fill-drip"></i> <span>Pour</span></button>
+                            <button className={`heat-toggle-btn ${isHeating ? 'active' : ''}`} onClick={() => setIsHeating(!isHeating)} title="Toggle Bunsen Burner"><i className="fas fa-fire"></i> <span>Burner: {isHeating ? 'ON' : 'OFF'}</span></button>
                         </div>
 
-                        <div className="controls">
-                            <button className="btn-cancel" onClick={clearFlask}><i className="fas fa-trash"></i> Clear</button>
-                            <button className="btn-primary" onClick={mixElements}><i className="fas fa-magic"></i> Mix</button>
+                        <div className="lab-toolbar">
+                            <button className="lab-toolbar-btn clear" onClick={clearFlask}>
+                                <i className="fas fa-trash"></i> Clear
+                            </button>
+                            <button className="lab-toolbar-btn mix" onClick={mixElements}>
+                                <i className="fas fa-magic"></i> Mix Elements
+                            </button>
                         </div>
+
+                        {/* ── Daily Challenge (bottom of experiment panel) ── */}
+                        {dailyChallenge && (
+                            <div style={{ width: '100%', marginTop: '14px', borderRadius: '10px', padding: '10px 14px', background: dailyDone ? 'rgba(29,209,161,0.15)' : 'rgba(240,147,251,0.12)', border: `1px solid ${dailyDone ? 'rgba(29,209,161,0.3)' : 'rgba(240,147,251,0.3)'}`, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{dailyDone ? '✅' : '🌟'}</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: '700', fontSize: '0.7rem', color: dailyDone ? '#1dd1a1' : '#f093fb', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+                                        Daily Challenge {dailyDone ? '— Complete!' : `— +${dailyChallenge.xp} XP`}
+                                    </div>
+                                    <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)', lineHeight: '1.4' }}>
+                                        {dailyDone ? 'Come back tomorrow for a new challenge!' : dailyChallenge.clue}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </main>
 
-            {/* Recipe Modal */}
+            {/* Recipe Modal — fully redesigned */}
             {showRecipeModal && (
-                <div className="modal-container show">
-                    <div className="modal-content modern-modal">
-                        <button className="modern-close-btn" onClick={() => setShowRecipeModal(false)}>&times;</button>
-                        <div className="modal-sidebar">
-                            <h2 className="recipe-title"><i className="fas fa-flask" style={{ color: '#6e45e2', marginRight: '10px' }}></i> Experiment Guide</h2>
-                            <p className="recipe-desc">Use this guide to find the right elements and conditions to make new compounds.</p>
-                            <div className="inventory-search">
-                                <i className="fas fa-search search-icon"></i>
-                                <input type="text" value={recipeSearch} onChange={e => setRecipeSearch(e.target.value)} placeholder="Search compounds..." />
+                <div className="guide-overlay" onClick={() => setShowRecipeModal(false)}>
+                    <div className="guide-sheet" onClick={e => e.stopPropagation()}>
+
+                        {/* ── Header ── */}
+                        <div className="guide-header">
+                            <div>
+                                <div className="guide-title">⚗️ Experiment Guide</div>
+                                <div className="guide-subtitle">
+                                    <span className="guide-discovered-badge">{discoveredCompounds.size} / {Object.keys(recipes).length} discovered</span>
+                                    <div className="guide-progress-bar">
+                                        <div className="guide-progress-fill" style={{ width: `${(discoveredCompounds.size / Object.keys(recipes).length) * 100}%` }}></div>
+                                    </div>
+                                </div>
                             </div>
+                            <button className="guide-close-btn" onClick={() => setShowRecipeModal(false)}>✕</button>
                         </div>
-                        <div className="modal-main">
-                            <div className="recipe-grid">
-                                {Object.entries(recipes).filter(([_, res]) => res.name.toLowerCase().includes(recipeSearch.toLowerCase())).map(([key, res]) => {
-                                    const isDiscovered = discoveredCompounds.has(res.formula);
-                                    return (
-                                        <div key={res.formula} className={`recipe-card ${isDiscovered ? '' : 'locked'}`}>
-                                            <div className="recipe-icon">
-                                                {res.icon}
-                                                {!isDiscovered && <i className="fas fa-lock" style={{ position: 'absolute', bottom: '-5px', right: '-5px', fontSize: '0.8rem', color: '#b2bec3', background: '#fff', borderRadius: '50%', padding: '2px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}></i>}
-                                            </div>
-                                            <div className="recipe-card-content">
-                                                <h4 style={{ color: '#2d3436', marginBottom: '3px', fontSize: '1.05rem' }}>{res.name}</h4>
-                                                <p style={{ fontSize: '0.95rem', color: '#6e45e2', fontWeight: 'bold', marginBottom: '6px' }}>{res.formula}</p>
-                                                <p style={{ fontSize: '0.8rem', color: '#636e72' }}>Req: <strong>{key.split(',').join(' + ')}</strong> {res.requiresHeat ? '🔥' : ''}</p>
+
+                        {/* ── Search ── */}
+                        <div className="guide-search-wrap">
+                            <i className="fas fa-search guide-search-icon"></i>
+                            <input
+                                className="guide-search-input"
+                                type="text"
+                                value={recipeSearch}
+                                onChange={e => { setRecipeSearch(e.target.value); setRecipeCategory('all'); }}
+                                placeholder="Search compounds..."
+                            />
+                            {recipeSearch && (
+                                <span className="guide-search-clear" onClick={() => setRecipeSearch('')}>✕</span>
+                            )}
+                        </div>
+
+                        {/* ── Category tabs ── */}
+                        {!recipeSearch && (
+                            <div className="guide-tabs">
+                                {CATEGORIES.map(cat => (
+                                    <button
+                                        key={cat.id}
+                                        className={`guide-tab ${recipeCategory === cat.id ? 'active' : ''}`}
+                                        onClick={() => setRecipeCategory(cat.id)}
+                                    >
+                                        <span>{cat.icon}</span> {cat.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* ── Recipe grid ── */}
+                        <div className="guide-grid">
+                            {Object.entries(recipes)
+                                .filter(([_, res]) => {
+                                    const matchSearch = res.name.toLowerCase().includes(recipeSearch.toLowerCase()) ||
+                                                        res.formula.toLowerCase().includes(recipeSearch.toLowerCase());
+                                    const matchCat = recipeCategory === 'all' || getCategory(res.name) === recipeCategory;
+                                    return matchSearch && matchCat;
+                                })
+                                .sort((a, b) => a[1].name.localeCompare(b[1].name))
+                                .map(([key, res]) => (
+                                    <div key={res.formula} className="guide-card unlocked">
+                                        <div className="guide-card-icon">{res.icon}</div>
+                                        <div className="guide-card-body">
+                                            <div className="guide-card-name">{res.name}</div>
+                                            <div className="guide-card-formula">{res.formula}</div>
+                                            <div className="guide-card-recipe">
+                                                {key.split(',').map((sym, i) => (
+                                                    <span key={i} className="guide-element-chip">{sym}</span>
+                                                ))}
+                                                {res.requiresHeat && <span className="guide-heat-badge">🔥 Heat</span>}
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    </div>
+                                ))
+                            }
+                            {Object.entries(recipes).filter(([_, res]) => {
+                                const matchSearch = res.name.toLowerCase().includes(recipeSearch.toLowerCase());
+                                const matchCat = recipeCategory === 'all' || getCategory(res.name) === recipeCategory;
+                                return matchSearch && matchCat;
+                            }).length === 0 && (
+                                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+                                    <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔍</div>
+                                    <div style={{ fontWeight: '600' }}>No compounds found</div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -607,7 +1083,7 @@ export default function Laboratory() {
                                 <>
                                     <div className="element-model-box" style={{ width: '100%', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
                                         <model-viewer
-                                            src={`/assets/models/${getModelFilename(resultData.res.name)}.glb`}
+                                            src={`/assets/models/${getModelFilename(resultData.res.name)}.gltf`}
                                             alt={`3D model of ${resultData.res.name}`}
                                             auto-rotate
                                             rotation-per-second="45deg"

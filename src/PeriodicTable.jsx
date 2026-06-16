@@ -481,7 +481,7 @@ export default function PeriodicTable() {
                                 </div>
                                 <div className="element-model-box" style={{ width: '100%', maxWidth: '360px', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
                                     <model-viewer
-                                        src={`/assets/models/${selectedElement.name.toLowerCase()}.glb`}
+                                        src={`/assets/models/${selectedElement.name.toLowerCase()}.gltf`}
                                         alt={`3D model of ${selectedElement.name}`}
                                         auto-rotate
                                         rotation-per-second="45deg"
