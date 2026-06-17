@@ -189,6 +189,7 @@
 }
 .score-icon-box.time-attack { background: #fff0f0; color: #ff6b6b; }
 .score-icon-box.matching { background: #eaf4ff; color: #4facfe; }
+.score-icon-box.recall { background: #f3f0ff; color: #6e45e2; }
 
 .score-details { flex: 1; text-align: left; }
 
@@ -214,6 +215,10 @@
 .btn-play-game.matching { background: #eaf4ff; color: #4facfe; }
 @media (hover: hover) {
     .btn-play-game.matching:hover { background: #4facfe; color: white; transform: scale(1.05); }
+}
+.btn-play-game.recall { background: #f3f0ff; color: #6e45e2; }
+@media (hover: hover) {
+    .btn-play-game.recall:hover { background: #6e45e2; color: white; transform: scale(1.05); }
 }
 
 /* --- Compounds Modal List --- */

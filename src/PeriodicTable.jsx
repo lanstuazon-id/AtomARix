@@ -4,7 +4,7 @@ import './PeriodicTable.css';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
-const elementData = {
+export const elementData = {
     "H": { n: 1, name: "Hydrogen", cat: "nonmetal", x: 1, y: 1, mass: "1.008", config: "1s¹", fact: "The most abundant element in the universe!", period: 1, summary: "Hydrogen is the lightest element. Hydrogen is a gas at normal temperature and pressure, but hydrogen condenses to a liquid at minus 253 degrees Celsius. Hydrogen is the simplest element. Each atom of hydrogen has only one proton." },
     "He": { n: 2, name: "Helium", cat: "noble-gas", x: 18, y: 1, mass: "4.002", config: "1s²", fact: "Inhaling helium makes your voice sound higher-pitched!", period: 1, summary: "Helium is a colorless, odorless, non-toxic noble gas with the lowest boiling point of any element, primarily sourced as a byproduct of natural gas extraction. Indispensable for MRI scanners, semiconductor manufacturing, and aerospace, it is also used in welding and diving mixtures. Discovered in 1868, it is the second most abundant element, largely found underground." },
     "Li": { n: 3, name: "Lithium", cat: "alkali-metal", x: 1, y: 2, mass: "6.94", config: "[He] 2s¹", fact: "Lithium is the lightest metal.", period: 2, summary: "Lithium is a soft and very light metal that reacts easily with water. It is widely used in rechargeable batteries for phones, laptops, and electric cars. It is also used in some medicines for mental health treatment. Lithium must be stored carefully because it is reactive. It was discovered in 1817." },
@@ -181,7 +181,10 @@ export default function PeriodicTable() {
     };
 
     const openDesktopAR = () => {
-        const arUrl = new URL(window.location.href);
+        // Point to a dedicated, public AR viewer route — not the current
+        // (login-protected) page — so scanning the QR code on a phone opens
+        // the 3D model directly instead of redirecting to Login.
+        const arUrl = new URL(window.location.origin + '/ar-view');
         arUrl.searchParams.set('element', selectedElement.symbol);
         setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(arUrl.toString())}`);
         setShowDesktopAr(true);

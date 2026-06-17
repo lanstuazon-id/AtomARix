@@ -109,6 +109,7 @@ const LAB_BADGES = [
     { id: 'lab-mad',       title: 'Mad Scientist',    icon: '🧪', bg: 'bg-purple', desc: 'Discover 15 compounds',                  check: (d) => d >= 15 },
     { id: 'lab-master',    title: 'Master Chemist',   icon: '🏅', bg: 'bg-gold',   desc: 'Discover all 36 compounds',              check: (d) => d >= 36 },
     { id: 'lab-speed',     title: 'Speed Mixer',      icon: '⚡', bg: 'bg-green',  desc: 'Discover 5 compounds in one session',    check: (d, sess) => sess >= 5 },
+    { id: 'lab-recall',    title: 'Recall Master',    icon: '🧠', bg: 'bg-purple', desc: 'Score 7+ in the Compound Recall game',  check: (d, sess, f, b, recall) => recall >= 7 },
 ];
 
 // ── Daily challenge pool ─────────────────────────────────────────────────────
@@ -186,6 +187,21 @@ export default function Laboratory() {
     const [resultData, setResultData] = useState({ type: 'empty', res: null });
     const [showDesktopAr, setShowDesktopAr] = useState(false);
     const [qrUrl, setQrUrl] = useState('');
+
+    // ── Compound Recall mini-game state ───────────────────────────────────────
+    const [showRecallGame, setShowRecallGame] = useState(false);
+    const [recallActive, setRecallActive] = useState(false);
+    const [recallRound, setRecallRound] = useState(null);   // { key, compound, choices: [el1, el2, el3, el4] }
+    const [recallScore, setRecallScore] = useState(0);
+    const [recallStreak, setRecallStreak] = useState(0);
+    const [recallRoundsLeft, setRecallRoundsLeft] = useState(0);
+    const [recallFeedback, setRecallFeedback] = useState(null); // { correct: bool, sym: string }
+    const [recallBestScore, setRecallBestScore] = useState(
+        parseInt(localStorage.getItem(`compoundRecallBestScore_${currentUser}`) || '0', 10)
+    );
+    const [recallGameFinished, setRecallGameFinished] = useState(false);
+    const [isNewRecallBest, setIsNewRecallBest] = useState(false);
+    const RECALL_TOTAL_ROUNDS = 8;
 
     // Refs
     const particlesContainerRef = useRef(null);
@@ -509,14 +525,14 @@ export default function Laboratory() {
     };
 
     // ── Check and award lab badges ───────────────────────────────────────────
-    const checkBadges = (newDiscoveredSet, newSessionCount, burnerUses) => {
+    const checkBadges = (newDiscoveredSet, newSessionCount, burnerUses, recallScore = 0) => {
         const earnedKey = `labBadges_${currentUser}`;
         const alreadyEarned = new Set(JSON.parse(localStorage.getItem(earnedKey)) || []);
         const newlyEarned = [];
 
         LAB_BADGES.forEach(badge => {
             if (!alreadyEarned.has(badge.id) &&
-                badge.check(newDiscoveredSet.size, newSessionCount, newDiscoveredSet, burnerUses)) {
+                badge.check(newDiscoveredSet.size, newSessionCount, newDiscoveredSet, burnerUses, recallScore)) {
                 alreadyEarned.add(badge.id);
                 newlyEarned.push(badge);
             }
@@ -533,7 +549,91 @@ export default function Laboratory() {
         }
     };
 
-    // ── Hint system ──────────────────────────────────────────────────────────
+    // ── Compound Recall mini-game ────────────────────────────────────────────
+    // A quick popup quiz: shown a compound's formula/icon, the student picks
+    // which element was NOT part of the mixture. Reinforces the same recipes
+    // data already used in the main lab, just tested in reverse (recall vs. build).
+    const generateRecallRound = () => {
+        const recipeEntries = Object.entries(recipes);
+        const [key, compound] = recipeEntries[Math.floor(Math.random() * recipeEntries.length)];
+        const correctSymbols = [...new Set(key.split(','))];
+
+        // Pick one correct element as the "answer" plus 3 distractor elements
+        // that are NOT part of this compound, to test recall of its actual makeup.
+        const correctSym = correctSymbols[Math.floor(Math.random() * correctSymbols.length)];
+        const wrongPool = baseElements.filter(e => !correctSymbols.includes(e.sym));
+        const shuffledWrong = [...wrongPool].sort(() => Math.random() - 0.5).slice(0, 3);
+
+        const choices = [correctSym, ...shuffledWrong.map(e => e.sym)].sort(() => Math.random() - 0.5);
+
+        setRecallRound({ key, compound, correctSym, choices });
+        setRecallFeedback(null);
+    };
+
+    const startRecallGame = () => {
+        setRecallScore(0);
+        setRecallStreak(0);
+        setRecallRoundsLeft(RECALL_TOTAL_ROUNDS);
+        setRecallActive(true);
+        setRecallGameFinished(false);
+        setIsNewRecallBest(false);
+        generateRecallRound();
+    };
+
+    const answerRecallRound = (chosenSym) => {
+        if (recallFeedback) return; // prevent double-answer during feedback display
+        const isCorrect = chosenSym === recallRound.correctSym;
+
+        if (isCorrect) {
+            setRecallScore(prev => prev + 1);
+            setRecallStreak(prev => prev + 1);
+        } else {
+            setRecallStreak(0);
+        }
+        setRecallFeedback({ correct: isCorrect, sym: chosenSym });
+
+        setTimeout(() => {
+            const remaining = recallRoundsLeft - 1;
+            setRecallRoundsLeft(remaining);
+            if (remaining > 0) {
+                generateRecallRound();
+            } else {
+                finishRecallGame();
+            }
+        }, 900);
+    };
+
+    const finishRecallGame = () => {
+        setRecallActive(false);
+        setRecallGameFinished(true);
+
+        // Save best score (mirrors the matchingGameBestScore / timeAttackBestCorrect pattern)
+        setRecallScore(currentScore => {
+            const bestKey = `compoundRecallBestScore_${currentUser}`;
+            const existingBest = parseInt(localStorage.getItem(bestKey) || '0', 10);
+            if (currentScore > existingBest) {
+                localStorage.setItem(bestKey, currentScore.toString());
+                setRecallBestScore(currentScore);
+                setIsNewRecallBest(true);
+                setDoc(doc(db, 'users', currentUser), { compoundRecallBestScore: currentScore }, { merge: true }).catch(e => console.error(e));
+            }
+            // Award XP for participating, scaled by performance
+            awardXp(currentScore * 15, `Compound Recall: ${currentScore}/${RECALL_TOTAL_ROUNDS}`);
+            // Check for the Recall Master badge using the score just earned
+            checkBadges(discoveredCompounds, sessionDiscoveries, 0, currentScore);
+            return currentScore;
+        });
+    };
+
+    const closeRecallGame = () => {
+        setShowRecallGame(false);
+        setRecallActive(false);
+        setRecallRound(null);
+        setRecallFeedback(null);
+        setRecallGameFinished(false);
+    };
+
+
     const useHint = () => {
         if (hintsLeft <= 0) return;
         // Find a random undiscovered compound and reveal one element
@@ -866,9 +966,18 @@ export default function Laboratory() {
                     <div className="experiment-panel" style={{ background: '#1e1e2e', borderColor: '#2d2d3f' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '14px', marginBottom: '4px' }}>
                             <h2 style={{ color: '#fff', margin: 0, fontSize: '1rem', fontWeight: '700' }}>⚗️ Experiment Station</h2>
-                            <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: '600' }}>
-                                {currentFlask.length > 0 ? `${currentFlask.length} element${currentFlask.length !== 1 ? 's' : ''} added` : 'Flask is empty'}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)', fontWeight: '600' }}>
+                                    {currentFlask.length > 0 ? `${currentFlask.length} element${currentFlask.length !== 1 ? 's' : ''} added` : 'Flask is empty'}
+                                </span>
+                                <button
+                                    onClick={() => { setShowRecallGame(true); startRecallGame(); }}
+                                    title="Play Compound Recall"
+                                    style={{ background: 'linear-gradient(135deg, #6e45e2, #8e44ad)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 3px 10px rgba(110,69,226,0.35)' }}
+                                >
+                                    <i className="fas fa-brain"></i> Compound Recall
+                                </button>
+                            </div>
                         </div>
 
 
@@ -1134,6 +1243,85 @@ export default function Laboratory() {
                         <p style={{ color: '#666', marginBottom: '15px', lineHeight: '1.5' }}>Scan the QR code with your mobile device's camera to view <strong>{resultData?.res?.name}</strong> in Augmented Reality!</p>
                         <img src={qrUrl} alt="QR Code" style={{ marginBottom: '20px', borderRadius: '8px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} />
                         <button className="btn-primary" style={{ width: '100%' }} onClick={() => setShowDesktopAr(false)}>Got it</button>
+                    </div>
+                </div>
+            )}
+            {/* ── Compound Recall Mini-Game ── */}
+            {showRecallGame && (
+                <div className="modal-container show" style={{ zIndex: 10002 }} onClick={(e) => { if (e.target === e.currentTarget && !recallActive) closeRecallGame(); }}>
+                    <div className="modal-content" style={{ maxWidth: '460px', textAlign: 'center', padding: '30px' }}>
+                        {recallActive && recallRound ? (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#6e45e2', background: '#f3f0ff', padding: '4px 12px', borderRadius: '20px' }}>
+                                        Round {RECALL_TOTAL_ROUNDS - recallRoundsLeft + 1}/{RECALL_TOTAL_ROUNDS}
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1dd1a1' }}>
+                                        <i className="fas fa-check-circle"></i> Score: {recallScore}
+                                    </span>
+                                </div>
+
+                                <div style={{ fontSize: '3rem', marginBottom: '5px' }}>{recallRound.compound.icon}</div>
+                                <h2 style={{ color: '#2d3436', marginBottom: '5px' }}>{recallRound.compound.name}</h2>
+                                <p style={{ color: '#888', fontSize: '1.1rem', fontWeight: '700', marginBottom: '20px' }}>{recallRound.compound.formula}</p>
+                                <p style={{ color: '#555', marginBottom: '18px', fontSize: '0.95rem' }}>Which element was used to make this compound?</p>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                                    {recallRound.choices.map(sym => {
+                                        const el = baseElements.find(e => e.sym === sym);
+                                        const isThisCorrect = recallFeedback && sym === recallRound.correctSym;
+                                        const isThisWrongPick = recallFeedback && recallFeedback.sym === sym && !recallFeedback.correct;
+                                        return (
+                                            <button
+                                                key={sym}
+                                                onClick={() => answerRecallRound(sym)}
+                                                disabled={!!recallFeedback}
+                                                style={{
+                                                    padding: '14px 10px', borderRadius: '12px', border: '2px solid',
+                                                    borderColor: isThisCorrect ? '#1dd1a1' : isThisWrongPick ? '#ff6b6b' : '#e1e1e1',
+                                                    background: isThisCorrect ? '#e3fdf5' : isThisWrongPick ? '#fff0f0' : '#f8f9fa',
+                                                    cursor: recallFeedback ? 'default' : 'pointer', transition: 'all 0.2s',
+                                                    fontWeight: '700', fontSize: '1rem', color: '#2d3436'
+                                                }}
+                                            >
+                                                {el?.sym} <span style={{ display: 'block', fontSize: '0.7rem', color: '#888', fontWeight: '500' }}>{el?.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {recallStreak >= 3 && !recallFeedback && (
+                                    <p style={{ marginTop: '14px', color: '#f39c12', fontWeight: '700', fontSize: '0.85rem' }}>🔥 {recallStreak} in a row!</p>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🧠</div>
+                                <h2 style={{ color: '#2d3436', marginBottom: '8px' }}>Compound Recall</h2>
+                                {recallGameFinished ? (
+                                    <>
+                                        <p style={{ color: '#666', marginBottom: '15px' }}>Great work! Here's how you did:</p>
+                                        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#6e45e2', marginBottom: '5px' }}>{recallScore}/{RECALL_TOTAL_ROUNDS}</div>
+                                        {isNewRecallBest && (
+                                            <p style={{ color: '#f39c12', fontWeight: '700', marginBottom: '10px' }}><i className="fas fa-trophy"></i> New personal best!</p>
+                                        )}
+                                        <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '20px' }}>Best score: {recallBestScore}/{RECALL_TOTAL_ROUNDS}</p>
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                            <button className="btn-secondary" onClick={closeRecallGame}>Close</button>
+                                            <button className="btn-primary" onClick={startRecallGame}>Play Again</button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p style={{ color: '#666', marginBottom: '20px' }}>You'll see a compound's name and formula — pick which element was used to make it. {RECALL_TOTAL_ROUNDS} rounds, test your memory!</p>
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                            <button className="btn-secondary" onClick={closeRecallGame}>Cancel</button>
+                                            <button className="btn-primary" onClick={startRecallGame}>Start Game</button>
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        )}
                     </div>
                 </div>
             )}

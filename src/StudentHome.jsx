@@ -120,7 +120,7 @@ export default function StudentHome() {
         const savedSection = localStorage.getItem(`joinedRoomSection_${userName}`);
         return savedId && savedSection ? { id: savedId, section: savedSection } : null;
     });
-    const [stats, setStats] = useState({ learned: 0, compounds: 0, timeAttack: 0, matching: 999 });
+    const [stats, setStats] = useState({ learned: 0, compounds: 0, timeAttack: 0, matching: 999, recallGame: 0 });
     const [leaderboard, setLeaderboard] = useState([]);
     const [matchingLeaderboard, setMatchingLeaderboard] = useState([]);
     const [lastReadTime, setLastReadTime] = useState(0);
@@ -175,7 +175,8 @@ export default function StudentHome() {
         const timeAttackScore = parseInt(localStorage.getItem(`timeAttackBestCorrect_${userName}`) || '0', 10);
         let matchingScore = parseInt(localStorage.getItem(`matchingGameBestScore_${userName}`), 10);
         if (isNaN(matchingScore) || matchingScore <= 0) matchingScore = 999;
-        setStats({ learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingScore });
+        const recallGameScore = parseInt(localStorage.getItem(`compoundRecallBestScore_${userName}`) || '0', 10);
+        setStats({ learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingScore, recallGame: recallGameScore });
 
         let unsubscribeRoom = null;
         let unsubscribeUser = null;
@@ -209,6 +210,9 @@ export default function StudentHome() {
                         if (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0) {
                             localStorage.setItem(`matchingGameBestScore_${userName}`, data.matchingGameBestScore.toString());
                         }
+                        if (data.compoundRecallBestScore !== undefined) {
+                            localStorage.setItem(`compoundRecallBestScore_${userName}`, data.compoundRecallBestScore.toString());
+                        }
                         if (data.avatarUrl !== undefined) {
                             if (data.avatarUrl === '') {
                                 localStorage.removeItem(`userAvatar_${userName}`);
@@ -228,7 +232,8 @@ export default function StudentHome() {
                             learned: data.learnedElements ? data.learnedElements.length : learnedCount, 
                             compounds: data.discoveredCompounds ? data.discoveredCompounds.length : discoveredCompoundsCount,
                             timeAttack: data.timeAttackBestCorrect !== undefined ? data.timeAttackBestCorrect : timeAttackScore,
-                            matching: (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0) ? data.matchingGameBestScore : matchingScore
+                            matching: (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0) ? data.matchingGameBestScore : matchingScore,
+                            recallGame: data.compoundRecallBestScore !== undefined ? data.compoundRecallBestScore : recallGameScore
                         });
                     }
 
@@ -991,6 +996,18 @@ export default function StudentHome() {
                             {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.matching === 999 ? '-' : stats.matching} <small>moves</small></span>}
                         </div>
                         <button className="btn-play-game matching" onClick={() => navigate('/matchinggame')}>
+                            Play Now
+                        </button>
+                    </div>
+                    <div className="score-stat-card">
+                        <div className="score-icon-box recall">
+                            <i className="fas fa-brain"></i>
+                        </div>
+                        <div className="score-details">
+                            <h4>Compound Recall Best</h4>
+                            {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.recallGame}/8 <small>correct</small></span>}
+                        </div>
+                        <button className="btn-play-game recall" onClick={() => navigate('/laboratory')}>
                             Play Now
                         </button>
                     </div>

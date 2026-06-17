@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import { auth, db } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function Login() {
@@ -27,6 +27,20 @@ export default function Login() {
 
     // Modal state
     const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'error' });
+
+    // Clears all form inputs — used after a successful registration so the
+    // login screen the user lands on next is blank, not pre-filled with
+    // whatever they just typed to create their account.
+    const resetFormFields = () => {
+        setUsername('');
+        setPassword('');
+        setFullname('');
+        setConfirmPassword('');
+        setPasswordError('');
+        setTeacherCode('');
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+    };
 
     // On mount: check for invite token in URL, then check remembered user
     useEffect(() => {
@@ -188,8 +202,16 @@ export default function Login() {
                 }
 
                 setModal({ show: true, title: 'Account Created!', message: 'Redirecting to login...', type: 'loading' });
+
+                // Firebase signs the user in automatically right after
+                // createUserWithEmailAndPassword. Sign them back out so the
+                // login screen they land on actually requires a real login,
+                // instead of silently being authenticated already.
+                await signOut(auth);
+
                 setTimeout(() => {
                     setModal({ show: false, title: '', message: '', type: '' });
+                    resetFormFields();
                     setIsLoginView(true);
                 }, 800);
             } catch (error) {

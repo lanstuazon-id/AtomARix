@@ -12,6 +12,7 @@ import Achievements from './Achievements.jsx'
 import TeacherRoom from './TeacherRoom.jsx'
 import StudentRoom from './StudentRoom.jsx'
 import AdminDashboard from './AdminDashboard.jsx'
+import ArViewer from './ArViewer.jsx'
 
 // ── Change this to your own secret password ──────────────────────────────────
 const ADMIN_PASS = 'atomarix-admin-2026';
@@ -76,6 +77,11 @@ function App() {
         <Route path="/" element={<Login />} />
         {/* Teacher invite link lands here — token is read from the URL by Login.jsx */}
         <Route path="/register" element={<Login />} />
+
+        {/* Public AR viewer — reached by scanning the QR code shown on desktop.
+            Intentionally NOT protected: the phone scanning it is a separate,
+            unauthenticated browser session and has no logged-in user. */}
+        <Route path="/ar-view" element={<ArViewer />} />
 
         {/* Admin Route — password protected */}
         <Route path="/admin/tokens" element={
