@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './StudentRoom.css';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from './firebase';
@@ -29,10 +29,22 @@ const taElements = [
 export default function StudentRoom() {
     const { roomId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const userName = sessionStorage.getItem('loggedInUser');
 
     const [room, setRoom] = useState(null);
-    const [activeTab, setActiveTab] = useState('feed');
+    const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'feed');
+
+    // If the student navigates here again with a target tab (e.g. tapping
+    // "Go to Classroom" from a notification while already on this page),
+    // jump to that tab. useState only reads location.state on first mount,
+    // so this effect catches subsequent navigations to the same route.
+    useEffect(() => {
+        if (location.state?.activeTab) {
+            setActiveTab(location.state.activeTab);
+        }
+    }, [location.state]);
+
     const [posts, setPosts] = useState([]);
     const [classwork, setClasswork] = useState([]);
     const [previewAttachment, setPreviewAttachment] = useState(null);

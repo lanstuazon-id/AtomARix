@@ -481,15 +481,15 @@ export default function PeriodicTable() {
                                 </div>
                                 <div className="element-model-box" style={{ width: '100%', maxWidth: '360px', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
                                     <model-viewer
-                                        src={`/assets/models/${selectedElement.name.toLowerCase()}.gltf`}
+                                        src={`/assets/models/${selectedElement.name.toLowerCase()}.glb`}
                                         alt={`3D model of ${selectedElement.name}`}
                                         auto-rotate
                                         rotation-per-second="45deg"
-                                        scale="0.05 0.05 0.05"
                                         camera-controls
                                         ar
                                         autoplay
-                                        ar-scale="auto"
+                                        scale="0.4 0.4 0.4"
+                                        ar-scale="fixed"
                                         ar-modes="webxr scene-viewer quick-look"
                                         style={{ width: '100%', height: '100%' }}
                                     >

@@ -7,27 +7,47 @@ import { auth, db } from './firebase';
 import { deleteUser } from 'firebase/auth';
 
 const generateEmojiAvatar = (emoji) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 200;
-    canvas.height = 200;
-    const ctx = canvas.getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 200, 200);
-    gradient.addColorStop(0, '#f3f0ff');
-    gradient.addColorStop(1, '#eaf4ff');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 200, 200);
-    // Explicitly declare standard mobile Emoji fonts so smartphones can draw them properly!
-    ctx.font = '100px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Android Emoji", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, 100, 110);
-    return canvas.toDataURL('image/png');
+    // NOTE: iOS/WebKit's Canvas 2D `fillText()` cannot render color emoji — it
+    // draws them blank or monochrome. SVG <text>, however, renders color emoji
+    // correctly on iOS, so we build the avatar as an SVG and convert that to PNG.
+    const svgMarkup = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+            <defs>
+                <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#f3f0ff" />
+                    <stop offset="100%" stop-color="#eaf4ff" />
+                </linearGradient>
+            </defs>
+            <rect width="200" height="200" fill="url(#bg)" />
+            <text x="100" y="115" font-size="100" text-anchor="middle" dominant-baseline="middle">${emoji}</text>
+        </svg>`;
+
+    return new Promise((resolve, reject) => {
+        const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const image = new Image();
+        image.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(image, 0, 0, 200, 200);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        image.onerror = (err) => {
+            URL.revokeObjectURL(url);
+            reject(err);
+        };
+        image.src = url;
+    });
 };
 
 const getCroppedImg = (imageSrc, pixelCrop) => {
     return new Promise((resolve, reject) => {
         const image = new Image();
-        image.src = imageSrc;
+        // Attach handlers BEFORE setting src — on iOS Safari a cached/fast image
+        // can fire 'load' immediately, and if onload isn't attached yet it's missed.
         image.onload = () => {
             const canvas = document.createElement('canvas');
             const targetSize = 200;
@@ -50,6 +70,7 @@ const getCroppedImg = (imageSrc, pixelCrop) => {
             resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
         image.onerror = (error) => reject(error);
+        image.src = imageSrc;
     });
 };
 
@@ -412,17 +433,73 @@ export default function StudentHome() {
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                setCropImageSrc(event.target.result);
-                setCrop({ x: 0, y: 0 });
-                setZoom(1);
-                setSelectedEmoji(null);
-            };
-            reader.readAsDataURL(file);
+        const inputEl = e.target;
+        if (!file) return;
+
+        // iOS often saves photos as HEIC/HEIC. Some iOS PWA WebViews silently
+        // fail (no onload, no onerror) when FileReader tries to read these.
+        const isLikelyHeic = file.type === 'image/heic' || file.type === 'image/heif' ||
+            /\.heic$|\.heif$/i.test(file.name || '');
+
+        if (isLikelyHeic) {
+            setResultModal({
+                show: true,
+                title: 'Photo Format Not Supported',
+                message: 'This looks like a HEIC photo (iPhone\'s default format). Please pick a different photo, or take a screenshot of it and upload the screenshot instead — screenshots save as JPG/PNG which work here.',
+                type: 'error'
+            });
+            inputEl.value = '';
+            return;
         }
-        e.target.value = ''; // Reset input so same file can be selected again
+
+        const reader = new FileReader();
+        let settled = false;
+
+        // Safety net: if neither onload nor onerror fires within 8s (known iOS
+        // standalone-PWA WKWebView issue), surface an error instead of hanging forever.
+        const timeoutId = setTimeout(() => {
+            if (!settled) {
+                settled = true;
+                setResultModal({
+                    show: true,
+                    title: 'Couldn\'t Load Photo',
+                    message: 'The photo took too long to load. Please try a different photo, or open this app in Safari directly instead of the home screen app.',
+                    type: 'error'
+                });
+                inputEl.value = '';
+            }
+        }, 8000);
+
+        reader.onload = (event) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            setCropImageSrc(event.target.result);
+            setCrop({ x: 0, y: 0 });
+            setZoom(1);
+            setSelectedEmoji(null);
+            inputEl.value = '';
+        };
+        reader.onerror = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            setResultModal({
+                show: true,
+                title: 'Couldn\'t Load Photo',
+                message: 'Something went wrong reading that photo. Please try a different one.',
+                type: 'error'
+            });
+            inputEl.value = '';
+        };
+
+        try {
+            reader.readAsDataURL(file);
+        } catch (err) {
+            clearTimeout(timeoutId);
+            setResultModal({ show: true, title: 'Couldn\'t Load Photo', message: 'Something went wrong reading that photo. Please try a different one.', type: 'error' });
+            inputEl.value = '';
+        }
     };
 
     const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
@@ -580,7 +657,7 @@ export default function StudentHome() {
             let titlePrefix = cw.type === 'module' ? 'New Module: ' : 'New Assessment: ';
             if (cw.type === 'assessment') {
                 if (cw.assessmentType === 'time_attack') titlePrefix = 'New Time Attack: ';
-                if (cw.assessmentType === 'custom') titlePrefix = 'New Custom Quiz: ';
+                if (cw.assessmentType === 'custom') titlePrefix = 'New Generated Quiz: ';
             }
             return {
                 id: `cw-${cw.id}`, type: cw.type, assessmentType: cw.assessmentType, 
@@ -827,7 +904,7 @@ export default function StudentHome() {
                     <div className="classroom-updates-card">
                         <div className="updates-header">
                             <h3><i className={`fas fa-bell ${recentUpdates.length > 0 ? 'notification-bell' : ''}`}></i> {joinedRoom.grade} - {joinedRoom.section}</h3>
-                            <button className="btn-go-to-class" onClick={() => navigate(`/student-room/${joinedRoom.id}`)}>
+                            <button className="btn-go-to-class" onClick={() => navigate(`/student-room/${joinedRoom.id}`, { state: { activeTab: 'feed' } })}>
                                 Go to Classroom <i className="fas fa-arrow-right"></i>
                             </button>
                         </div>
@@ -840,7 +917,14 @@ export default function StudentHome() {
                             ) : recentUpdates.length > 0 ? (
                                 <div className="recent-posts-list">
                                     {recentUpdates.map((update) => (
-                                        <div key={update.id} className="recent-post-item">
+                                        <div
+                                            key={update.id}
+                                            className={`recent-post-item ${update.type} clickable`}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => navigate(`/student-room/${joinedRoom.id}`, { state: { activeTab: update.type === 'announcement' ? 'feed' : 'activities' } })}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/student-room/${joinedRoom.id}`, { state: { activeTab: update.type === 'announcement' ? 'feed' : 'activities' } }); } }}
+                                        >
                                             <div className={`recent-post-icon ${update.type}`}>
                                                 <i className={`fas ${
                                                     update.type === 'announcement' ? 'fa-comment-dots' :
@@ -1148,7 +1232,16 @@ export default function StudentHome() {
                                                 type="button" 
                                                 key={emoji} 
                                                 className={`emoji-btn ${selectedEmoji === emoji ? 'selected' : ''}`} 
-                                                onClick={() => { setEditedAvatarUrl(generateEmojiAvatar(emoji)); setSelectedEmoji(emoji); }}
+                                                onClick={async () => {
+                                                    setSelectedEmoji(emoji);
+                                                    try {
+                                                        const avatarImg = await generateEmojiAvatar(emoji);
+                                                        setEditedAvatarUrl(avatarImg);
+                                                    } catch (err) {
+                                                        console.error('Error generating emoji avatar:', err);
+                                                        setResultModal({ show: true, title: 'Something Went Wrong', message: 'Could not set that emoji as your avatar. Please try another one.', type: 'error' });
+                                                    }
+                                                }}
                                             >
                                                 {emoji}
                                             </button>

@@ -38,6 +38,8 @@ export default function TeacherRoom() {
     const [cwTitle, setCwTitle] = useState('');
     const [cwDesc, setCwDesc] = useState('');
     const [assessmentType, setAssessmentType] = useState('custom');
+    const [cwTimeLimit, setCwTimeLimit] = useState('');
+    const [cwDeadline, setCwDeadline] = useState('');
     const [isCopied, setIsCopied] = useState(false);
 
     // Attachment States
@@ -83,6 +85,7 @@ export default function TeacherRoom() {
     const [isAiGenerating, setIsAiGenerating] = useState(false);
     const [aiError, setAiError] = useState('');
     const [aiGenerated, setAiGenerated] = useState(false);
+    const [isAiErrorModalOpen, setIsAiErrorModalOpen] = useState(false);
 
     const addQuestion = () => {
         setQuizQuestions(prev => [...prev, { id: Date.now().toString() + Math.random(), question: '', options: ['', '', '', ''], correctOption: 0 }]);
@@ -160,7 +163,29 @@ export default function TeacherRoom() {
 
             if (!lessonContent) throw new Error('No content to generate from. Upload a PDF or paste your lesson text.');
 
-            // Step 2: Generate quiz questions
+            // Step 2: Validate if content is chemistry-related
+            const validateResult = await generateQuiz({
+                payload: {
+                    model: 'claude-sonnet-4-6',
+                    max_tokens: 100,
+                    messages: [{
+                        role: 'user',
+                        content: `You are a subject matter validator. Read the following content and determine if it is related to chemistry (e.g., elements, compounds, reactions, periodic table, atoms, molecules, acids, bases, lab procedures, chemical formulas, chemical bonding, stoichiometry, thermochemistry, etc.).
+
+Respond with ONLY one word: YES or NO.
+
+CONTENT:
+${lessonContent}`
+                    }]
+                }
+            });
+
+            const validationAnswer = validateResult.data?.content?.map(b => b.text || '').join('').trim().toUpperCase();
+            if (!validationAnswer.includes('YES')) {
+                throw new Error('The uploaded material does not appear to be related to chemistry. Please upload a chemistry lesson or module only.');
+            }
+
+            // Step 3: Generate quiz questions
             const prompt = `You are a professional quiz generator for a Grade 7-8 chemistry classroom. Based on the lesson content below, generate exactly ${aiQuestionCount} multiple-choice questions.
 
 LESSON CONTENT:
@@ -202,6 +227,7 @@ Example format:
         } catch (err) {
             console.error('AI Quiz generation error:', err);
             setAiError(err.message || 'Something went wrong. Please try again.');
+            setIsAiErrorModalOpen(true);
         } finally {
             setIsAiGenerating(false);
         }
@@ -271,10 +297,10 @@ Example format:
     }, [previewAttachment]);
 
     useEffect(() => {
-        const anyOpen = isPostModalOpen || isCwModalOpen || isEditPostModalOpen || isDeletePostModalOpen || isDeleteCwModalOpen || isReportModalOpen || isRemoveStudentModalOpen || previewAttachment || isLinkModalOpen || isRemoveQuestionModalOpen;
+        const anyOpen = isPostModalOpen || isCwModalOpen || isEditPostModalOpen || isDeletePostModalOpen || isDeleteCwModalOpen || isReportModalOpen || isRemoveStudentModalOpen || previewAttachment || isLinkModalOpen || isRemoveQuestionModalOpen || isAiErrorModalOpen;
         document.body.style.overflow = anyOpen ? 'hidden' : '';
         return () => { document.body.style.overflow = ''; };
-    }, [isPostModalOpen, isCwModalOpen, isEditPostModalOpen, isDeletePostModalOpen, isDeleteCwModalOpen, isReportModalOpen, isRemoveStudentModalOpen, previewAttachment, isLinkModalOpen, isRemoveQuestionModalOpen]);
+    }, [isPostModalOpen, isCwModalOpen, isEditPostModalOpen, isDeletePostModalOpen, isDeleteCwModalOpen, isReportModalOpen, isRemoveStudentModalOpen, previewAttachment, isLinkModalOpen, isRemoveQuestionModalOpen, isAiErrorModalOpen]);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -339,6 +365,12 @@ Example format:
     const handleCreateClasswork = async (e) => {
         e.preventDefault();
         if (!cwTitle.trim()) return alert('Title is required!');
+        if (cwDeadline) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const selected = new Date(cwDeadline);
+            if (selected < today) return alert('Deadline cannot be a past date. Please select today or a future date.');
+        }
         if (assessmentType === 'custom') {
             for (let i = 0; i < quizQuestions.length; i++) {
                 if (!quizQuestions[i].question.trim()) return alert(`Question ${i + 1} cannot be empty.`);
@@ -347,9 +379,9 @@ Example format:
         }
         setIsUploading(true);
         try {
-            const newClasswork = { id: Date.now(), type: 'assessment', assessmentType, title: cwTitle, desc: cwDesc, attachment: null, questions: assessmentType === 'custom' ? quizQuestions : null, timestamp: new Date().toISOString() };
+            const newClasswork = { id: Date.now(), type: 'assessment', assessmentType, title: cwTitle, desc: cwDesc, attachment: null, questions: assessmentType === 'custom' ? quizQuestions : null, timestamp: new Date().toISOString(), timeLimit: cwTimeLimit ? parseInt(cwTimeLimit) : null, deadline: cwDeadline || null };
             await updateDoc(doc(db, "teacher_rooms", roomId), { classwork: [...classwork, newClasswork] });
-            setCwTitle(''); setCwDesc(''); setAttachment(null); setAssessmentType('custom');
+            setCwTitle(''); setCwDesc(''); setAttachment(null); setAssessmentType('custom'); setCwTimeLimit(''); setCwDeadline('');
             resetAiState(); setIsCwModalOpen(false);
         } catch (error) { console.error("Error creating classwork: ", error); alert("Failed to create classwork. Please try again.");
         } finally { setIsUploading(false); }
@@ -439,27 +471,48 @@ Example format:
         </>
     );
 
+    const formatDeadline = (deadline) => {
+        const due = new Date(deadline);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPast = due < today;
+        return {
+            isPast,
+            label: isPast ? 'Closed' : 'Due',
+            icon: isPast ? 'fa-lock' : 'fa-calendar-alt',
+            date: due.toLocaleDateString([], { month: 'short', day: 'numeric' })
+        };
+    };
+
     const renderActivities = () => (
         <div className="masonry-grid">
             {classwork.slice().reverse().map(cw => {
                 const icon = cw.assessmentType === 'time_attack' ? 'fa-stopwatch' : 'fa-tasks';
                 const color = cw.assessmentType === 'time_attack' ? '#f39c12' : '#e74c3c';
                 const bg = cw.assessmentType === 'time_attack' ? '#fffdf7' : '#fcf3f2';
+                const deadlineInfo = cw.deadline ? formatDeadline(cw.deadline) : null;
                 return (
                     <div key={cw.id} className="post-card">
                         <div className="post-icon" style={{ background: bg, color: color }}><i className={`fas ${icon}`}></i></div>
-                        <div className="post-content" style={{ width: '100%' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <h4>{cw.title}
-                                    {cw.assessmentType === 'time_attack' && <span style={{fontSize: '0.75rem', background: '#f39c12', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-stopwatch"></i> Time Attack</span>}
-                                    {cw.assessmentType === 'custom' && cw.questions && <span style={{fontSize: '0.75rem', background: '#e74c3c', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-tasks"></i> Generated Quiz</span>}
-                                </h4>
-                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                    <button onClick={() => { setSelectedReportCw(cw); setExpandedStudentId(null); setIsReportModalOpen(true); }} style={{ background: '#eaf4ff', border: 'none', color: '#4facfe', cursor: 'pointer', padding: '6px 12px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'} onMouseLeave={e => e.currentTarget.style.background = '#eaf4ff'} title="View Submissions"><i className="fas fa-chart-bar"></i> Report</button>
-                                    <button onClick={() => { setSelectedCw(cw); setIsDeleteCwModalOpen(true); }} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1.1rem' }} title="Delete Activity"><i className="fas fa-trash"></i></button>
+                        <div className="post-content activity-content">
+                            <div className="activity-header">
+                                <div className="activity-title-row">
+                                    <h4>{cw.title}</h4>
+                                    {cw.assessmentType === 'time_attack' && <span className="activity-badge badge-time-attack"><i className="fas fa-stopwatch"></i> Time Attack</span>}
+                                    {cw.assessmentType === 'custom' && cw.questions && <span className="activity-badge badge-generated-quiz"><i className="fas fa-tasks"></i> Generated Quiz</span>}
+                                </div>
+                                <div className="activity-actions">
+                                    <button onClick={() => { setSelectedReportCw(cw); setExpandedStudentId(null); setIsReportModalOpen(true); }} className="report-btn" title="View Submissions"><i className="fas fa-chart-bar"></i> Report</button>
+                                    <button onClick={() => { setSelectedCw(cw); setIsDeleteCwModalOpen(true); }} className="delete-icon-btn" title="Delete Activity"><i className="fas fa-trash"></i></button>
                                 </div>
                             </div>
-                            <span>Posted by {room.teacherFullName || room.teacher} • {new Date(cw.timestamp).toLocaleString()}</span>
+                            {(cw.timeLimit || cw.deadline) && (
+                                <div className="schedule-badges">
+                                    {cw.timeLimit && <span className="schedule-badge badge-time-limit"><i className="fas fa-hourglass-half"></i> {cw.timeLimit} min limit</span>}
+                                    {deadlineInfo && <span className={`schedule-badge badge-deadline ${deadlineInfo.isPast ? 'is-past' : ''}`}><i className={`fas ${deadlineInfo.icon}`}></i> {deadlineInfo.label} {deadlineInfo.date}</span>}
+                                </div>
+                            )}
+                            <span className="activity-posted-by">Posted by {room.teacherFullName || room.teacher} • {new Date(cw.timestamp).toLocaleString()}</span>
                             <p>{cw.desc}</p>
                         </div>
                     </div>
@@ -603,7 +656,7 @@ Example format:
                     flex: 1;
                     border-left: 1px solid #eee;
                     padding-left: 30px;
-                    min-height: 400px;
+                    /* min-height: 400px; - Removed to allow flex to control height */
                 }
                 @media (max-width: 950px) {
                     .cw-modal-container { flex-direction: column; }
@@ -717,10 +770,10 @@ Example format:
                                 <button type="button" className="close-modal" onClick={() => { setIsCwModalOpen(false); resetAiState(); }} style={{ position: 'static', fontSize: '2rem', padding: '0 5px' }}>&times;</button>
                             </div>
                             
-                            <div style={{ flex: 1, overflowY: 'auto', padding: '30px', minHeight: 0 }}>
-                                <div className="cw-modal-container" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+                            <div style={{ flex: 1, display: 'flex', padding: '30px', minHeight: 0, overflowY: 'auto' }}>
+                                <div className="cw-modal-container" style={{ maxWidth: '1100px', margin: '0 auto', flex: 1 }}>
                                     {/* Left Column: Metadata and Selection */}
-                                    <div className="cw-modal-left">
+                                    <div className="cw-modal-left" style={{ overflowY: 'auto', minHeight: 0 }}>
                                         <div style={{ marginBottom: '10px' }}>
                                             <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: '#888', textTransform: 'uppercase' }}>1. Basic Information</label>
                                             <div className="input-group" style={{ marginBottom: '12px' }}><input type="text" value={cwTitle} onChange={e => setCwTitle(e.target.value)} placeholder="Assessment Title (e.g., Chapter 1 Quiz)" required /></div>
@@ -746,10 +799,59 @@ Example format:
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <div style={{ marginTop: '18px' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: '#888', textTransform: 'uppercase' }}>3. Schedule & Limits <span style={{ fontWeight: '400', color: '#bbb', fontSize: '0.8rem' }}>(optional)</span></label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                {assessmentType === 'custom' && (
+                                                <div style={{ background: '#f8f9fa', borderRadius: '10px', padding: '12px 14px', border: '1px solid #eee' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                        <i className="fas fa-hourglass-half" style={{ color: '#6e45e2', fontSize: '0.9rem' }}></i>
+                                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#2d3436' }}>Time Limit</span>
+                                                        <span style={{ fontSize: '0.75rem', color: '#aaa' }}>— how long students have to finish</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            max="300"
+                                                            value={cwTimeLimit}
+                                                            onChange={e => setCwTimeLimit(e.target.value)}
+                                                            placeholder="e.g. 30"
+                                                            style={{ width: '90px', padding: '7px 10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.9rem', outline: 'none', fontFamily: 'inherit' }}
+                                                            onFocus={e => e.target.style.borderColor = '#6e45e2'}
+                                                            onBlur={e => e.target.style.borderColor = '#ddd'}
+                                                        />
+                                                        <span style={{ color: '#888', fontSize: '0.85rem' }}>minutes</span>
+                                                        {cwTimeLimit && <button type="button" onClick={() => setCwTimeLimit('')} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}><i className="fas fa-times"></i> clear</button>}
+                                                    </div>
+                                                </div>
+                                                )}
+                                                <div style={{ background: '#f8f9fa', borderRadius: '10px', padding: '12px 14px', border: '1px solid #eee' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                        <i className="fas fa-calendar-alt" style={{ color: '#e74c3c', fontSize: '0.9rem' }}></i>
+                                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#2d3436' }}>Deadline</span>
+                                                        <span style={{ fontSize: '0.75rem', color: '#aaa' }}>— last day/time to submit</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <input
+                                                            type="date"
+                                                            min={new Date().toISOString().split("T")[0]}
+                                                            value={cwDeadline}
+                                                            onChange={e => setCwDeadline(e.target.value)}
+                                                            style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.85rem', outline: 'none', fontFamily: 'inherit', colorScheme: 'light' }}
+                                                            onFocus={e => e.target.style.borderColor = '#e74c3c'}
+                                                            onBlur={e => e.target.style.borderColor = '#ddd'}
+                                                        />
+                                                        {cwDeadline && <button type="button" onClick={() => setCwDeadline('')} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}><i className="fas fa-times"></i> clear</button>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Right Column: Quiz Generator Content */}
-                                    <div className="cw-modal-right">
+                                    <div className="cw-modal-right" style={{ overflowY: 'auto', minHeight: 0 }}>
                             {assessmentType === 'custom' && (
                                             <div style={{ marginTop: '0' }}>
                                     <h3 style={{ color: '#2d3436', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}><i className="fas fa-robot" style={{ color: '#6e45e2' }}></i>Quiz Generator</h3>
@@ -794,9 +896,11 @@ Example format:
                                                         </div>
                                                     </div>
 
-                                                    <button type="button" className="ai-generate-btn" onClick={handleGenerateAiQuiz} disabled={isAiGenerating || (!aiPdfFile && !aiLessonText.trim())}>
-                                                        <i className="fas fa-magic"></i> Generate Quiz with AI
-                                                    </button>
+                                                    {!aiGenerated && (
+                                                        <button type="button" className="ai-generate-btn" onClick={handleGenerateAiQuiz} disabled={isAiGenerating || (!aiPdfFile && !aiLessonText.trim())}>
+                                                            <i className="fas fa-magic"></i> Generate Quiz with AI
+                                                        </button>
+                                                    )}
                                                 </>
                                             ) : (
                                                 <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -817,12 +921,7 @@ Example format:
                                                 </div>
                                             )}
 
-                                            {aiError && (
-                                                <div style={{ marginTop: '14px', padding: '12px 16px', background: '#fff0f0', border: '1px solid #fecaca', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <i className="fas fa-exclamation-circle" style={{ color: '#e74c3c', fontSize: '1.1rem' }}></i>
-                                                    <span style={{ color: '#c0392b', fontWeight: '600', fontSize: '0.9rem' }}>{aiError}</span>
-                                                </div>
-                                            )}
+
                                         </div>
                                     )}
 
@@ -1085,6 +1184,30 @@ Example format:
                         <div className="modal-actions">
                             <button type="button" className="btn-cancel" onClick={() => setIsRemoveQuestionModalOpen(false)}>Cancel</button>
                             <button type="button" className="btn-confirm" onClick={confirmRemoveQuestion} style={{ backgroundColor: '#e74c3c' }}>Remove</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── AI Error Modal ── */}
+            {isAiErrorModalOpen && (
+                <div className="modal-container show" style={{ zIndex: 10001 }} onClick={() => { setIsAiErrorModalOpen(false); setAiError(''); }}>
+                    <div className="modal-content" style={{ textAlign: 'center', maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'linear-gradient(135deg, #fff0f0, #fecaca)', display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', boxShadow: '0 4px 15px rgba(231,76,60,0.15)' }}>
+                            <i className="fas fa-flask" style={{ fontSize: '2rem', color: '#e74c3c' }}></i>
+                        </div>
+                        <h2 style={{ marginBottom: '10px', color: '#2d3436' }}>Not Chemistry-Related</h2>
+                        <p style={{ color: '#666', marginBottom: '25px', lineHeight: '1.6', fontSize: '0.95rem' }}>
+                            {aiError || 'The uploaded material does not appear to be related to chemistry. Please upload a chemistry lesson or module only.'}
+                        </p>
+                        <div style={{ background: '#f8f9fa', borderRadius: '12px', padding: '12px 16px', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <i className="fas fa-info-circle" style={{ color: '#6e45e2', fontSize: '1rem', flexShrink: 0 }}></i>
+                            <span style={{ color: '#555', fontSize: '0.85rem', textAlign: 'left' }}>Accepted topics: elements, compounds, reactions, periodic table, atoms, molecules, acids & bases, lab procedures, and more.</span>
+                        </div>
+                        <div className="modal-actions" style={{ justifyContent: 'center' }}>
+                            <button type="button" className="btn-confirm" style={{ background: 'linear-gradient(135deg, #6e45e2, #8e44ad)', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setIsAiErrorModalOpen(false); setAiError(''); setAiPdfFile(null); setAiLessonText(''); }}>
+                                <i className="fas fa-redo"></i> Generate Another
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -8,7 +8,9 @@
 .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: #6e45e2; font-size: 1.4rem; cursor: pointer; }
 .nav-links { display: flex; list-style: none; gap: 15px; margin: 0; padding: 0; }
 .nav-links li { cursor: pointer; color: #666; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px; transition: all 0.3s; }
-.nav-links li:hover { background: #f0f2f5; color: #6e45e2; }
+@media (hover: hover) {
+    .nav-links li:hover { background: #f0f2f5; color: #6e45e2; }
+}
 .nav-links li.active { color: #6e45e2; font-weight: 600; background: #f3f0ff; }
 
 /* --- Main Container --- */
@@ -38,7 +40,9 @@
     background: white; border: 1px solid #eee; padding: 20px; border-radius: 12px; display: flex; align-items: center; gap: 15px; cursor: pointer;
     box-shadow: 0 4px 10px rgba(0,0,0,0.02); transition: all 0.3s; color: #666; font-size: 1rem;
 }
-.btn-create-post:hover { box-shadow: 0 6px 15px rgba(0,0,0,0.05); }
+@media (hover: hover) {
+    .btn-create-post:hover { box-shadow: 0 6px 15px rgba(0,0,0,0.05); }
+}
 .btn-create-post .avatar { width: 40px; height: 40px; background: #6e45e2; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; }
 
 /* --- Post Card --- */
@@ -49,19 +53,50 @@
 .post-content span { color: #888; font-size: 0.85rem; }
 .post-content p { margin-top: 10px; color: #555; line-height: 1.5; white-space: pre-wrap; }
 
+/* --- Activity Cards (Activities Tab) --- */
+.activity-content { width: 100%; }
+.activity-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+.activity-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.activity-title-row h4 { margin: 0; }
+
+.activity-badge { font-size: 0.75rem; color: white !important; padding: 3px 10px; border-radius: 12px; font-weight: bold; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.badge-time-attack { background: #f39c12; }
+.badge-generated-quiz { background: #e74c3c; }
+
+.activity-actions { display: flex; gap: 10px; align-items: center; }
+.report-btn { background: #eaf4ff; border: none; color: #4facfe; cursor: pointer; padding: 6px 12px; border-radius: 8px; font-size: 0.9rem; font-weight: bold; display: flex; align-items: center; gap: 6px; transition: background 0.2s; white-space: nowrap; }
+@media (hover: hover) {
+    .report-btn:hover { background: #dbeafe; }
+}
+.delete-icon-btn { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 1.1rem; }
+
+.schedule-badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 0; }
+.schedule-badge { font-size: 0.78rem; padding: 3px 10px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.badge-time-limit { background: #f3f0ff; color: #6e45e2; border: 1px solid #d7ccff; }
+.badge-deadline { background: #fff7f0; color: #f39c12; border: 1px solid #fde68a; }
+.badge-deadline.is-past { background: #fff0f0; color: #e74c3c; border: 1px solid #fecaca; }
+
+.activity-posted-by { display: block; margin-top: 6px; }
+
 /* --- Classwork Actions --- */
 .classwork-actions { display: flex; justify-content: flex-end; margin-bottom: 20px; }
 .btn-primary { background: #6e45e2; color: white; border: none; padding: 12px 25px; border-radius: 50px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 1rem; box-shadow: 0 4px 10px rgba(110,69,226,0.2); transition: transform 0.2s;}
-.btn-primary:hover { transform: translateY(-2px); }
+@media (hover: hover) {
+    .btn-primary:hover { transform: translateY(-2px); }
+}
 
 /* --- Modal Styles --- */
 .modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 1; transition: opacity 0.3s; }
 .modal-content { background: white; padding: 30px; border-radius: 16px; width: 90%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); transform: scale(1); transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); text-align: left; }
 .modal-actions { display: flex; gap: 15px; justify-content: flex-end; margin-top: 25px; }
 .btn-cancel { background: #f0f2f5; color: #333; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.3s; }
-.btn-cancel:hover { background: #e4e6eb; }
+@media (hover: hover) {
+    .btn-cancel:hover { background: #e4e6eb; }
+}
 .btn-confirm { background: #6e45e2; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.3s; }
-.btn-confirm:hover { background: #5a32c3; }
+@media (hover: hover) {
+    .btn-confirm:hover { background: #5a32c3; }
+}
 .modal-icon-box { font-size: 3rem; margin-bottom: 15px; display: block; }
 
 /* --- Modern Announce Modal --- */
@@ -69,7 +104,9 @@
 .announce-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; border-bottom: 1px solid #f0f0f0; background: #fdfdff; }
 .announce-modal-header h2 { margin: 0; font-size: 1.25rem; color: #2d3436; }
 .announce-modal-header .close-modal { position: static; width: 32px; height: 32px; font-size: 1.5rem; background: transparent; }
-.announce-modal-header .close-modal:hover { background: #ffeaea; color: #e74c3c; }
+@media (hover: hover) {
+    .announce-modal-header .close-modal:hover { background: #ffeaea; color: #e74c3c; }
+}
 .announce-input-area { display: flex; gap: 15px; padding: 25px; align-items: flex-start; }
 .announce-input-area .avatar { width: 45px; height: 45px; background: linear-gradient(135deg, #6e45e2, #4facfe); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; flex-shrink: 0; box-shadow: 0 4px 10px rgba(110,69,226,0.2); }
 .modern-textarea { flex: 1; border: none; background: transparent; resize: none; font-size: 1.1rem; color: #333; outline: none; padding-top: 10px; line-height: 1.5; }
@@ -77,19 +114,25 @@
 .announce-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; border-top: 1px solid #f0f0f0; background: #fdfdff; }
 .toolbar-icons { display: flex; gap: 10px; }
 .toolbar-icons button { background: transparent; border: none; width: 40px; height: 40px; border-radius: 50%; color: #666; font-size: 1.1rem; cursor: pointer; transition: all 0.2s; display: flex; justify-content: center; align-items: center; }
-.toolbar-icons button:hover { background: #f0f2f5; color: #6e45e2; }
+@media (hover: hover) {
+    .toolbar-icons button:hover { background: #f0f2f5; color: #6e45e2; }
+}
 .btn-confirm.disabled { background: #dcdde1; color: #fff; cursor: not-allowed; box-shadow: none; transform: none; }
 
 /* --- Dropdown Menu --- */
 .menu-container { position: relative; display: inline-block; flex-shrink: 0; }
 .btn-menu { border: none; color: #888; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.2s; background: transparent; }
-.btn-menu:hover { background: rgba(0, 0, 0, 0.05); color: #333; }
+@media (hover: hover) {
+    .btn-menu:hover { background: rgba(0, 0, 0, 0.05); color: #333; }
+}
 .dropdown-menu { display: none; position: absolute; right: 0; top: 35px; background: white; min-width: 150px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); overflow: hidden; z-index: 100; border: 1px solid #eee; }
 .dropdown-menu.show { display: block; animation: fadeIn 0.2s; }
 .dropdown-item { padding: 12px 15px; color: #555; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: background 0.2s; font-size: 0.9rem; font-weight: 500; }
-.dropdown-item:hover { background: #f0f2f5; color: #2d3436; }
 .dropdown-item.danger { color: #e74c3c; }
-.dropdown-item.danger:hover { background: #fceae9; color: #c0392b; }
+@media (hover: hover) {
+    .dropdown-item:hover { background: #f0f2f5; color: #2d3436; }
+    .dropdown-item.danger:hover { background: #fceae9; color: #c0392b; }
+}
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
 /* --- Input Fields --- */

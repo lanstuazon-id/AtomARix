@@ -48,7 +48,10 @@
     border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s;
     display: flex; align-items: center; gap: 8px; font-size: 1rem;
 }
-.btn-restart:hover { background: #ff4b2b; color: white; }
+@media (hover: hover) {
+    .btn-restart:hover { background: #ff4b2b; color: white; }
+}
+
 
 .game-area {
     background: white;
@@ -87,13 +90,15 @@
     cursor: pointer;
     transition: all 0.2s;
 }
-
-.option-btn:hover:not(:disabled) {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 15px rgba(0,0,0,0.05);
-    border-color: #ff4b2b;
-    color: #ff4b2b;
+@media (hover: hover) {
+    .option-btn:hover:not(:disabled) {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.05);
+        border-color: #ff4b2b;
+        color: #ff4b2b;
+    }
 }
+
 
 .option-btn.correct { background: #1dd1a1 !important; border-color: #1dd1a1 !important; color: white !important; }
 .option-btn.wrong { background: #ff6b6b !important; border-color: #ff6b6b !important; color: white !important; }
@@ -105,7 +110,10 @@
     border-radius: 12px; font-weight: bold; font-size: 1.5rem; cursor: pointer; 
     transition: all 0.3s; box-shadow: 0 5px 15px rgba(255, 75, 43, 0.3);
 }
-.btn-start:hover { transform: scale(1.05); }
+@media (hover: hover) {
+    .btn-start:hover { transform: scale(1.05); }
+}
+
 
 /* --- Responsive Design --- */
 @media (max-width: 900px), (pointer: coarse) {

@@ -38,7 +38,10 @@
     border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s;
     display: flex; align-items: center; gap: 8px; font-size: 1rem;
 }
-.btn-restart:hover { background: #6e45e2; color: white; }
+@media (hover: hover) {
+    .btn-restart:hover { background: #6e45e2; color: white; }
+}
+
 
 .game-grid {
     display: grid;

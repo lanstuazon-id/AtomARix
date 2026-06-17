@@ -49,6 +49,7 @@ export default function TimeAttack() {
     const [timeLeft, setTimeLeft] = useState(60);
     const [correctAnswers, setCorrectAnswers] = useState(0);
     const [wrongAnswers, setWrongAnswers] = useState(0);
+    const [isNewHighScore, setIsNewHighScore] = useState(false);
     
     // Question State
     const [currentElement, setCurrentElement] = useState(null);
@@ -59,16 +60,25 @@ export default function TimeAttack() {
     
     // Tracking State
     const [elementsToReview, setElementsToReview] = useState(new Set());
-    const [elementWeights, setElementWeights] = useState({});
+    // SRS data per element: { interval (minutes), easeFactor, dueDate (timestamp ms), repetitions }
+    const [srsData, setSrsData] = useState({});
 
-    // Load weights on mount
+    // Default SRS card for an element with no history yet — due immediately so new elements surface early
+    const createDefaultSrsCard = () => ({
+        interval: 0,
+        easeFactor: 2.5,
+        dueDate: Date.now(),
+        repetitions: 0
+    });
+
+    // Load SRS data on mount
     useEffect(() => {
-        const savedWeights = JSON.parse(localStorage.getItem(srsKey)) || {};
-        const initWeights = { ...savedWeights };
+        const saved = JSON.parse(localStorage.getItem(srsKey)) || {};
+        const initData = { ...saved };
         elements.forEach(el => {
-            if (initWeights[el.sym] === undefined) initWeights[el.sym] = 10;
+            if (!initData[el.sym]) initData[el.sym] = createDefaultSrsCard();
         });
-        setElementWeights(initWeights);
+        setSrsData(initData);
     }, [srsKey]);
 
     // Handle Scroll Locking and Fullscreen cleanup
@@ -97,10 +107,10 @@ export default function TimeAttack() {
                     }
                 }
 
-                // Sync SRS Weights
+                // Sync SRS Data
                 if (data.timeAttackSRS) {
                     localStorage.setItem(srsKey, JSON.stringify(data.timeAttackSRS));
-                    setElementWeights(data.timeAttackSRS);
+                    setSrsData(data.timeAttackSRS);
                 }
             }
         }, (e) => console.error("Error syncing time attack data:", e));
@@ -118,22 +128,38 @@ export default function TimeAttack() {
         return () => clearInterval(timer);
     }, [gameState, timeLeft]);
 
-    const getNextElementBySRS = (weights) => {
-        let totalWeight = elements.reduce((sum, el) => sum + weights[el.sym], 0);
-        let random = Math.random() * totalWeight;
-        for (let i = 0; i < elements.length; i++) {
-            random -= weights[elements[i].sym];
-            if (random <= 0) return elements[i];
+    // Selects the next element using SRS principles: most "overdue" elements
+    // (where now - dueDate is largest) are prioritized, since they're the ones
+    // most at risk of being forgotten. Elements not yet due are still eligible
+    // (so the question pool doesn't go stale), but are picked with lower priority.
+    const getNextElementBySRS = (data) => {
+        const now = Date.now();
+
+        // overdueAmount: how many ms past its due date this element is.
+        // Elements not yet due get a small positive floor instead of a negative
+        // number, so they can still occasionally appear as filler.
+        const weighted = elements.map(el => {
+            const card = data[el.sym] || createDefaultSrsCard();
+            const overdueMs = now - card.dueDate;
+            const priority = overdueMs > 0 ? overdueMs : 1000; // 1s floor for not-yet-due items
+            return { el, priority };
+        });
+
+        const totalPriority = weighted.reduce((sum, w) => sum + w.priority, 0);
+        let random = Math.random() * totalPriority;
+        for (let i = 0; i < weighted.length; i++) {
+            random -= weighted[i].priority;
+            if (random <= 0) return weighted[i].el;
         }
-        return elements[0];
+        return weighted[0].el;
     };
 
-    const generateQuestion = (weights) => {
-        let el = getNextElementBySRS(weights);
+    const generateQuestion = (data) => {
+        let el = getNextElementBySRS(data);
         
         // Avoid immediate repetition of the same element
         if (el.sym === lastElementSym && elements.length > 1) {
-            el = getNextElementBySRS(weights);
+            el = getNextElementBySRS(data);
         }
         setCurrentElement(el);
         setLastElementSym(el.sym);
@@ -174,8 +200,9 @@ export default function TimeAttack() {
         setWrongAnswers(0);
         setElementsToReview(new Set());
         setTimeLeft(60);
+        setIsNewHighScore(false);
         setGameState('playing');
-        generateQuestion(elementWeights);
+        generateQuestion(srsData);
 
         // Attempt to go Fullscreen for focus
         if (containerRef.current?.requestFullscreen) {
@@ -185,30 +212,63 @@ export default function TimeAttack() {
         }
     };
 
+    // Updates a single element's SRS card using SM-2-style rules, adapted to
+    // minutes instead of days so progress is visible within one game session.
+    const updateSrsCard = (card, isCorrect) => {
+        let { interval, easeFactor, repetitions } = card;
+
+        if (isCorrect) {
+            repetitions += 1;
+            // Graduating intervals: first correct answer -> short recheck,
+            // second -> longer, subsequent -> interval grows by easeFactor.
+            if (repetitions === 1) {
+                interval = 10; // 10 minutes
+            } else if (repetitions === 2) {
+                interval = 30; // 30 minutes
+            } else {
+                interval = Math.round(interval * easeFactor);
+            }
+            // Ease factor nudges up slightly on success (SM-2 convention), capped at 3.0
+            easeFactor = Math.min(3.0, easeFactor + 0.1);
+        } else {
+            // Wrong answer: reset progress and bring the element back soon
+            repetitions = 0;
+            interval = 2; // back in 2 minutes
+            // Ease factor drops on failure, floored at 1.3 (standard SM-2 minimum)
+            easeFactor = Math.max(1.3, easeFactor - 0.2);
+            setElementsToReview(prev => new Set(prev).add(currentElement.sym));
+        }
+
+        return {
+            interval,
+            easeFactor,
+            repetitions,
+            dueDate: Date.now() + interval * 60 * 1000
+        };
+    };
+
     const checkAnswer = (selectedAns) => {
         if (answeredState.isAnswering) return;
         setAnsweredState({ selected: selectedAns, isAnswering: true });
         
-        const newWeights = { ...elementWeights };
+        const newSrsData = { ...srsData };
         let isCorrect = selectedAns === question.correct;
 
         if (isCorrect) {
             setCorrectAnswers(prev => prev + 1);
-            // Reduce priority significantly if correct
-            newWeights[currentElement.sym] = Math.max(1, Math.floor(newWeights[currentElement.sym] * 0.6));
         } else {
             setWrongAnswers(prev => prev + 1);
-            // Increase priority significantly if wrong
-            newWeights[currentElement.sym] = Math.min(100, newWeights[currentElement.sym] + 20);
-            setElementsToReview(prev => new Set(prev).add(currentElement.sym));
         }
+
+        const currentCard = newSrsData[currentElement.sym] || createDefaultSrsCard();
+        newSrsData[currentElement.sym] = updateSrsCard(currentCard, isCorrect);
         
-        setElementWeights(newWeights);
-        localStorage.setItem(srsKey, JSON.stringify(newWeights));
+        setSrsData(newSrsData);
+        localStorage.setItem(srsKey, JSON.stringify(newSrsData));
 
         setTimeout(() => {
             if (gameState === 'playing') {
-                generateQuestion(newWeights);
+                generateQuestion(newSrsData);
                 setAnsweredState({ selected: null, isAnswering: false });
             }
         }, 800);
@@ -219,12 +279,13 @@ export default function TimeAttack() {
         const existingHighScore = parseInt(localStorage.getItem(highScoreKey) || '0');
         
         const updateData = {
-            timeAttackSRS: elementWeights
+            timeAttackSRS: srsData
         };
 
         if (correctAnswers > existingHighScore) {
             localStorage.setItem(highScoreKey, correctAnswers);
             updateData.timeAttackBestCorrect = correctAnswers;
+            setIsNewHighScore(true);
         }
 
         setDoc(doc(db, "users", currentUser), updateData, { merge: true }).catch(e => console.error(e));
@@ -327,20 +388,22 @@ export default function TimeAttack() {
                     </div>
                 )}
 
-                <div className="game-header">
-                    <div className="stats" style={{ width: '120px' }}>
-                        <i className="fas fa-clock"></i> <span>{timeLeft}s</span>
+                {gameState !== 'end' && (
+                    <div className="game-header">
+                        <div className="stats" style={{ width: '120px' }}>
+                            <i className="fas fa-clock"></i> <span>{timeLeft}s</span>
+                        </div>
+                        <div className="stats-container" style={{ justifyContent: 'center', flex: 1 }}>
+                            <div className="stats" style={{ color: '#1dd1a1' }}><i className="fas fa-check-circle"></i> Correct: <span>{correctAnswers}</span></div>
+                            <div className="stats" style={{ color: '#ff6b6b' }}><i className="fas fa-times-circle"></i> Wrong: <span>{wrongAnswers}</span></div>
+                        </div>
+                        <div style={{ width: '120px', display: 'flex', justifyContent: 'flex-end' }}>
+                            {gameState === 'playing' && (
+                                <button className="btn-restart" onClick={startGame}><i className="fas fa-redo"></i> Restart</button>
+                            )}
+                        </div>
                     </div>
-                    <div className="stats-container" style={{ justifyContent: 'center', flex: 1 }}>
-                        <div className="stats" style={{ color: '#1dd1a1' }}><i className="fas fa-check-circle"></i> Correct: <span>{correctAnswers}</span></div>
-                        <div className="stats" style={{ color: '#ff6b6b' }}><i className="fas fa-times-circle"></i> Wrong: <span>{wrongAnswers}</span></div>
-                    </div>
-                    <div style={{ width: '120px', display: 'flex', justifyContent: 'flex-end' }}>
-                        {gameState !== 'start' && (
-                            <button className="btn-restart" onClick={startGame}><i className="fas fa-redo"></i> Restart</button>
-                        )}
-                    </div>
-                </div>
+                )}
 
                 <div className="game-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
                     {gameState === 'start' && (
@@ -389,11 +452,36 @@ export default function TimeAttack() {
                         </div>
                     )}
 
-                    {gameState === 'end' && (
+                    {gameState === 'end' && (() => {
+                        const totalAnswered = correctAnswers + wrongAnswers;
+                        const accuracy = totalAnswered > 0 ? Math.round((correctAnswers / totalAnswered) * 100) : 0;
+                        return (
                         <div className="start-screen">
                             <h2 style={{ color: '#2d3436' }}>Time's Up! ⏰</h2>
+
+                            {isNewHighScore && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)', color: 'white', padding: '12px 22px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 6px 15px rgba(253, 160, 133, 0.4)', marginTop: '5px' }}>
+                                    <i className="fas fa-trophy" style={{ fontSize: '1.3rem' }}></i> New High Score!
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: '500px', marginTop: '15px' }}>
+                                <div style={{ flex: '1 1 100px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '16px', padding: '15px 10px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1dd1a1' }}>{correctAnswers}</div>
+                                    <div style={{ fontSize: '0.78rem', color: '#888', textTransform: 'uppercase', fontWeight: 600 }}>Correct</div>
+                                </div>
+                                <div style={{ flex: '1 1 100px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '16px', padding: '15px 10px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ff6b6b' }}>{wrongAnswers}</div>
+                                    <div style={{ fontSize: '0.78rem', color: '#888', textTransform: 'uppercase', fontWeight: 600 }}>Wrong</div>
+                                </div>
+                                <div style={{ flex: '1 1 100px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '16px', padding: '15px 10px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#6e45e2' }}>{accuracy}%</div>
+                                    <div style={{ fontSize: '0.78rem', color: '#888', textTransform: 'uppercase', fontWeight: 600 }}>Accuracy</div>
+                                </div>
+                            </div>
+
                             {elementsToReview.size > 0 && (
-                                <div style={{ marginTop: '10px', width: '100%', maxWidth: '500px', background: '#f8f9fa', padding: '15px', borderRadius: '12px', border: '1px solid #eee' }}>
+                                <div style={{ marginTop: '20px', width: '100%', maxWidth: '500px', background: '#f8f9fa', padding: '15px', borderRadius: '12px', border: '1px solid #eee' }}>
                                     <h3 style={{ color: '#2d3436', fontSize: '1rem', marginBottom: '10px', textTransform: 'uppercase' }}><i className="fas fa-book-open"></i> Elements to Review</h3>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
                                         {Array.from(elementsToReview).map(sym => <span key={sym} style={{ background: '#fff0f0', border: '1px solid #ffb8b8', padding: '6px 12px', borderRadius: '8px', fontWeight: 'bold', color: '#e74c3c', fontSize: '0.9rem' }}>{elements.find(e => e.sym === sym)?.name} ({sym})</span>)}
@@ -407,7 +495,8 @@ export default function TimeAttack() {
                                 )}
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
             </main>
         </div>

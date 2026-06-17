@@ -56,11 +56,16 @@
     overflow: hidden;
     text-align: left;
 }
+@media (hover: hover) {
+    .badge-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+}
 
-.badge-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
 
 .badge-card.locked { filter: grayscale(1); opacity: 0.6; }
-.badge-card.locked:hover { transform: none; box-shadow: none; cursor: not-allowed; }
+@media (hover: hover) {
+    .badge-card.locked:hover { transform: none; box-shadow: none; cursor: not-allowed; }
+}
+
 .badge-card.locked::after { content: "\f023"; font-family: "Font Awesome 5 Free"; font-weight: 900; position: absolute; right: 20px; top: 25px; font-size: 1.5rem; color: #ccc; }
 
 .badge-icon {

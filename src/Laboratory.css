@@ -1,6 +1,9 @@
 /* --- New Action Buttons --- */
 .btn-secondary { background: #f0f2f5; color: #333; border: none; padding: 12px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
-.btn-secondary:hover { background: #e4e6eb; transform: translateY(-2px); }
+@media (hover: hover) {
+    .btn-secondary:hover { background: #e4e6eb; transform: translateY(-2px); }
+}
+
 
 /* ══════════════════════════════════════════════
    EXPERIMENT GUIDE MODAL — full redesign
@@ -66,7 +69,10 @@
     align-items: center; justify-content: center;
     flex-shrink: 0; transition: all 0.2s;
 }
-.guide-close-btn:hover { background: #ffeaea; color: #e53e3e; }
+@media (hover: hover) {
+    .guide-close-btn:hover { background: #ffeaea; color: #e53e3e; }
+}
+
 
 /* Search */
 .guide-search-wrap {
@@ -86,7 +92,10 @@
     position: absolute; right: 32px; top: 50%; transform: translateY(-50%);
     color: #aaa; cursor: pointer; font-size: 0.85rem;
 }
-.guide-search-clear:hover { color: #e53e3e; }
+@media (hover: hover) {
+    .guide-search-clear:hover { color: #e53e3e; }
+}
+
 
 /* Category tabs */
 .guide-tabs {
@@ -101,7 +110,10 @@
     font-size: 0.8rem; font-weight: 600; color: #666;
     cursor: pointer; white-space: nowrap; transition: all 0.2s; flex-shrink: 0;
 }
-.guide-tab:hover { border-color: #6e45e2; color: #6e45e2; }
+@media (hover: hover) {
+    .guide-tab:hover { border-color: #6e45e2; color: #6e45e2; }
+}
+
 .guide-tab.active { background: #6e45e2; color: #fff; border-color: #6e45e2; }
 
 /* Scrollable grid area */
@@ -123,11 +135,14 @@
     transition: all 0.2s; position: relative;
     text-align: left;
 }
-.guide-card.unlocked:hover {
-    border-color: #6e45e2;
-    box-shadow: 0 6px 18px rgba(110,69,226,0.1);
-    transform: translateY(-2px);
+@media (hover: hover) {
+    .guide-card.unlocked:hover {
+        border-color: #6e45e2;
+        box-shadow: 0 6px 18px rgba(110,69,226,0.1);
+        transform: translateY(-2px);
+    }
 }
+
 .guide-card.locked {
     background: #fafafa;
     border: 1.5px dashed #e0e0e0;
@@ -178,8 +193,14 @@
     align-items: center; justify-content: center;
     transition: all 0.2s; opacity: 0;
 }
-.guide-card:hover .guide-add-btn { opacity: 1; }
-.guide-add-btn:hover { background: #6e45e2; border-color: #6e45e2; transform: scale(1.1); }
+@media (hover: hover) {
+    .guide-card:hover .guide-add-btn { opacity: 1; }
+}
+
+@media (hover: hover) {
+    .guide-add-btn:hover { background: #6e45e2; border-color: #6e45e2; transform: scale(1.1); }
+}
+
 
 /* Desktop: centered panel instead of bottom sheet */
 @media (min-width: 640px) {
@@ -222,10 +243,16 @@
 .inventory-search input:focus { border-color: #6e45e2; background: white; box-shadow: 0 0 0 3px rgba(110, 69, 226, 0.1); }
 .inventory-search .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #aaa; font-size: 0.9rem; }
 .clear-search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #aaa; cursor: pointer; transition: color 0.2s; font-size: 0.9rem; }
-.clear-search-icon:hover { color: #e74c3c; }
+@media (hover: hover) {
+    .clear-search-icon:hover { color: #e74c3c; }
+}
+
 
 .element-drag { width: 60px; height: 60px; background: #fff; border: 2px solid #e1e1e1; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; cursor: grab; user-select: none; transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.02); color: #2d3436; }
-.element-drag:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.05); }
+@media (hover: hover) {
+    .element-drag:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.05); }
+}
+
 .element-drag:active { cursor: grabbing; transform: scale(0.95); }
 
 .experiment-panel { flex: 2; min-width: 300px; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #f0f0f0; display: flex; flex-direction: column; align-items: center; position: relative; }
@@ -277,7 +304,10 @@
 @keyframes smokeAnim { 0% { transform: translate(0, 0) scale(1); opacity: 0.8; } 100% { transform: translate(var(--tx), var(--ty)) scale(3); opacity: 0; } }
 
 .btn-primary { background: #6e45e2; color: white; border: none; padding: 12px 30px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.btn-primary:hover { background: #5a32c3; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(110, 69, 226, 0.3); }
+@media (hover: hover) {
+    .btn-primary:hover { background: #5a32c3; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(110, 69, 226, 0.3); }
+}
+
 
 /* --- Realistic Bunsen Burner --- */
 .bunsen-burner { position: absolute; bottom: -65px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; z-index: 0; }
@@ -289,16 +319,25 @@
 .heat-toggle-btn { position: absolute; bottom: 20px; right: 0px; background: #f8f9fa; border: 2px solid #dcdde1; color: #7f8fa6; padding: 10px 15px; border-radius: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; transition: all 0.3s ease; z-index: 10; }
 .heat-toggle-btn i { font-size: 1.5rem; }
 .heat-toggle-btn.active { background: #ff6b6b; color: white; border-color: #ff4757; box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4); }
-.heat-toggle-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+@media (hover: hover) {
+    .heat-toggle-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+}
+
 
 .pour-toggle-btn { position: absolute; bottom: 20px; left: 0px; background: #f8f9fa; border: 2px solid #dcdde1; color: #7f8fa6; padding: 10px 15px; border-radius: 12px; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; transition: all 0.3s ease; z-index: 10; }
 .pour-toggle-btn i { font-size: 1.5rem; }
-.pour-toggle-btn:hover { background: #4facfe; color: white; border-color: #4facfe; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(79, 172, 254, 0.3); }
+@media (hover: hover) {
+    .pour-toggle-btn:hover { background: #4facfe; color: white; border-color: #4facfe; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(79, 172, 254, 0.3); }
+}
+
 
 /* --- AR Overlay --- */
 .ar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 2000; display: none; }
 .ar-close-btn { position: absolute; top: 30px; right: 30px; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: background 0.3s; z-index: 2002; }
-.ar-close-btn:hover { background: rgba(0,0,0,0.7); transform: scale(1.1); }
+@media (hover: hover) {
+    .ar-close-btn:hover { background: rgba(0,0,0,0.7); transform: scale(1.1); }
+}
+
 
 @media (max-width: 768px) {
     .modern-modal { flex-direction: column; }

@@ -8,7 +8,10 @@
 .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: #6e45e2; font-size: 1.4rem; cursor: pointer; }
 .nav-links { display: flex; list-style: none; gap: 15px; margin: 0; padding: 0; }
 .nav-links li { cursor: pointer; color: #666; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px; transition: all 0.3s; }
-.nav-links li:hover { background: #f0f2f5; color: #6e45e2; }
+@media (hover: hover) {
+    .nav-links li:hover { background: #f0f2f5; color: #6e45e2; }
+}
+
 .nav-links li.active { color: #6e45e2; font-weight: 600; background: #f3f0ff; }
 
 /* --- Main Container --- */
@@ -46,7 +49,10 @@
 
 /* --- Leave Room Button --- */
 .btn-leave-room { background: none; border: 1px solid #e74c3c; color: #e74c3c; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; transition: all 0.3s; }
-.btn-leave-room:hover { background: #e74c3c; color: white; }
+@media (hover: hover) {
+    .btn-leave-room:hover { background: #e74c3c; color: white; }
+}
+
 
 /* --- Responsive Design --- */
 @media (max-width: 900px), (pointer: coarse) {
