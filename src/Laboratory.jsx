@@ -40,7 +40,7 @@ const GROUP_COLORS = {
     metalloid:{ bg: '#eaf3de', text: '#173404', accent: '#3b6d11' },
 };
 
-const recipes = {
+export const recipes = {
     "H,H,O": { name: "Water", formula: "H₂O", icon: "💧", desc: "Essential for all known forms of life.", color: "#74b9ff" },
     "Cl,Na": { name: "Sodium Chloride (Salt)", formula: "NaCl", icon: "🧂", desc: "Commonly used as a condiment and food preservative.", color: "#f1f2f6" },
     "C,O,O": { name: "Carbon Dioxide", formula: "CO₂", icon: "💨", desc: "A greenhouse gas produced by respiration.", color: "#dfe6e9", requiresHeat: true },
@@ -78,6 +78,13 @@ const recipes = {
     "Al,Cl,Cl,Cl": { name: "Aluminum Chloride", formula: "AlCl₃", icon: "🛡️", desc: "Used in antiperspirants and in the chemical industry.", color: "#e17055" },
     "Br,H": { name: "Hydrogen Bromide", formula: "HBr", icon: "⚠️", desc: "A colorless compound and a strong acid in water.", color: "#fab1a0" },
     "Br,Na": { name: "Sodium Bromide", formula: "NaBr", icon: "💊", desc: "Widely used as an anticonvulsant and a sedative.", color: "#f1f2f6" }
+};
+
+// Converts a compound name like "Sodium Chloride (Salt)" into a model filename
+// like "sodium_chloride". Exported so ArViewer.jsx can build the exact same
+// filename when looking up a compound's 3D model from a QR-scanned link.
+export const getModelFilename = (name) => {
+    return name.split(' (')[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 };
 
 // ── XP & Level config ────────────────────────────────────────────────────────
@@ -460,12 +467,14 @@ export default function Laboratory() {
     };
 
     const getModelFilename = (name) => {
-        // Converts "Sodium Chloride (Salt)" to "sodium_chloride"
         return name.split(' (')[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     };
 
     const openDesktopAR = () => {
-        const arUrl = new URL(window.location.href);
+        // Point to the public AR viewer route — not the current (login-protected)
+        // Laboratory page — so scanning the QR code on a phone opens the 3D
+        // model directly instead of bouncing to Login on an unauthenticated device.
+        const arUrl = new URL(window.location.origin + '/ar-view');
         arUrl.searchParams.set('compound', resultData.res.formula);
         setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(arUrl.toString())}`);
         setShowDesktopAr(true);
@@ -1192,15 +1201,14 @@ export default function Laboratory() {
                                 <>
                                     <div className="element-model-box" style={{ width: '100%', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
                                         <model-viewer
-                                            src={`/assets/models/${getModelFilename(resultData.res.name)}.gltf`}
+                                            src={`/assets/models/${getModelFilename(resultData.res.name)}.glb`}
                                             alt={`3D model of ${resultData.res.name}`}
                                             auto-rotate
                                             rotation-per-second="45deg"
-                                            scale="0.05 0.05 0.05"
                                             camera-controls
                                             ar
                                         autoplay
-                                            ar-scale="auto"
+                                            ar-scale="fixed"
                                             ar-modes="webxr scene-viewer quick-look"
                                             style={{ width: '100%', height: '100%' }}
                                         >

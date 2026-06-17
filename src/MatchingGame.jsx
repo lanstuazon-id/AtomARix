@@ -25,6 +25,14 @@ const categoryData = {
     ]
 };
 
+// Audio objects created once at module load, not per-render/per-component-instance,
+// since useRef(new Audio(...)) would otherwise construct a new Audio() on every
+// render (the argument is still evaluated eagerly even though useRef only keeps
+// the first result).
+const sndFlipAudio = new Audio('/assets/audio/drop.mp3');
+const sndSuccessAudio = new Audio('/assets/audio/success.mp3');
+const sndErrorAudio = new Audio('/assets/audio/error.mp3');
+
 export default function MatchingGame() {
     const navigate = useNavigate();
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
@@ -32,16 +40,16 @@ export default function MatchingGame() {
     const bestScoreKey = `matchingGameBestScore_${currentUser}`;
 
     // Audio refs (using public folder paths)
-    const sndFlip = useRef(new Audio('/assets/audio/drop.mp3'));
-    const sndSuccess = useRef(new Audio('/assets/audio/success.mp3'));
-    const sndError = useRef(new Audio('/assets/audio/error.mp3'));
+    const sndFlip = useRef(sndFlipAudio);
+    const sndSuccess = useRef(sndSuccessAudio);
+    const sndError = useRef(sndErrorAudio);
 
     // Modals
     const [showInstructions, setShowInstructions] = useState(!localStorage.getItem(instructionsKey));
     const [showGameOver, setShowGameOver] = useState(false);
 
     // Game State
-    const [gameState, setGameState] = useState('start'); // 'start', 'playing'
+    const [gameState, setGameState] = useState('start'); // 'start', 'playing', 'end'
     const [currentCategory, setCurrentCategory] = useState([]);
     const [cards, setCards] = useState([]);
     
@@ -54,8 +62,14 @@ export default function MatchingGame() {
     const [moves, setMoves] = useState(0);
     const [timeElapsed, setTimeElapsed] = useState(0);
     const [finalStars, setFinalStars] = useState(0);
+    const [bestScore, setBestScore] = useState(() => {
+        const saved = parseInt(localStorage.getItem(bestScoreKey), 10);
+        return (isNaN(saved) || saved <= 0) ? null : saved;
+    });
+    const [isNewBest, setIsNewBest] = useState(false);
 
-    // Timer Logic
+    // Timer Logic — only ticks while actively playing; stops automatically
+    // once gameState becomes 'end' (game won), freezing the displayed time.
     useEffect(() => {
         let interval;
         if (gameState === 'playing') {
@@ -77,6 +91,7 @@ export default function MatchingGame() {
                     if (isNaN(localScore) || localScore <= 0) localScore = 999;
                     if (score < localScore) {
                         localStorage.setItem(bestScoreKey, score.toString());
+                        setBestScore(score);
                     }
                 }
             }
@@ -102,6 +117,7 @@ export default function MatchingGame() {
         setTimeElapsed(0);
         setShowGameOver(false);
         setIsLocked(false);
+        setIsNewBest(false);
         
         // Create pairs
         let newCards = [];
@@ -176,13 +192,30 @@ export default function MatchingGame() {
 
         if (finalMoves < existingBestScore) {
             localStorage.setItem(bestScoreKey, finalMoves);
+            setBestScore(finalMoves);
+            setIsNewBest(true);
             setDoc(doc(db, "users", currentUser), { matchingGameBestScore: finalMoves }, { merge: true }).catch(e => console.error(e));
+        } else {
+            setIsNewBest(false);
         }
 
-        // Calculate Stars
+        // Calculate Stars — thresholds scale with the number of pairs in this
+        // category, so adding a category with a different size (not just the
+        // current fixed 8) still produces fair star ratings. These per-pair
+        // rates are calibrated to reproduce the original 8-pair thresholds
+        // exactly (2-star: 16 moves/45s, 1-star: 24 moves/90s at 8 pairs).
+        const pairCount = currentCategory.length;
+        const movesPerPair3Star = 2;      // moves/pair cutoff for 3 stars
+        const movesPerPair2Star = 3;      // moves/pair cutoff for 2 stars
+        const secondsPerPair3Star = 5.625; // seconds/pair cutoff for 3 stars
+        const secondsPerPair2Star = 11.25; // seconds/pair cutoff for 2 stars
+
         let starsEarned = 3;
-        if (finalMoves > 24 || finalTime > 90) starsEarned = 1;
-        else if (finalMoves > 16 || finalTime > 45) starsEarned = 2;
+        if (finalMoves > pairCount * movesPerPair2Star || finalTime > pairCount * secondsPerPair2Star) {
+            starsEarned = 1;
+        } else if (finalMoves > pairCount * movesPerPair3Star || finalTime > pairCount * secondsPerPair3Star) {
+            starsEarned = 2;
+        }
         
         setFinalStars(starsEarned);
         setTimeout(() => setShowGameOver(true), 500);
@@ -283,7 +316,12 @@ export default function MatchingGame() {
                 {gameState === 'start' ? (
                     <div className="start-screen" style={{ background: 'white', padding: '40px', borderRadius: '20px', border: '1px solid #f0f0f0', textAlign: 'center', minHeight: '40vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                         <h2 style={{ color: '#2d3436', fontSize: '2rem' }}>Select a Category</h2>
-                        <p style={{ color: '#666', marginBottom: '20px' }}>Choose a set of elements to match.</p>
+                        <p style={{ color: '#666', marginBottom: '8px' }}>Choose a set of elements to match.</p>
+                        {bestScore !== null && (
+                            <p style={{ color: '#6e45e2', fontWeight: '700', fontSize: '0.9rem', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <i className="fas fa-trophy" style={{ color: '#f1c40f' }}></i> Your best: {bestScore} moves
+                            </p>
+                        )}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', width: '100%', maxWidth: '800px' }}>
                             <button className="btn-category" onClick={() => startGame('common')} style={{ background: 'white', border: '2px solid #e1e1e1', padding: '20px', borderRadius: '16px', fontSize: '1.2rem', fontWeight: 'bold', color: '#2d3436', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                                 <i className="fas fa-globe" style={{ fontSize: '2.5rem', color: '#6e45e2' }}></i> Common Elements <span style={{ fontSize: '0.9rem', color: '#888', fontWeight: 'normal' }}>H, O, C, Na...</span>
@@ -296,12 +334,15 @@ export default function MatchingGame() {
                             </button>
                         </div>
                     </div>
-                ) : (
+                ) : (gameState === 'playing' || gameState === 'end') ? (
                     <div id="gameBoard">
                         <div className="game-header">
                             <div className="stats-container">
                                 <div className="stats">Moves: <span>{moves}</span></div>
                                 <div className="stats">Time: <span>{formatTime(timeElapsed)}</span></div>
+                                {bestScore !== null && (
+                                    <div className="stats" style={{ color: '#888' }}><i className="fas fa-trophy" style={{ color: '#f1c40f' }}></i> Best: <span>{bestScore}</span></div>
+                                )}
                             </div>
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <button className="btn-restart" style={{ borderColor: '#ccc', color: '#666' }} onClick={() => setGameState('start')}><i className="fas fa-list"></i> Categories</button>
@@ -323,7 +364,7 @@ export default function MatchingGame() {
                             })}
                         </div>
                     </div>
-                )}
+                ) : null}
             </main>
 
             {/* Instructions Modal */}
@@ -347,7 +388,12 @@ export default function MatchingGame() {
                     <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
                         <div style={{ fontSize: '4rem', color: '#f1c40f', marginBottom: '10px' }}><i className="fas fa-trophy"></i></div>
                         <h2 style={{ color: '#2d3436', marginBottom: '5px' }}>Congratulations! 🎉</h2>
-                        <p style={{ color: '#666', marginBottom: '20px' }}>You matched all the elements!</p>
+                        <p style={{ color: '#666', marginBottom: isNewBest ? '8px' : '20px' }}>You matched all the elements!</p>
+                        {isNewBest && (
+                            <p style={{ color: '#f1c40f', fontWeight: '700', fontSize: '0.95rem', marginBottom: '20px' }}>
+                                <i className="fas fa-trophy"></i> New personal best!
+                            </p>
+                        )}
                         
                         <div style={{ background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', padding: '20px', marginBottom: '25px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '1.1rem' }}><span style={{ color: '#555', fontWeight: '600' }}>Time:</span><span style={{ color: '#2d3436', fontWeight: 'bold' }}>{formatTime(timeElapsed)}</span></div>

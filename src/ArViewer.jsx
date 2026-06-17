@@ -1,18 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { elementData } from './PeriodicTable.jsx';
+import { recipes, getModelFilename } from './Laboratory.jsx';
 
 // Public AR viewer — intentionally NOT wrapped in ProtectedRoute. When a
-// student scans the QR code shown on desktop, their phone is a separate,
-// unauthenticated browser session, so this page must work without login.
-// It only ever shows one element's 3D model, nothing else from the app.
+// student scans a QR code shown on desktop (from the Periodic Table or the
+// Laboratory), their phone is a separate, unauthenticated browser session,
+// so this page must work without login. It only ever shows one item's 3D
+// model — either a single element or a single discovered compound — nothing
+// else from the app.
 export default function ArViewer() {
     const [searchParams] = useSearchParams();
-    const symbol = searchParams.get('element');
-    const element = symbol ? elementData[symbol] : null;
+    const elementSymbol = searchParams.get('element');
+    const compoundFormula = searchParams.get('compound');
+
+    const element = elementSymbol ? elementData[elementSymbol] : null;
+
+    // Compounds are looked up by their formula (e.g. "H₂O"), since that's
+    // what's encoded in the QR code from Laboratory.jsx, not the recipe key.
+    const compound = compoundFormula
+        ? Object.values(recipes).find(r => r.formula === compoundFormula)
+        : null;
+
     const [modelFailed, setModelFailed] = useState(false);
 
-    // Load Google's <model-viewer> component, same as PeriodicTable.jsx
+    // Load Google's <model-viewer> component, same as PeriodicTable.jsx / Laboratory.jsx
     useEffect(() => {
         if (!document.getElementById('model-viewer-script')) {
             const script = document.createElement('script');
@@ -23,13 +35,22 @@ export default function ArViewer() {
         }
     }, []);
 
-    if (!symbol || !element) {
+    const title = element ? element.name : compound ? compound.name : null;
+    const subtitle = element ? `${elementSymbol} · Atomic Number ${element.n}` : compound ? compound.formula : null;
+    const modelSrc = element
+        ? `/assets/models/${element.name.toLowerCase()}.glb`
+        : compound
+            ? `/assets/models/${getModelFilename(compound.name)}.glb`
+            : null;
+    const noteText = element ? element.fact : compound ? compound.desc : null;
+
+    if (!modelSrc) {
         return (
             <div style={styles.page}>
                 <div style={styles.card}>
                     <i className="fas fa-flask" style={{ fontSize: '2.5rem', color: '#ccc', marginBottom: '15px' }}></i>
-                    <h2 style={{ color: '#2d3436', marginBottom: '8px' }}>Element Not Found</h2>
-                    <p style={{ color: '#888', fontSize: '0.9rem' }}>This AR link looks invalid or incomplete. Please scan the QR code again from the Periodic Table page.</p>
+                    <h2 style={{ color: '#2d3436', marginBottom: '8px' }}>Item Not Found</h2>
+                    <p style={{ color: '#888', fontSize: '0.9rem' }}>This AR link looks invalid or incomplete. Please scan the QR code again from the Periodic Table or Laboratory page.</p>
                 </div>
             </div>
         );
@@ -43,14 +64,14 @@ export default function ArViewer() {
                         <i className="fas fa-atom"></i> AtomARix AR Viewer
                     </span>
                 </div>
-                <h1 style={{ fontSize: '1.8rem', color: '#2d3436', margin: '0 0 4px' }}>{element.name}</h1>
-                <p style={{ color: '#888', margin: '0 0 20px', fontSize: '0.95rem' }}>{symbol} · Atomic Number {element.n}</p>
+                <h1 style={{ fontSize: '1.8rem', color: '#2d3436', margin: '0 0 4px' }}>{title}</h1>
+                <p style={{ color: '#888', margin: '0 0 20px', fontSize: '0.95rem' }}>{subtitle}</p>
 
                 <div style={styles.modelBox}>
                     {!modelFailed ? (
                         <model-viewer
-                            src={`/assets/models/${element.name.toLowerCase()}.glb`}
-                            alt={`3D model of ${element.name}`}
+                            src={modelSrc}
+                            alt={`3D model of ${title}`}
                             auto-rotate
                             rotation-per-second="45deg"
                             camera-controls
@@ -78,10 +99,10 @@ export default function ArViewer() {
                     )}
                 </div>
 
-                {element.fact && (
+                {noteText && (
                     <p style={{ marginTop: '20px', color: '#555', fontSize: '0.9rem', lineHeight: '1.5', background: '#f8f9fa', padding: '14px 16px', borderRadius: '12px', textAlign: 'left' }}>
                         <i className="fas fa-lightbulb" style={{ color: '#f39c12', marginRight: '6px' }}></i>
-                        {element.fact}
+                        {noteText}
                     </p>
                 )}
 
