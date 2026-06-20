@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './PeriodicTable.css';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -125,11 +125,141 @@ export const elementData = {
     "Og": { n: 118, name: "Oganesson", cat: "noble-gas", x: 18, y: 7, mass: "294", config: "[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁶", fact: "Heaviest known element.", period: 7, summary: "Oganesson is the heaviest known element in the periodic table. It is extremely unstable and radioactive. It exists only for a very short time after being created. Scientists study it to understand the limits of matter. It was discovered in 2002." }
 };
 
+// Dedicated hints for the Periodic Puzzle mini-game. These are written
+// specifically to NOT reveal the element's own name — unlike the `fact`
+// field above (used in the info modal), which sometimes states the name
+// directly (e.g. "Lithium is the lightest metal") and would give the
+// answer away if reused as a puzzle hint.
+export const puzzleHints = {
+    "H": "The lightest and simplest element in the universe — just one proton and one electron.",
+    "He": "A noble gas so light it makes balloons float and your voice sound higher if you breathe it in.",
+    "Li": "The lightest metal on the periodic table, used inside rechargeable batteries.",
+    "Be": "A toxic alkaline-earth metal that's surprisingly sweet-tasting — never taste it though!",
+    "B": "A metalloid added to glass fibers to make them stronger and heat-resistant.",
+    "C": "Forms both soft pencil lead and the hardest natural gemstone, depending on its structure.",
+    "N": "Makes up about 78% of the air you're breathing right now.",
+    "O": "The gas your body needs most to survive, making up about 21% of the air.",
+    "F": "A reactive gas added to toothpaste and drinking water to protect teeth from decay.",
+    "Ne": "A noble gas that glows reddish-orange in glass tubes used for bright signs.",
+    "Na": "A soft alkali metal you can cut with a butter knife, found in table salt.",
+    "Mg": "A bright-burning alkaline-earth metal used in flares and fireworks.",
+    "Al": "The most common metal in Earth's crust, used in soda cans and aircraft.",
+    "Si": "A metalloid that forms the basis of computer chips and is found in sand.",
+    "P": "A nonmetal essential for life, found in DNA and bones.",
+    "S": "A yellow nonmetal used to make gunpowder and matches.",
+    "Cl": "A nonmetal gas used to disinfect swimming pools and drinking water.",
+    "Ar": "A noble gas once used to fill old-style incandescent light bulbs.",
+    "K": "An alkali metal vital for nerve signals and muscle function in your body.",
+    "Ca": "An alkaline-earth metal that keeps your bones and teeth strong.",
+    "Sc": "A lightweight transition metal used in aerospace parts and baseball bats.",
+    "Ti": "A transition metal as strong as steel but much lighter, used in jet engines.",
+    "V": "A transition metal added to steel to make it more shock-resistant.",
+    "Cr": "A transition metal that gives rubies their deep red color.",
+    "Mn": "A transition metal that plants need for photosynthesis to work.",
+    "Fe": "The most abundant metal on Earth by mass, found at the planet's core.",
+    "Co": "A transition metal used to make some of the strongest magnets.",
+    "Ni": "A transition metal commonly used in coins and stainless steel.",
+    "Cu": "A reddish transition metal that conducts electricity extremely well, used in wiring.",
+    "Zn": "A transition metal coated onto steel to stop it from rusting.",
+    "Ga": "A post-transition metal with such a low melting point it can melt in your hand.",
+    "Ge": "A metalloid used to make fiber optic cables for the internet.",
+    "As": "A metalloid that was historically used as a poison.",
+    "Se": "A nonmetal once widely used inside photocopier machines.",
+    "Br": "A reddish-brown nonmetal that's a liquid at room temperature.",
+    "Kr": "A noble gas used in the bright flashes of high-speed photography.",
+    "Rb": "A soft alkali metal used inside extremely precise atomic clocks.",
+    "Sr": "An alkaline-earth metal that gives fireworks a vivid crimson-red color.",
+    "Y": "A transition metal used in LED lights and glowing phosphor screens.",
+    "Zr": "A transition metal used to build the cores of nuclear reactors.",
+    "Nb": "A transition metal used in superconducting magnets, like those in MRI machines.",
+    "Mo": "A transition metal that helps plants convert nitrogen from the air.",
+    "Tc": "The first element ever created artificially in a lab rather than found in nature.",
+    "Ru": "A transition metal that resists tarnishing even at room temperature.",
+    "Rh": "One of the rarest and most expensive metals, used in car exhaust systems.",
+    "Pd": "A transition metal that's a key ingredient inside catalytic converters.",
+    "Ag": "A shiny transition metal with the best electrical conductivity of any element.",
+    "Cd": "A transition metal once commonly used inside rechargeable batteries.",
+    "In": "A post-transition metal used to make touchscreens responsive to your finger.",
+    "Sn": "A post-transition metal used to coat steel cans and prevent corrosion.",
+    "Sb": "A metalloid added to fabrics and plastics to make them flame-resistant.",
+    "Te": "A metalloid used in the manufacturing of solar panels.",
+    "I": "A nonmetal your thyroid gland needs to function properly.",
+    "Xe": "A noble gas used as fuel in some spacecraft ion propulsion engines.",
+    "Cs": "An alkali metal used inside the most accurate atomic clocks ever built.",
+    "Ba": "An alkaline-earth metal swallowed before certain medical X-ray scans.",
+    "La": "The very first element in the lanthanide row of the periodic table.",
+    "Ce": "A lanthanide used in the coating of self-cleaning ovens.",
+    "Pr": "A lanthanide used to strengthen the metal alloys in aircraft engines.",
+    "Nd": "A lanthanide responsible for the strongest permanent magnets ever made.",
+    "Pm": "A radioactive lanthanide once used to power small nuclear batteries.",
+    "Sm": "A lanthanide used in certain targeted cancer treatment drugs.",
+    "Eu": "A lanthanide used in tiny anti-counterfeiting marks on Euro banknotes.",
+    "Gd": "A lanthanide injected as a contrast agent before MRI scans.",
+    "Tb": "A lanthanide responsible for the green glow in certain phosphor screens.",
+    "Dy": "A lanthanide used in the control rods of nuclear reactors.",
+    "Ho": "A lanthanide with the strongest magnetic pull of any known element.",
+    "Er": "A lanthanide used in the lasers found in surgical equipment.",
+    "Tm": "A rare lanthanide used to power small, portable X-ray machines.",
+    "Yb": "A lanthanide sometimes added to improve certain stainless steel alloys.",
+    "Lu": "A lanthanide used in the detectors of PET medical scanners.",
+    "Hf": "A transition metal used in the control rods of nuclear submarines.",
+    "Ta": "A transition metal essential inside the tiny capacitors of mobile phones.",
+    "W": "The transition metal with the highest melting point of any metal on the table.",
+    "Re": "A rare transition metal used in the turbine blades of jet engines.",
+    "Os": "The densest naturally occurring element known.",
+    "Ir": "An extremely corrosion-resistant transition metal often found in meteorites.",
+    "Pt": "A precious transition metal popular in fine jewelry and lab equipment.",
+    "Au": "The most malleable metal — it can be hammered into incredibly thin sheets.",
+    "Hg": "A transition metal that's liquid at room temperature, once used in old thermometers.",
+    "Tl": "A highly toxic post-transition metal, historically used in rat poison.",
+    "Pb": "A dense post-transition metal once used in pipes, now used in radiation shielding.",
+    "Bi": "A post-transition metal that can be grown into colorful, staircase-shaped crystals.",
+    "Po": "A highly radioactive metalloid first discovered by Marie Curie.",
+    "At": "The rarest naturally occurring element on Earth.",
+    "Rn": "A radioactive noble gas that can seep into and build up in basements.",
+    "Fr": "An extremely rare alkali metal — only about an ounce is estimated to exist on Earth at any time.",
+    "Ra": "A radioactive alkaline-earth metal once used in glow-in-the-dark watch dials.",
+    "Ac": "A rare radioactive metal at the start of its own row, known to glow faintly blue in the dark.",
+    "Th": "A radioactive metal being researched as a potential nuclear reactor fuel.",
+    "Pa": "An extremely rare and toxic radioactive metal near the start of the actinide row.",
+    "U": "The primary radioactive fuel used to power nuclear plants.",
+    "Np": "A radioactive metal commonly found in the waste from nuclear reactors.",
+    "Pu": "A radioactive metal that has powered the electronics on deep-space probes.",
+    "Am": "A radioactive metal found inside many household smoke detectors.",
+    "Cm": "A radioactive metal named in honor of a famous scientist couple.",
+    "Bk": "A radioactive metal named after a university city in California.",
+    "Cf": "A radioactive metal sometimes used to help start up nuclear reactors.",
+    "Es": "A radioactive metal named in honor of a famous physicist known for relativity.",
+    "Fm": "A radioactive metal named after a physicist who built the first nuclear reactor.",
+    "Md": "A radioactive metal named after the scientist who organized the periodic table.",
+    "No": "A radioactive metal named in honor of the founder of a famous science prize.",
+    "Lr": "A radioactive metal named after a physicist known for inventing the cyclotron.",
+    "Rf": "A highly radioactive, lab-made transition metal near the start of period 7.",
+    "Db": "A synthetic transition metal named after a Russian research city.",
+    "Sg": "A synthetic transition metal named after a pioneering nuclear chemist.",
+    "Bh": "A synthetic transition metal named after a famous quantum physicist.",
+    "Hs": "A synthetic transition metal named after a German state.",
+    "Mt": "A synthetic transition metal named after a pioneering female physicist.",
+    "Ds": "A synthetic transition metal named after the German city where it was discovered.",
+    "Rg": "A synthetic transition metal named after the discoverer of X-rays.",
+    "Cn": "A synthetic transition metal named after a famous astronomer.",
+    "Nh": "A post-transition metal and the first element ever discovered in Asia.",
+    "Fl": "A synthetic post-transition metal named after a Russian research laboratory.",
+    "Mc": "A synthetic post-transition metal named after the Russian capital region.",
+    "Lv": "A synthetic post-transition metal named after a US national laboratory.",
+    "Ts": "A synthetic metalloid named after a US state known for nuclear research.",
+    "Og": "The heaviest element ever confirmed on the periodic table.",
+};
+
+
 export default function PeriodicTable() {
     const navigate = useNavigate();
     const location = useLocation();
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
     const storageKey = `learnedElements_${currentUser}`;
+    const puzzleCategoriesKey = `puzzleCategoriesCompleted_${currentUser}`; // array of category ids completed at least once
+    const puzzleCountKey = `puzzlesCompleted_${currentUser}`;               // total completion count (replays count too)
+    const puzzleBadgesKey = `puzzleBadges_${currentUser}`;
 
     // State
     const [learnedElements, setLearnedElements] = useState(() => new Set(JSON.parse(localStorage.getItem(storageKey)) || []));
@@ -142,6 +272,41 @@ export default function PeriodicTable() {
     const [showDesktopAr, setShowDesktopAr] = useState(false);
     const [reviewElements, setReviewElements] = useState(location.state?.highlightElements || []);
     const [qrUrl, setQrUrl] = useState('');
+
+    // ── Periodic Puzzle mini-game state ──────────────────────────────────────
+    const [showPuzzleSetup, setShowPuzzleSetup] = useState(false);   // category-select screen
+    const [showPuzzleInstructions, setShowPuzzleInstructions] = useState(false);
+    const [puzzleActive, setPuzzleActive] = useState(false);         // game actually running, full-screen
+    const [puzzleCategory, setPuzzleCategory] = useState('all');
+    const [puzzleTray, setPuzzleTray] = useState([]);                // symbols left to place
+    const [puzzlePlaced, setPuzzlePlaced] = useState({});            // { symbol: true } once correctly placed
+    const [puzzleWrongTile, setPuzzleWrongTile] = useState(null);    // symbol of the tile just mis-placed on (for shake feedback)
+    const [puzzleComplete, setPuzzleComplete] = useState(false);
+    const [selectedTileSymbol, setSelectedTileSymbol] = useState(null); // blank tile tapped — opens the question modal for this tile
+    const [puzzleWrongCount, setPuzzleWrongCount] = useState(0);     // total wrong placements this game, across all tiles
+    const [puzzleGameOver, setPuzzleGameOver] = useState(false);     // wrong-attempt limit reached
+    const [puzzleSuccessSymbol, setPuzzleSuccessSymbol] = useState(null); // symbol just correctly placed — shows the success modal
+    const [puzzleMistakeToast, setPuzzleMistakeToast] = useState(null); // { key } transient "X mistakes left" notification
+    const [puzzleModalOptions, setPuzzleModalOptions] = useState([]); // option chips for the currently-open question modal, fixed at open time so they don't reshuffle on re-render
+    const puzzleContainerRef = useRef(null);
+
+    // Wrong-attempt limits per category, scaled roughly to category size so
+    // "All" (118 elements) allows more room for mistakes than a small
+    // category like Alkali Metals (6 elements). Tap-to-place replaced
+    // drag-and-drop (HTML5 DnD doesn't fire on touch devices at all, which
+    // was the actual cause of the puzzle being unplayable on phones/tablets).
+    const puzzleWrongLimits = {
+        "all": 15,
+        "alkali-metal": 2,
+        "alkaline-earth": 2,
+        "noble-gas": 3,
+        "nonmetal": 4,
+        "post-transition": 4,
+        "metalloid": 4,
+        "transition-metal": 6,
+        "lanthanide": 7,
+        "actinide": 7,
+    };
 
     // Auto-scroll to highlighted element in full screen mode
     useEffect(() => {
@@ -156,6 +321,53 @@ export default function PeriodicTable() {
             return () => clearTimeout(timer);
         }
     }, [searchTerm, isExpandedTable]);
+
+    // Keep puzzleActive in sync if the student exits fullscreen via the
+    // browser's own controls (Esc key, swipe-down on mobile, etc.) instead
+    // of our in-game Exit button — without this, the React state would
+    // think the puzzle is still "active" while the browser has already
+    // dropped out of fullscreen.
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            if (!document.fullscreenElement && puzzleActive) {
+                setPuzzleActive(false);
+                setPuzzleTray([]);
+                setPuzzlePlaced({});
+                setPuzzleWrongTile(null);
+                setPuzzleComplete(false);
+                setSelectedTileSymbol(null);
+                setPuzzleWrongCount(0);
+                setPuzzleGameOver(false);
+                setPuzzleSuccessSymbol(null);
+                setPuzzleMistakeToast(null);
+            }
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, [puzzleActive]);
+
+    // Request fullscreen once puzzleActive becomes true. This runs in an
+    // effect (after React has committed the .puzzle-fullscreen div to the
+    // DOM) rather than inside startPuzzleGame directly, since the ref would
+    // still be null at the moment setPuzzleActive(true) is called — state
+    // updates and DOM mounts happen asynchronously relative to that call.
+    useEffect(() => {
+        if (puzzleActive && puzzleContainerRef.current?.requestFullscreen) {
+            puzzleContainerRef.current.requestFullscreen().catch(err => {
+                console.warn(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        }
+    }, [puzzleActive]);
+
+    // Clears the question modal's option list whenever it closes, regardless
+    // of which code path closed it (correct answer, Game Over, exit, etc.) —
+    // centralizing this in one effect avoids needing to remember to reset it
+    // at every individual call site that sets selectedTileSymbol to null.
+    useEffect(() => {
+        if (!selectedTileSymbol) {
+            setPuzzleModalOptions([]);
+        }
+    }, [selectedTileSymbol]);
 
     // Fetch learned elements from the cloud on mount
     useEffect(() => {
@@ -201,22 +413,27 @@ export default function PeriodicTable() {
         }
     }, []);
 
-    const openModal = (symbol) => {
-        const el = elementData[symbol];
-        setSelectedElement({ ...el, symbol });
-        setShowModal(true);
-        document.body.style.overflow = 'hidden';
-
+    // Marks an element as learned (syncs to Firestore) without necessarily
+    // showing the full info modal — used by the puzzle's own success modal,
+    // which shows a different, game-specific celebration instead.
+    const markElementLearned = (symbol) => {
         if (!learnedElements.has(symbol)) {
             setLearnedElements(prev => {
                 const newSet = new Set(prev).add(symbol);
                 const newArray = [...newSet];
                 localStorage.setItem(storageKey, JSON.stringify(newArray));
-                // Sync to cloud instantly
                 setDoc(doc(db, "users", currentUser), { learnedElements: newArray }, { merge: true }).catch(e => console.error(e));
                 return newSet;
             });
         }
+    };
+
+    const openModal = (symbol) => {
+        const el = elementData[symbol];
+        setSelectedElement({ ...el, symbol });
+        setShowModal(true);
+        document.body.style.overflow = 'hidden';
+        markElementLearned(symbol);
     };
 
     const closeModal = () => {
@@ -225,6 +442,248 @@ export default function PeriodicTable() {
         document.body.style.overflow = '';
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
+        }
+    };
+
+    // ── Periodic Puzzle mini-game ────────────────────────────────────────────
+    // Tiles for the chosen category render blank and grayscale; the student
+    // drags each element's symbol from the bottom tray onto its correct grid
+    // position. Reuses the existing elementData (x/y grid coords, fact field
+    // as the hint) and the existing element-info modal for correct placements.
+    const getPuzzleElementSymbols = (category) => {
+        return Object.entries(elementData)
+            .filter(([, el]) => category === 'all' || el.cat === category)
+            .map(([symbol]) => symbol);
+    };
+
+    const shuffleArray = (arr) => {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    };
+
+    // Friendly display labels for each category, used in the tray's filter header.
+    const categoryLabels = {
+        "alkali-metal": "Alkali Metals",
+        "alkaline-earth": "Alkaline Earth Metals",
+        "transition-metal": "Transition Metals",
+        "post-transition": "Post-Transition Metals",
+        "metalloid": "Metalloids",
+        "nonmetal": "Nonmetals",
+        "noble-gas": "Noble Gases",
+        "lanthanide": "Lanthanides",
+        "actinide": "Actinides",
+    };
+
+    // Tapping a blank tile selects it, which filters the tray down to just
+    // that tile's category — e.g. tapping an alkali metal tile shows only
+    // the remaining alkali metal chips, instead of all 118 at once. This
+    // keeps "All" from being overwhelming while the puzzle stays a genuine
+    // challenge (same-category chips still include wrong options to pick from).
+    //
+    // Near the end of a category, puzzleTray alone can shrink to just the
+    // correct answer with no decoys left (everything else already placed),
+    // turning the "choice" into a forced single tap. To keep it a genuine
+    // multiple-choice question throughout, we top up with decoys pulled from
+    // already-placed elements in the same category (safe to show — tapping
+    // one is simply a wrong answer, it doesn't un-place anything) until
+    // there are at least MIN_OPTIONS, capped at the category's actual size.
+    const MIN_PUZZLE_OPTIONS = 6;
+    const getFilteredTray = (tileSymbol) => {
+        if (!tileSymbol) return [];
+        const targetCat = elementData[tileSymbol].cat;
+        const unplacedInCat = puzzleTray.filter(symbol => elementData[symbol].cat === targetCat);
+
+        if (unplacedInCat.length >= MIN_PUZZLE_OPTIONS) {
+            return shuffleArray(unplacedInCat);
+        }
+
+        const placedInCat = Object.keys(puzzlePlaced).filter(symbol => elementData[symbol].cat === targetCat);
+        const needed = MIN_PUZZLE_OPTIONS - unplacedInCat.length;
+        const decoys = shuffleArray(placedInCat).slice(0, needed);
+
+        return shuffleArray([...unplacedInCat, ...decoys]);
+    };
+
+    const selectPuzzleTile = (symbol) => {
+        setSelectedTileSymbol(symbol);
+        setPuzzleModalOptions(getFilteredTray(symbol));
+    };
+
+    const openPuzzleSetup = () => {
+        setShowPuzzleInstructions(true);
+    };
+
+    // Deep-link support: the "Play Now" button on the Periodic Puzzle stat
+    // card (StudentHome) navigates here with { autoOpenPuzzle: true } so the
+    // student lands straight on the instructions screen instead of having to
+    // find and click "Play Periodic Puzzle" on this page first.
+    useEffect(() => {
+        if (location.state?.autoOpenPuzzle) {
+            setShowPuzzleInstructions(true);
+            // Clear the flag from history state so refreshing/navigating back
+            // doesn't keep re-opening the instructions modal.
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
+
+    const proceedToCategorySelect = () => {
+        setShowPuzzleInstructions(false);
+        setShowPuzzleSetup(true);
+    };
+
+    const startPuzzleGame = (category) => {
+        const symbols = getPuzzleElementSymbols(category);
+        setPuzzleCategory(category);
+        setPuzzleTray(shuffleArray(symbols));
+        setPuzzlePlaced({});
+        setPuzzleWrongTile(null);
+        setPuzzleComplete(false);
+        setSelectedTileSymbol(null);
+        setPuzzleWrongCount(0);
+        setPuzzleGameOver(false);
+        setPuzzleSuccessSymbol(null);
+        setPuzzleMistakeToast(null);
+        setShowPuzzleSetup(false);
+        setPuzzleActive(true);
+        // Fullscreen is requested in a useEffect (see below) once puzzleActive
+        // becomes true and the .puzzle-fullscreen div has actually mounted —
+        // calling requestFullscreen() here would run before React commits the
+        // DOM update, so puzzleContainerRef.current would still be null.
+    };
+
+    const exitPuzzleGame = () => {
+        setPuzzleActive(false);
+        setPuzzleTray([]);
+        setPuzzlePlaced({});
+        setPuzzleWrongTile(null);
+        setPuzzleComplete(false);
+        setSelectedTileSymbol(null);
+        setPuzzleWrongCount(0);
+        setPuzzleGameOver(false);
+        setPuzzleSuccessSymbol(null);
+        setPuzzleMistakeToast(null);
+
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(e => console.warn(e));
+        }
+    };
+
+    // All selectable category ids (mirrors the buttons on the setup screen),
+    // used to detect when a student has cleared every category at least once.
+    const ALL_PUZZLE_CATEGORIES = [
+        'alkali-metal', 'alkaline-earth', 'transition-metal', 'post-transition',
+        'metalloid', 'nonmetal', 'noble-gas', 'lanthanide', 'actinide',
+    ];
+
+    // Persists progress for the Periodic Puzzle mini-game, mirroring the
+    // pattern used for learnedElements: write to localStorage immediately,
+    // then sync to Firestore so Achievements/StudentHome can read it.
+    const savePuzzleCompletion = (category) => {
+        // Total completions (replays of the same category still count toward this)
+        const prevCount = parseInt(localStorage.getItem(puzzleCountKey) || '0', 10);
+        const newCount = prevCount + 1;
+        localStorage.setItem(puzzleCountKey, newCount.toString());
+
+        // Unique categories completed at least once
+        const prevCats = new Set(JSON.parse(localStorage.getItem(puzzleCategoriesKey)) || []);
+        prevCats.add(category);
+        const newCats = [...prevCats];
+        localStorage.setItem(puzzleCategoriesKey, JSON.stringify(newCats));
+
+        // Badge checks
+        const prevBadges = new Set(JSON.parse(localStorage.getItem(puzzleBadgesKey)) || []);
+        if (newCount >= 1) prevBadges.add('puzzle-first');
+        if (newCount >= 10) prevBadges.add('puzzle-veteran');
+        const completedAllCategories = ALL_PUZZLE_CATEGORIES.every(c => prevCats.has(c));
+        if (completedAllCategories) prevBadges.add('puzzle-master');
+        if (category === 'all') prevBadges.add('puzzle-full-table');
+        const newBadges = [...prevBadges];
+        localStorage.setItem(puzzleBadgesKey, JSON.stringify(newBadges));
+
+        // Sync to cloud so other pages (and other devices) pick it up
+        setDoc(doc(db, "users", currentUser), {
+            puzzlesCompleted: newCount,
+            puzzleCategoriesCompleted: newCats,
+            puzzleBadges: newBadges,
+        }, { merge: true }).catch(e => console.error("Error saving puzzle stats:", e));
+    };
+
+    // Tapping a tray chip attempts to place it on the currently selected tile
+    // (selectedTileSymbol). Replaces the old drag-and-drop flow entirely —
+    // HTML5 Drag and Drop never fires from touch gestures, which was the
+    // actual reason the puzzle was unplayable on phones/tablets/iPad.
+    const attemptPlacement = (chosenSymbol) => {
+        if (!selectedTileSymbol) return;
+        const targetSymbol = selectedTileSymbol;
+
+        if (chosenSymbol === targetSymbol) {
+            // Correct placement
+            const newPlaced = { ...puzzlePlaced, [targetSymbol]: true };
+            setPuzzlePlaced(newPlaced);
+            setPuzzleTray(prev => prev.filter(s => s !== chosenSymbol));
+            setPuzzleWrongTile(null);
+            setSelectedTileSymbol(null); // closes the question modal
+            setPuzzleSuccessSymbol(targetSymbol); // opens the success modal instead
+
+            markElementLearned(targetSymbol);
+
+            // Check for full completion of this category — deferred until
+            // the success modal's Next button is pressed (see proceedFromSuccess),
+            // so the student always sees their last correct answer first.
+        } else {
+            // Wrong placement — shake feedback, plus count toward the
+            // whole-game wrong-attempt limit (not per-tile). Hitting the
+            // limit ends the game with a Game Over modal. The question
+            // modal (selectedTileSymbol) stays open so they can try again.
+            setPuzzleWrongTile(targetSymbol);
+            setTimeout(() => setPuzzleWrongTile(null), 600);
+
+            setPuzzleWrongCount(prev => {
+                const newCount = prev + 1;
+                const limit = puzzleWrongLimits[puzzleCategory] ?? 5;
+                const remaining = Math.max(0, limit - newCount);
+
+                if (newCount >= limit) {
+                    setSelectedTileSymbol(null); // close the question modal
+                    setPuzzleGameOver(true);
+                } else {
+                    // Transient toast — keyed by Date.now() so retriggering
+                    // it (e.g. two wrong guesses in a row) restarts its
+                    // fade-out animation instead of looking stuck.
+                    const toastKey = Date.now();
+                    setPuzzleMistakeToast({ key: toastKey, remaining });
+                    setTimeout(() => {
+                        setPuzzleMistakeToast(current => (current && current.key === toastKey) ? null : current);
+                    }, 2200);
+                }
+                return newCount;
+            });
+        }
+    };
+
+    // Called from the success modal's "Next" button. Closes the success
+    // modal and, if that was the last element in the category, triggers the
+    // completion modal — deferred to here so the student sees their final
+    // correct answer's success modal before the completion celebration.
+    const proceedFromSuccess = () => {
+        const justPlacedSymbol = puzzleSuccessSymbol;
+        setPuzzleSuccessSymbol(null);
+
+        if (justPlacedSymbol) {
+            const totalInCategory = getPuzzleElementSymbols(puzzleCategory).length;
+            // By the time the student taps "Next" (a separate, later click
+            // event), React has already re-rendered with the updated
+            // puzzlePlaced from attemptPlacement, so this closure has the
+            // fresh count rather than a stale one.
+            const placedCount = Object.keys(puzzlePlaced).length;
+            if (placedCount >= totalInCategory) {
+                setPuzzleComplete(true);
+                savePuzzleCompletion(puzzleCategory);
+            }
         }
     };
 
@@ -317,133 +776,7 @@ export default function PeriodicTable() {
         { id: 10, icon: 'fas fa-flask', left: '5%', animDuration: '17s', delay: '9s', size: '2rem' },
     ];
 
-    return (
-        <div style={{ background: '#f8faff', minHeight: '100vh', position: 'relative' }}>
-            {/* Floating Chemistry Background */}
-            <div className="floating-background">
-                {floatingItems.map(item => (
-                    <div 
-                        key={item.id} 
-                        className="floating-item" 
-                        style={{ 
-                            left: item.left, 
-                            animationDuration: item.animDuration, 
-                            animationDelay: item.delay,
-                            fontSize: item.size,
-                            fontWeight: item.fontWeight || 'normal'
-                        }}
-                    >
-                        {item.icon ? <i className={item.icon}></i> : item.text}
-                    </div>
-                ))}
-            </div>
-            <style>
-            {`
-                .floating-background { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 0; overflow: hidden; }
-                .floating-item { position: absolute; color: #6e45e2; opacity: 0.08; bottom: -100px; animation: float-up infinite linear; }
-                @keyframes float-up { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(-120vh) rotate(360deg); } }
-
-                @media (min-width: 768px) {
-                    .periodic-modal-landscape {
-                        max-width: 850px !important;
-                        width: 90% !important;
-                    }
-                    .periodic-modal-landscape .modal-header {
-                        margin-bottom: 25px !important;
-                    }
-                    .periodic-modal-landscape .detailed-info-container {
-                        display: flex !important;
-                        flex-direction: row !important;
-                        gap: 40px !important;
-                        align-items: flex-start !important;
-                    }
-                    .periodic-modal-landscape .info-col {
-                        flex: 1;
-                    }
-                    .periodic-modal-landscape .modal-right-col {
-                        width: 360px;
-                        flex-shrink: 0;
-                    }
-                }
-            `}
-            </style>
-             <nav className="navbar">
-                <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
-                <ul className="nav-links">
-                    <li onClick={() => navigate('/home')}><i className="fas fa-home"></i> <span>Home</span></li>
-                    <li className="active"><i className="fas fa-th"></i> <span>Periodic Table</span></li>
-                    <li onClick={() => navigate('/laboratory')}><i className="fas fa-flask"></i> <span>Laboratory</span></li>
-                    <li onClick={() => navigate('/matchinggame')}><i className="fas fa-puzzle-piece"></i> <span>Matching Game</span></li>
-                    <li onClick={() => navigate('/timeattack')}><i className="fas fa-stopwatch"></i> <span>Time Attack</span></li>
-                    <li onClick={() => navigate('/achievements')}><i className="fas fa-trophy"></i> <span>Achievements</span></li>
-                </ul>
-                <div style={{ width: '130px' }}></div>
-            </nav>
-
-            <main className="main-container" style={{ position: 'relative', zIndex: 1 }}>
-                <section className="controls-section">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <div className={`search-container ${isExpandedTable ? 'expanded-mode' : ''}`} style={{ marginBottom: 0 }}>
-                            <i className="fas fa-search search-icon"></i>
-                            <input type="text" value={searchTerm} onChange={handleSearchChange} className="search-input" placeholder="Search by name or symbol..." />
-                            {searchTerm && <i className="fas fa-times clear-search-icon" style={{ display: 'block' }} onClick={() => setSearchTerm('')} title="Clear Search"></i>}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            {reviewElements.length > 0 && (
-                                <button 
-                                    className="learn-filter-btn" 
-                                    style={{ background: '#6e45e2', color: 'white', borderColor: '#6e45e2' }}
-                                    onClick={() => setReviewElements([])}
-                                >
-                                    <i className="fas fa-times-circle"></i> Clear Review
-                                </button>
-                            )}
-                            <div className="learn-filters" style={{ display: 'flex', gap: '10px' }}>
-                                <button className={`learn-filter-btn ${learningFilter === 'learned' ? 'active-learned' : ''}`} onClick={() => handleLearningFilterClick('learned')}><i className="fas fa-check-circle"></i> Learned</button>
-                                <button className={`learn-filter-btn ${learningFilter === 'not-learned' ? 'active-not-learned' : ''}`} onClick={() => handleLearningFilterClick('not-learned')}><i className="fas fa-circle"></i> Not Yet Learned</button>
-                            </div>
-                            <div className="learned-counter"><i className="fas fa-star" style={{ color: '#f1c40f' }}></i> Learned: <span>{learnedElements.size}</span>/118</div>
-                        </div>
-                    </div>
-                    <div className="filter-group">
-                        {filterCategories.map(cat => (
-                            <button key={cat} className={`filter-btn ${activeCategory === cat ? 'active' : ''}`} data-category={cat} onClick={() => handleCategoryClick(cat)}>
-                                {cat.replace('-', ' ')}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                <div className="table-header-mobile">
-                    <h3 style={{ color: '#2d3436', margin: 0 }}><i className="fas fa-th"></i> Periodic Table</h3>
-                    <button className="btn-expand-table" onClick={() => setIsExpandedTable(true)}>
-                        <i className="fas fa-expand-arrows-alt"></i> Full Screen
-                    </button>
-                </div>
-
-                {isExpandedTable && (
-                    <button className="btn-close-expand" onClick={() => setIsExpandedTable(false)}>
-                        <i className="fas fa-compress-arrows-alt"></i> Close
-                    </button>
-                )}
-
-                <div className={`table-wrapper ${isExpandedTable ? 'expanded' : ''}`}>
-                <section className="table-grid">
-                    {Object.entries(elementData).map(([symbol, el]) => {
-                        const { opacity, highlighted } = getTileStyle(symbol, el.cat);
-                        return (
-                            <div key={symbol} className={`element-tile ${el.cat} ${highlighted ? 'highlighted' : ''}`} style={{ gridColumn: el.x, gridRow: el.y, opacity }} onClick={() => openModal(symbol)}>
-                                <span className="atomic-number">{el.n}</span>
-                                <span className="symbol">{symbol}</span>
-                                <span className="name">{el.name}</span>
-                            </div>
-                        );
-                    })}
-                </section>
-                </div>
-            </main>
-
-            {showModal && selectedElement && (
+    const elementInfoModal = showModal && selectedElement && (
                 <div className="modal-container show" onClick={closeModal}>
                     <div className="modal-content periodic-modal-landscape" onClick={e => e.stopPropagation()}>
                         <button className="close-modal" onClick={closeModal}>&times;</button>
@@ -517,7 +850,322 @@ export default function PeriodicTable() {
                         </div>
                     </div>
                 </div>
+    );
+
+    return (
+        <div style={{ background: '#f8faff', minHeight: '100vh', position: 'relative' }}>
+            {/* Floating Chemistry Background */}
+            <div className="floating-background">
+                {floatingItems.map(item => (
+                    <div 
+                        key={item.id} 
+                        className="floating-item" 
+                        style={{ 
+                            left: item.left, 
+                            animationDuration: item.animDuration, 
+                            animationDelay: item.delay,
+                            fontSize: item.size,
+                            fontWeight: item.fontWeight || 'normal'
+                        }}
+                    >
+                        {item.icon ? <i className={item.icon}></i> : item.text}
+                    </div>
+                ))}
+            </div>
+            <style>
+            {`
+                .floating-background { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 0; overflow: hidden; }
+                .floating-item { position: absolute; color: #6e45e2; opacity: 0.08; bottom: -100px; animation: float-up infinite linear; }
+                @keyframes float-up { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(-120vh) rotate(360deg); } }
+
+                @media (min-width: 768px) {
+                    .periodic-modal-landscape {
+                        max-width: 850px !important;
+                        width: 90% !important;
+                    }
+                    .periodic-modal-landscape .modal-header {
+                        margin-bottom: 25px !important;
+                    }
+                    .periodic-modal-landscape .detailed-info-container {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        gap: 40px !important;
+                        align-items: flex-start !important;
+                    }
+                    .periodic-modal-landscape .info-col {
+                        flex: 1;
+                    }
+                    .periodic-modal-landscape .modal-right-col {
+                        width: 360px;
+                        flex-shrink: 0;
+                    }
+                }
+            `}
+            </style>
+             <nav className="navbar">
+                <div className="nav-brand" style={{ width: '130px' }}><i className="fas fa-atom"></i> <span>AtomARix</span></div>
+                <ul className="nav-links">
+                    <li onClick={() => navigate('/home')}><i className="fas fa-home"></i> <span>Home</span></li>
+                    <li className="active"><i className="fas fa-th"></i> <span>Periodic Table</span></li>
+                    <li onClick={() => navigate('/laboratory')}><i className="fas fa-flask"></i> <span>Laboratory</span></li>
+                    <li onClick={() => navigate('/matchinggame')}><i className="fas fa-puzzle-piece"></i> <span>Matching Game</span></li>
+                    <li onClick={() => navigate('/timeattack')}><i className="fas fa-stopwatch"></i> <span>Time Attack</span></li>
+                    <li onClick={() => navigate('/achievements')}><i className="fas fa-trophy"></i> <span>Achievements</span></li>
+                </ul>
+                <div style={{ width: '130px' }}></div>
+            </nav>
+
+            <main className="main-container" style={{ position: 'relative', zIndex: 1 }}>
+                {!puzzleActive && (
+                <section className="controls-section">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <div className={`search-container ${isExpandedTable ? 'expanded-mode' : ''}`} style={{ marginBottom: 0 }}>
+                            <i className="fas fa-search search-icon"></i>
+                            <input type="text" value={searchTerm} onChange={handleSearchChange} className="search-input" placeholder="Search by name or symbol..." />
+                            {searchTerm && <i className="fas fa-times clear-search-icon" style={{ display: 'block' }} onClick={() => setSearchTerm('')} title="Clear Search"></i>}
+                        </div>
+                        <button
+                            onClick={openPuzzleSetup}
+                            style={{ background: 'linear-gradient(135deg, #6e45e2, #8e44ad)', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(110,69,226,0.3)', fontSize: '0.95rem', flexShrink: 0, marginLeft: '12px' }}
+                        >
+                            <i className="fas fa-puzzle-piece"></i> Play Periodic Puzzle
+                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            {reviewElements.length > 0 && (
+                                <button 
+                                    className="learn-filter-btn" 
+                                    style={{ background: '#6e45e2', color: 'white', borderColor: '#6e45e2' }}
+                                    onClick={() => setReviewElements([])}
+                                >
+                                    <i className="fas fa-times-circle"></i> Clear Review
+                                </button>
+                            )}
+                            <div className="learn-filters" style={{ display: 'flex', gap: '10px' }}>
+                                <button className={`learn-filter-btn ${learningFilter === 'learned' ? 'active-learned' : ''}`} onClick={() => handleLearningFilterClick('learned')}><i className="fas fa-check-circle"></i> Learned</button>
+                                <button className={`learn-filter-btn ${learningFilter === 'not-learned' ? 'active-not-learned' : ''}`} onClick={() => handleLearningFilterClick('not-learned')}><i className="fas fa-circle"></i> Not Yet Learned</button>
+                            </div>
+                            <div className="learned-counter"><i className="fas fa-star" style={{ color: '#f1c40f' }}></i> Learned: <span>{learnedElements.size}</span>/118</div>
+                        </div>
+                    </div>
+                    <div className="filter-group">
+                        {filterCategories.map(cat => (
+                            <button key={cat} className={`filter-btn ${activeCategory === cat ? 'active' : ''}`} data-category={cat} onClick={() => handleCategoryClick(cat)}>
+                                {cat.replace('-', ' ')}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+                )}
+
+                {!puzzleActive && (
+                <div className="table-header-mobile">
+                    <h3 style={{ color: '#2d3436', margin: 0 }}><i className="fas fa-th"></i> Periodic Table</h3>
+                    <button className="btn-expand-table" onClick={() => setIsExpandedTable(true)}>
+                        <i className="fas fa-expand-arrows-alt"></i> Full Screen
+                    </button>
+                </div>
+                )}
+
+                {isExpandedTable && (
+                    <button className="btn-close-expand" onClick={() => setIsExpandedTable(false)}>
+                        <i className="fas fa-compress-arrows-alt"></i> Close
+                    </button>
+                )}
+
+                {!puzzleActive && (
+                    <div className={`table-wrapper ${isExpandedTable ? 'expanded' : ''}`}>
+                        <section className="table-grid">
+                            {Object.entries(elementData).map(([symbol, el]) => {
+                                const { opacity, highlighted } = getTileStyle(symbol, el.cat);
+                                return (
+                                    <div key={symbol} className={`element-tile ${el.cat} ${highlighted ? 'highlighted' : ''}`} style={{ gridColumn: el.x, gridRow: el.y, opacity }} onClick={() => openModal(symbol)}>
+                                        <span className="atomic-number">{el.n}</span>
+                                        <span className="symbol">{symbol}</span>
+                                        <span className="name">{el.name}</span>
+                                    </div>
+                                );
+                            })}
+                        </section>
+                    </div>
+                )}
+            </main>
+
+            {/* ── Periodic Puzzle: dedicated full-screen game container ──
+                 Uses the real browser Fullscreen API (see confirmStartPuzzle),
+                 not the CSS .table-wrapper.expanded overlay used for normal
+                 browsing — kept fully separate so the two never interfere. */}
+            {puzzleActive && (
+                <div ref={puzzleContainerRef} className="puzzle-fullscreen">
+                    <div className="puzzle-fs-header">
+                        <span className="puzzle-fs-title"><i className="fas fa-puzzle-piece"></i> Periodic Puzzle — {puzzleCategory === 'all' ? 'All Elements' : puzzleCategory.replace('-', ' ')}</span>
+                        <span className="puzzle-fs-progress">{puzzleTray.length} remaining</span>
+                        <span className={`puzzle-fs-lives ${(puzzleWrongLimits[puzzleCategory] ?? 5) - puzzleWrongCount <= 1 ? 'puzzle-fs-lives-low' : ''}`}>
+                            <i className="fas fa-heart"></i> {Math.max(0, (puzzleWrongLimits[puzzleCategory] ?? 5) - puzzleWrongCount)} mistakes left
+                        </span>
+                        <button className="puzzle-exit-btn" onClick={exitPuzzleGame}>
+                            <i className="fas fa-times"></i> Exit
+                        </button>
+                    </div>
+
+                    {/* Transient toast shown the moment a wrong symbol is placed —
+                        separate from the persistent header badge, since a toast at
+                        the moment of the mistake is more attention-grabbing than a
+                        number quietly ticking down in the corner. */}
+                    {puzzleMistakeToast && (
+                        <div className="puzzle-mistake-toast" key={puzzleMistakeToast.key}>
+                            <i className="fas fa-exclamation-circle"></i>
+                            Not quite — {puzzleMistakeToast.remaining} mistake{puzzleMistakeToast.remaining !== 1 ? 's' : ''} left
+                        </div>
+                    )}
+
+                    <div className="puzzle-grid-wrapper">
+                    <section className="puzzle-grid">
+                        {Object.entries(elementData).map(([symbol, el]) => {
+                            const inThisCategory = puzzleCategory === 'all' || el.cat === puzzleCategory;
+                            const isPlaced = !!puzzlePlaced[symbol];
+                            const isWrongFlash = puzzleWrongTile === symbol;
+
+                            if (!inThisCategory) {
+                                // Tiles outside the chosen category stay visible but inert and dimmed,
+                                // so the student still sees the whole table's shape for context.
+                                return (
+                                    <div key={symbol} className={`element-tile ${el.cat}`} style={{ gridColumn: el.x, gridRow: el.y, opacity: 0.25, cursor: 'default' }}>
+                                        <span className="atomic-number">{el.n}</span>
+                                        <span className="symbol">{symbol}</span>
+                                        <span className="name">{el.name}</span>
+                                    </div>
+                                );
+                            }
+
+                            const isSelected = selectedTileSymbol === symbol;
+
+                            return (
+                                <div
+                                    key={symbol}
+                                    className={`element-tile puzzle-tile ${isPlaced ? el.cat + ' puzzle-solved' : 'puzzle-blank'} ${isWrongFlash ? 'puzzle-wrong-flash' : ''} ${isSelected ? 'puzzle-selected' : ''}`}
+                                    style={{ gridColumn: el.x, gridRow: el.y }}
+                                    onClick={() => { if (!isPlaced) selectPuzzleTile(symbol); }}
+                                >
+                                    {isPlaced && (
+                                        <>
+                                            <span className="atomic-number">{el.n}</span>
+                                            <span className="symbol">{symbol}</span>
+                                            <span className="name">{el.name}</span>
+                                        </>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </section>
+                    </div>
+
+                    {/* Rendered INSIDE the fullscreen element on purpose: when using the
+                        native Fullscreen API, only descendants of the fullscreen element
+                        are painted on screen — a sibling modal (even with position:fixed
+                        and a high z-index) would be invisible while fullscreen is active. */}
+                    {elementInfoModal}
+
+                    {/* ── Question Modal: tapping a blank tile opens this instead of
+                         filtering an inline tray. Shows the hint automatically plus
+                         the category's option chips to pick from. ── */}
+                    {selectedTileSymbol && (
+                        <div className="modal-container show" style={{ zIndex: 10002 }} onClick={() => setSelectedTileSymbol(null)}>
+                            <div className="modal-content puzzle-question-modal" onClick={e => e.stopPropagation()}>
+                                <button className="close-modal" onClick={() => setSelectedTileSymbol(null)}>&times;</button>
+                                <div className="puzzle-question-modal-icon"><i className="fas fa-question"></i></div>
+                                <h2>Which element belongs here?</h2>
+                                <div className="puzzle-hint-modal-meta">
+                                    <span><i className="fas fa-tag"></i> {categoryLabels[elementData[selectedTileSymbol].cat] || elementData[selectedTileSymbol].cat}</span>
+                                    <span><i className="fas fa-hashtag"></i> Atomic No. {elementData[selectedTileSymbol].n}</span>
+                                </div>
+                                <div className="puzzle-question-hint">
+                                    <i className="fas fa-lightbulb"></i>
+                                    <p>{puzzleHints[selectedTileSymbol]}</p>
+                                </div>
+                                <div className="puzzle-question-options">
+                                    {puzzleModalOptions.map(symbol => (
+                                        <button
+                                            key={symbol}
+                                            className="puzzle-tray-chip"
+                                            onClick={() => attemptPlacement(symbol)}
+                                        >
+                                            {symbol}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Success Modal: replaces the old full element-info modal for
+                         puzzle correct-answers. Shows just enough — name, symbol, the
+                         hint that was given, and an image — plus a Next button to continue,
+                         rather than the full multi-section info modal used elsewhere. ── */}
+                    {puzzleSuccessSymbol && (() => {
+                        const el = elementData[puzzleSuccessSymbol];
+                        return (
+                            <div className="modal-container show" style={{ zIndex: 10002 }}>
+                                <div className="modal-content puzzle-success-modal">
+                                    <div className="puzzle-success-modal-icon"><i className="fas fa-check"></i></div>
+                                    <h2>Correct!</h2>
+                                    <div className="puzzle-success-modal-symbol">{puzzleSuccessSymbol}</div>
+                                    <p className="puzzle-success-modal-name">{el.name}</p>
+                                    <div className="puzzle-success-modal-image">
+                                        <img
+                                            src={`/assets/elements/${el.name.toLowerCase()}.jpg`}
+                                            alt={el.name}
+                                            onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'flex'; }}
+                                        />
+                                        <span className="puzzle-success-modal-image-fallback"><i className="fas fa-image"></i></span>
+                                    </div>
+                                    <div className="puzzle-question-hint">
+                                        <i className="fas fa-lightbulb"></i>
+                                        <p>{puzzleHints[puzzleSuccessSymbol]}</p>
+                                    </div>
+                                    <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={proceedFromSuccess}>
+                                        Next <i className="fas fa-arrow-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {puzzleComplete && (
+                        <div className="modal-container show" style={{ zIndex: 10003 }}>
+                            <div className="modal-content" style={{ maxWidth: '420px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '3.5rem', marginBottom: '10px' }}>🎉</div>
+                                <h2 style={{ color: '#2d3436', marginBottom: '8px' }}>Puzzle Complete!</h2>
+                                <p style={{ color: '#666', marginBottom: '25px' }}>You correctly placed every element in <strong>{puzzleCategory === 'all' ? 'the full table' : puzzleCategory.replace('-', ' ')}</strong>!</p>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                    <button className="btn-cancel" onClick={exitPuzzleGame}>Exit</button>
+                                    <button className="btn-primary" onClick={() => { setPuzzleComplete(false); setPuzzleActive(false); if (document.fullscreenElement) document.exitFullscreen().catch(e => console.warn(e)); setShowPuzzleSetup(true); }}>Play Another Category</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {puzzleGameOver && (
+                        <div className="modal-container show" style={{ zIndex: 10003 }}>
+                            <div className="modal-content" style={{ maxWidth: '420px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '3.5rem', marginBottom: '10px' }}>😵</div>
+                                <h2 style={{ color: '#2d3436', marginBottom: '8px' }}>Game Over</h2>
+                                <p style={{ color: '#666', marginBottom: '25px' }}>
+                                    You've reached the limit of <strong>{puzzleWrongLimits[puzzleCategory] ?? 5} wrong placements</strong> for{' '}
+                                    <strong>{puzzleCategory === 'all' ? 'the full table' : puzzleCategory.replace('-', ' ')}</strong>. Give it another go!
+                                </p>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                    <button className="btn-cancel" onClick={exitPuzzleGame}>Exit</button>
+                                    <button className="btn-primary" onClick={() => startPuzzleGame(puzzleCategory)}>Try Again</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
+
+
+
+            {!puzzleActive && elementInfoModal}
 
             {showDesktopAr && (
                 <div className="modal-container show" style={{ zIndex: 10001 }}>
@@ -530,6 +1178,54 @@ export default function PeriodicTable() {
                     </div>
                 </div>
             )}
+
+            {/* ── Periodic Puzzle: Category Setup ── */}
+            {/* ── Periodic Puzzle: Instructions (shown first) ── */}
+            {showPuzzleInstructions && (
+                <div className="modal-container show" style={{ zIndex: 10002 }} onClick={() => setShowPuzzleInstructions(false)}>
+                    <div className="modal-content" style={{ maxWidth: '460px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <i className="fas fa-puzzle-piece" style={{ fontSize: '2.8rem', color: '#6e45e2', marginBottom: '10px' }}></i>
+                        <h2 style={{ color: '#2d3436', marginBottom: '15px' }}>How to Play</h2>
+                        <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                            <p style={{ color: '#555', margin: 0 }}><i className="fas fa-th" style={{ color: '#6e45e2', width: '20px' }}></i> The table turns <strong>black &amp; white</strong> with blank tiles for this category.</p>
+                            <p style={{ color: '#555', margin: 0 }}><i className="fas fa-hand-pointer" style={{ color: '#6e45e2', width: '20px' }}></i> <strong>Tap a blank tile</strong> — a popup shows a hint and the possible element symbols to choose from.</p>
+                            <p style={{ color: '#555', margin: 0 }}><i className="fas fa-check-circle" style={{ color: '#1dd1a1', width: '20px' }}></i> <strong>Correct!</strong> A popup shows the element's name, picture, and the hint, with a Next button to continue.</p>
+                            <p style={{ color: '#555', margin: 0 }}><i className="fas fa-times-circle" style={{ color: '#e74c3c', width: '20px' }}></i> <strong>Wrong?</strong> A notification shows how many mistakes you have left — try again from the same popup.</p>
+                            <p style={{ color: '#555', margin: 0 }}><i className="fas fa-heart" style={{ color: '#e74c3c', width: '20px' }}></i> Each category has a <strong>limited number of mistakes</strong> — run out, and it's game over!</p>
+                        </div>
+                        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={proceedToCategorySelect}>Choose a Category</button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Periodic Puzzle: Category Setup (shown after instructions) ── */}
+            {showPuzzleSetup && (
+                <div className="modal-container show" style={{ zIndex: 10002 }} onClick={() => setShowPuzzleSetup(false)}>
+                    <div className="modal-content" style={{ maxWidth: '480px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <i className="fas fa-puzzle-piece" style={{ fontSize: '2.8rem', color: '#6e45e2', marginBottom: '10px' }}></i>
+                        <h2 style={{ color: '#2d3436', marginBottom: '6px' }}>Choose a Category</h2>
+                        <p style={{ color: '#666', marginBottom: '20px' }}>Smaller categories are quicker — great for a first try!</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
+                            {filterCategories.map(cat => {
+                                const count = getPuzzleElementSymbols(cat).length;
+                                return (
+                                    <button
+                                        key={cat}
+                                        onClick={() => startPuzzleGame(cat)}
+                                        style={{ background: '#f8f9fa', border: '1px solid #e1e1e1', borderRadius: '12px', padding: '12px 10px', cursor: 'pointer', fontWeight: '700', color: '#2d3436', textTransform: 'capitalize', fontSize: '0.9rem' }}
+                                    >
+                                        {cat.replace('-', ' ')}
+                                        <span style={{ display: 'block', fontSize: '0.75rem', color: '#888', fontWeight: '500', marginTop: '2px' }}>{count} element{count !== 1 ? 's' : ''}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <button className="btn-cancel" style={{ width: '100%' }} onClick={() => setShowPuzzleSetup(false)}>Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Periodic Puzzle: Completion ── */}
         </div>
     );
 }

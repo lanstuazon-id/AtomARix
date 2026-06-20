@@ -80,9 +80,6 @@ export const recipes = {
     "Br,Na": { name: "Sodium Bromide", formula: "NaBr", icon: "💊", desc: "Widely used as an anticonvulsant and a sedative.", color: "#f1f2f6" }
 };
 
-// Converts a compound name like "Sodium Chloride (Salt)" into a model filename
-// like "sodium_chloride". Exported so ArViewer.jsx can build the exact same
-// filename when looking up a compound's 3D model from a QR-scanned link.
 export const getModelFilename = (name) => {
     return name.split(' (')[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 };

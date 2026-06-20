@@ -1,13 +1,7 @@
-/* --- New Action Buttons --- */
 .btn-secondary { background: #f0f2f5; color: #333; border: none; padding: 12px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
 @media (hover: hover) {
     .btn-secondary:hover { background: #e4e6eb; transform: translateY(-2px); }
 }
-
-
-/* ══════════════════════════════════════════════
-   EXPERIMENT GUIDE MODAL — full redesign
-══════════════════════════════════════════════ */
 
 /* Overlay */
 .guide-overlay {

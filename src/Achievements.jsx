@@ -28,6 +28,8 @@ export default function Achievements() {
         matching: 999,
         labXp: 0,
         labBadges: [],
+        puzzlesCompleted: 0,
+        puzzleBadges: [],
     });
     const [progressWidth, setProgressWidth] = useState(0);
 
@@ -40,8 +42,10 @@ export default function Achievements() {
         let timeAttackScore = parseInt(localStorage.getItem(`timeAttackBestCorrect_${userName}`) || '0');
         let matchingGameScore = parseInt(localStorage.getItem(`matchingGameBestScore_${userName}`), 10);
         if (isNaN(matchingGameScore) || matchingGameScore <= 0) matchingGameScore = 999;
+        let puzzlesCompleted = parseInt(localStorage.getItem(`puzzlesCompleted_${userName}`) || '0', 10);
+        let puzzleBadges = JSON.parse(localStorage.getItem(`puzzleBadges_${userName}`)) || [];
 
-        setStats(prev => ({ ...prev, learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore }));
+        setStats(prev => ({ ...prev, learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore, puzzlesCompleted, puzzleBadges }));
 
         // Sync with Firestore in real-time
         const userRef = doc(db, "users", userName);
@@ -55,13 +59,18 @@ export default function Achievements() {
                 const cloudMatching = data.matchingGameBestScore;
                 matchingGameScore = (cloudMatching !== undefined && cloudMatching > 0) ? cloudMatching : matchingGameScore;
 
-                setStats(prev => ({ ...prev, learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore }));
+                puzzlesCompleted = data.puzzlesCompleted !== undefined ? data.puzzlesCompleted : puzzlesCompleted;
+                puzzleBadges = data.puzzleBadges || puzzleBadges;
+
+                setStats(prev => ({ ...prev, learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingGameScore, puzzlesCompleted, puzzleBadges }));
                 
                 // Update local storage to match cloud
                 if (data.learnedElements) localStorage.setItem(`learnedElements_${userName}`, JSON.stringify(data.learnedElements));
                 if (data.discoveredCompounds) localStorage.setItem(`discoveredCompounds_${userName}`, JSON.stringify(data.discoveredCompounds));
                 if (data.timeAttackBestCorrect !== undefined) localStorage.setItem(`timeAttackBestCorrect_${userName}`, timeAttackScore.toString());
                 if (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0) localStorage.setItem(`matchingGameBestScore_${userName}`, matchingGameScore.toString());
+                if (data.puzzlesCompleted !== undefined) localStorage.setItem(`puzzlesCompleted_${userName}`, puzzlesCompleted.toString());
+                if (data.puzzleBadges) localStorage.setItem(`puzzleBadges_${userName}`, JSON.stringify(puzzleBadges));
                 const labXp = data.labXp || 0;
                 const labBadges = data.labBadges || [];
                 setStats(prev => ({ ...prev, labXp, labBadges }));
@@ -81,6 +90,11 @@ export default function Achievements() {
         { id: 'brainiac', title: 'Brainiac', desc: 'Complete the Matching Game in 20 moves or less.', icon: 'fa-brain', bg: 'bg-orange', unlocked: stats.matching <= 20 },
         { id: 'scientist', title: 'Mad Scientist', desc: 'Successfully create 5 different chemical compounds in the Virtual Laboratory.', icon: 'fa-vial', bg: 'bg-green', unlocked: stats.compounds >= 5 },
         { id: 'demon', title: 'Speed Demon', desc: 'Answer 10 or more questions correctly in a single round of Time Attack.', icon: 'fa-stopwatch', bg: 'bg-red', unlocked: stats.timeAttack >= 10 },
+        // ── Periodic Puzzle badges ──
+        { id: 'puzzle-first',      title: 'Puzzle Starter',    desc: 'Complete a category in the Periodic Puzzle for the first time.', icon: 'fa-puzzle-piece', bg: 'bg-blue',   unlocked: (stats.puzzleBadges || []).includes('puzzle-first')      },
+        { id: 'puzzle-full-table', title: 'Full Table Champ',  desc: 'Complete the Periodic Puzzle with every element on the table.',  icon: 'fa-th',            bg: 'bg-purple', unlocked: (stats.puzzleBadges || []).includes('puzzle-full-table') },
+        { id: 'puzzle-master',     title: 'Category Master',   desc: 'Complete every category at least once in the Periodic Puzzle.',  icon: 'fa-crown',         bg: 'bg-gold',   unlocked: (stats.puzzleBadges || []).includes('puzzle-master')     },
+        { id: 'puzzle-veteran',    title: 'Puzzle Veteran',    desc: 'Complete 10 rounds of the Periodic Puzzle.',                      icon: 'fa-trophy',        bg: 'bg-green',  unlocked: (stats.puzzleBadges || []).includes('puzzle-veteran')    },
         // ── Lab badges ──
         { id: 'lab-first',      title: 'First Discovery',   desc: 'Discover your first compound in the Virtual Laboratory.', icon: 'fa-vial', bg: 'bg-blue',   unlocked: (stats.labBadges || []).includes('lab-first')      },
         { id: 'lab-water',      title: 'Hydration Expert',  desc: 'Discover Water (H₂O) in the Laboratory.',                icon: 'fa-tint', bg: 'bg-blue',   unlocked: (stats.labBadges || []).includes('lab-water')      },
@@ -193,28 +207,6 @@ export default function Achievements() {
                         <div className="progress-bar-fill" style={{ width: `${progressWidth}%` }}></div>
                     </div>
                 </div>
-
-                {/* ── Lab XP Level Bar ── */}
-                {stats.labXp > 0 && (() => {
-                    const currentLevel = getLevel(stats.labXp);
-                    const nextLevel = LEVELS.find(l => l.minXp > stats.labXp) || null;
-                    const progress = nextLevel ? ((stats.labXp - currentLevel.minXp) / (nextLevel.minXp - currentLevel.minXp)) * 100 : 100;
-                    return (
-                        <div style={{ background: '#1e1e2e', borderRadius: '14px', padding: '18px 24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                            <div style={{ fontSize: '1.8rem' }}>⚗️</div>
-                            <div style={{ flex: 1, minWidth: '140px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                    <span style={{ color: '#a29bfe', fontWeight: '700', fontSize: '0.95rem' }}>Lab Level: {currentLevel.name}</span>
-                                    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>{stats.labXp} XP {nextLevel ? `/ ${nextLevel.minXp}` : '(MAX)'}</span>
-                                </div>
-                                <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
-                                    <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #6e45e2, #4facfe)', borderRadius: '99px' }}></div>
-                                </div>
-                            </div>
-                            {nextLevel && <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>Next: <span style={{ color: '#a29bfe' }}>{nextLevel.name}</span></div>}
-                        </div>
-                    );
-                })()}
 
                 <div className="achievements-grid">
                     {badges.map(badge => (

@@ -12,7 +12,9 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
 .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: #6e45e2; font-size: 1.4rem; }
 .nav-links { display: flex; list-style: none; gap: 25px; }
 .nav-links li { cursor: pointer; color: #666; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px; transition: all 0.3s; }
-.nav-links li:hover { background: #f0f2f5; color: #6e45e2; }
+@media (hover: hover) {
+    .nav-links li:hover { background: #f0f2f5; color: #6e45e2; }
+}
 .nav-links li.active { color: #6e45e2; font-weight: 600; background: #f3f0ff; }
 
 /* --- Main Container --- */
@@ -30,7 +32,9 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     font-weight: 600; transition: all 0.3s ease; background-color: #f0f2f5; color: #555;
     display: inline-flex; align-items: center;
 }
-.filter-btn:hover { transform: scale(1.05); background-color: #e4e6eb; }
+@media (hover: hover) {
+    .filter-btn:hover { transform: scale(1.05); background-color: #e4e6eb; }
+}
 .filter-btn.active { background-color: #6e45e2; color: white; box-shadow: 0 4px 10px rgba(110, 69, 226, 0.2); }
 
 /* Active Filter Button Colors */
@@ -50,7 +54,9 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     font-weight: 600; transition: all 0.3s ease; background-color: #f0f2f5; color: #555;
     display: inline-flex; align-items: center; gap: 6px;
 }
-.learn-filter-btn:hover { transform: scale(1.05); background-color: #e4e6eb; }
+@media (hover: hover) {
+    .learn-filter-btn:hover { transform: scale(1.05); background-color: #e4e6eb; }
+}
 .learn-filter-btn.active-learned { background-color: #1dd1a1; color: white; box-shadow: 0 4px 10px rgba(29, 209, 161, 0.2); }
 .learn-filter-btn.active-not-learned { background-color: #ff6b6b; color: white; box-shadow: 0 4px 10px rgba(255, 107, 107, 0.2); }
 
@@ -72,9 +78,21 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     cursor: pointer; transition: all 0.2s ease; position: relative; aspect-ratio: 1 / 1;
 }
-.element-tile:hover { transform: scale(1.1); z-index: 10; border-color: #6e45e2; }
+@media (hover: hover) {
+    .element-tile:hover { transform: scale(1.1); z-index: 10; border-color: #6e45e2; }
+}
 .element-tile.highlighted { z-index: 20; border-width: 3px; transform: scale(1.15); box-shadow: 0 6px 15px rgba(0,0,0,0.1); }
 .element-tile.highlighted .symbol { color: #6e45e2; transition: color 0.2s ease; }
+
+/* Full Screen Table — applies on ALL screen sizes (desktop included).
+   The mobile media query below only adjusts font sizes/spacing for small
+   screens; the actual fixed full-screen positioning must be universal,
+   otherwise "expanded" mode silently does nothing wider than 900px. */
+.table-wrapper.expanded {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: #f8faff; z-index: 1000000; overflow: auto;
+    padding: 70px 20px 140px 20px; box-sizing: border-box;
+}
 
 /* Category Colors */
 .nonmetal { background-color: #e3fafc; border-color: #48dbfb; }
@@ -113,13 +131,17 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
 .modal-content::-webkit-scrollbar-thumb { background: #dcdde1; border-radius: 10px; }
 .modal-container.show .modal-content { transform: translateY(0) scale(1); }
 .close-modal { position: absolute; top: 20px; right: 20px; border: none; background: #f0f2f5; font-size: 1.3rem; cursor: pointer; color: #555; width: 38px; height: 38px; border-radius: 50%; display: flex; justify-content: center; align-items: center; transition: all 0.2s ease; }
-.close-modal:hover { background: #ffeaea; color: #e74c3c; transform: scale(1.1); }
+@media (hover: hover) {
+    .close-modal:hover { background: #ffeaea; color: #e74c3c; transform: scale(1.1); }
+}
 
 .modal-header { display: flex; justify-content: space-between; margin-bottom: 15px; flex-wrap: nowrap; gap: 15px; align-items: center; }
 .modal-element-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .modal-element-title h2 { word-break: break-word; }
 #pronounceBtn { border: none; background: none; color: #6e45e2; cursor: pointer; font-size: 1.3rem; transition: all 0.2s ease; }
-#pronounceBtn:hover { transform: scale(1.2); color: #5a32c3; }
+@media (hover: hover) {
+    #pronounceBtn:hover { transform: scale(1.2); color: #5a32c3; }
+}
 .modal-symbol-card { width: 80px; height: 80px; border-radius: 12px; display: flex; justify-content: center; align-items: center; color: white; font-size: 2.5rem; font-weight: 800; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 .atomic-number-large { position: absolute; top: 8px; left: 10px; font-size: 1rem; }
 
@@ -144,7 +166,9 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(110, 69, 226, 0.3);
     transition: transform 0.2s;
 }
-.ar-btn:hover { transform: translateY(-2px); }
+@media (hover: hover) {
+    .ar-btn:hover { transform: translateY(-2px); }
+}
 
 .ar-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 2000; display: none; }
 .ar-close-btn {
@@ -153,7 +177,386 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
     font-size: 1.2rem; transition: background 0.3s;
 }
-.ar-close-btn:hover { background: rgba(0,0,0,0.7); transform: scale(1.1); }
+@media (hover: hover) {
+    .ar-close-btn:hover { background: rgba(0,0,0,0.7); transform: scale(1.1); }
+}
+
+/* --- Periodic Puzzle Game ---
+   We still call the browser's Fullscreen API (see confirmStartPuzzle in
+   PeriodicTable.jsx) for the "hide browser chrome" effect where supported.
+   But that API can silently fail or be unsupported (notably iOS Safari has
+   limited/no Fullscreen API support), so this container ALSO uses
+   position:fixed to visually cover the entire viewport on its own — the
+   game looks and behaves fullscreen even when the native API doesn't engage. */
+.puzzle-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #f8faff;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow: hidden;
+    z-index: 1000005;
+}
+
+.puzzle-fs-header {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: white;
+    border-bottom: 1px solid #eee;
+}
+.puzzle-fs-title {
+    font-weight: 700;
+    color: #2d3436;
+    font-size: clamp(0.85rem, 2vh, 1.1rem);
+    text-transform: capitalize;
+}
+.puzzle-fs-progress {
+    background: #f3f0ff;
+    color: #6e45e2;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.puzzle-fs-lives {
+    background: #fff7e0;
+    color: #f39c12;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.puzzle-fs-lives.puzzle-fs-lives-low {
+    background: #fff0f0;
+    color: #e74c3c;
+    animation: puzzle-pulse 1s infinite;
+}
+@keyframes puzzle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.puzzle-exit-btn {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    box-shadow: 0 3px 10px rgba(255,107,107,0.3);
+    flex-shrink: 0;
+}
+
+/* The grid takes all remaining vertical space between the header and tray.
+   It's centered and sized so each of the 18x10 cells comes out square,
+   rather than stretching to fill whatever rectangle is left (which would
+   make tiles rectangular on most screen aspect ratios). */
+.puzzle-grid-wrapper {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(4px, 1vh, 12px);
+    box-sizing: border-box;
+}
+.puzzle-grid {
+    display: grid;
+    grid-template-columns: repeat(18, 1fr);
+    grid-template-rows: repeat(10, 1fr);
+    gap: clamp(2px, 0.4vh, 6px);
+    height: 100%;
+    aspect-ratio: 18 / 10; /* forces the whole grid into an 18:10 rectangle, so each cell is square */
+    max-width: 100%;
+    max-height: 100%;
+}
+.puzzle-grid .element-tile {
+    min-width: 0;
+    min-height: 0;
+}
+.puzzle-grid .atomic-number { font-size: clamp(0.45rem, 0.9vh, 0.7rem); }
+.puzzle-grid .symbol { font-size: clamp(0.65rem, 1.6vh, 1.1rem); }
+.puzzle-grid .name { font-size: clamp(0.35rem, 0.7vh, 0.55rem); }
+
+.puzzle-tile.puzzle-blank {
+    background: #2d2d2d;
+    border: 2px dashed #555;
+    cursor: pointer;
+    filter: grayscale(1);
+    position: relative;
+}
+.puzzle-tile.puzzle-blank.puzzle-wrong-flash {
+    animation: puzzle-shake 0.4s ease;
+    border-color: #ff6b6b;
+    background: #3d2525;
+}
+@keyframes puzzle-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+}
+.puzzle-tile.puzzle-solved {
+    animation: puzzle-reveal 0.5s ease;
+    cursor: default;
+}
+@keyframes puzzle-reveal {
+    0% { filter: grayscale(1); transform: scale(0.9); }
+    60% { transform: scale(1.08); }
+    100% { filter: grayscale(0); transform: scale(1); }
+}
+/* Small dedicated hint button in the corner of each blank tile. Separate
+   from the tile body itself, which now has its own job: selecting the tile
+   to filter the tray below to its category (see .puzzle-selected). */
+.puzzle-hint-icon-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: #f1c40f;
+    width: clamp(14px, 2.4vh, 20px);
+    height: clamp(14px, 2.4vh, 20px);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(0.5rem, 1.1vh, 0.7rem);
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+/* The visual icon stays small so it fits even on tiny tiles (e.g. the 118-
+   tile "All" board), but its actual tappable area is invisibly expanded via
+   this pseudo-element — much easier to hit accurately on a phone/tablet
+   without making the icon itself look oversized. */
+.puzzle-hint-icon-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    transform: translate(-50%, -50%);
+}
+@media (hover: hover) {
+    .puzzle-hint-icon-btn:hover { background: rgba(255,255,255,0.25); }
+}
+
+/* Highlights the tile the student last tapped, so it's clear which
+   category the tray below is currently filtered to. */
+.puzzle-tile.puzzle-selected {
+    border-color: #6e45e2 !important;
+    border-style: solid !important;
+    box-shadow: 0 0 0 2px rgba(110,69,226,0.35);
+}
+
+/* ── Question Modal ── shown when tapping a blank tile. Reuses the shared
+   .puzzle-hint-modal-meta styling (category/atomic-number chips) but has
+   its own icon/heading and adds the hint box + option chips grid below. */
+.puzzle-question-modal {
+    max-width: 420px;
+    text-align: center;
+    padding: 35px 30px;
+}
+.puzzle-question-modal-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #f3f0ff;
+    color: #6e45e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    margin: 0 auto 12px;
+}
+.puzzle-question-modal h2 {
+    color: #2d3436;
+    margin-bottom: 12px;
+    font-size: 1.3rem;
+}
+.puzzle-hint-modal-meta {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.puzzle-hint-modal-meta span {
+    background: #f3f0ff;
+    color: #6e45e2;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: capitalize;
+}
+.puzzle-question-hint {
+    background: #fff7e0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    text-align: left;
+    margin-bottom: 20px;
+}
+.puzzle-question-hint i {
+    color: #f1c40f;
+    font-size: 1.1rem;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+.puzzle-question-hint p {
+    color: #444;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    margin: 0;
+}
+.puzzle-question-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+    gap: 10px;
+}
+
+/* ── Success Modal ── shown after a correct placement, replacing the old
+   full element-info modal for this specific flow. Deliberately compact:
+   name, symbol, image, and the hint that was given — plus a Next button. */
+.puzzle-success-modal {
+    max-width: 380px;
+    text-align: center;
+    padding: 35px 30px;
+}
+.puzzle-success-modal-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #e3fdf5;
+    color: #1dd1a1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    margin: 0 auto 10px;
+}
+.puzzle-success-modal h2 {
+    color: #1dd1a1;
+    margin-bottom: 8px;
+}
+.puzzle-success-modal-symbol {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #2d3436;
+    line-height: 1;
+}
+.puzzle-success-modal-name {
+    color: #888;
+    font-size: 1rem;
+    margin: 2px 0 16px;
+}
+.puzzle-success-modal-image {
+    width: 100%;
+    min-height: 180px;
+    max-height: 220px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f8f9fa;
+    border: 1px solid #eee;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+.puzzle-success-modal-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+.puzzle-success-modal-image-fallback {
+    display: none;
+    color: #ccc;
+    font-size: 2.5rem;
+}
+
+/* ── Mistake Toast ── transient notification on a wrong placement, shown
+   inside the puzzle-fullscreen container so it stays visible during native
+   fullscreen (see the comment on .puzzle-fullscreen for why this matters). */
+.puzzle-mistake-toast {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff0f0;
+    color: #e74c3c;
+    border: 1px solid #ffd4d4;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 6px 20px rgba(231,76,60,0.2);
+    z-index: 10010;
+    animation: puzzle-toast-in-out 2.2s ease forwards;
+    white-space: nowrap;
+}
+@keyframes puzzle-toast-in-out {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+    10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+}
+
+.puzzle-tray-chip {
+    background: linear-gradient(135deg, #6e45e2, #8e44ad);
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(110,69,226,0.3);
+    user-select: none;
+    font-family: inherit;
+    /* Comfortable minimum tap target size for touch devices (Apple/Google
+       both recommend ~44px minimum) — element symbols are short text, so
+       padding alone might not reach this on 1-2 letter symbols. */
+    min-width: 44px;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+}
+.puzzle-tray-chip:active { transform: scale(0.94); opacity: 0.85; }
+@media (hover: hover) {
+    .puzzle-tray-chip:hover { transform: translateY(-2px); box-shadow: 0 5px 12px rgba(110,69,226,0.4); }
+}
+
+/* Smaller screens (phones/small tablets in portrait): tighten the header a
+   bit further so the grid keeps as much vertical room as possible. */
+@media (max-width: 600px) {
+    .puzzle-fs-header { padding: 8px 12px; flex-wrap: wrap; gap: 8px; row-gap: 6px; }
+    .puzzle-fs-title { flex: 1 1 100%; order: -1; } /* title takes its own full-width row on top, badges+exit wrap below it */
+    .puzzle-exit-btn { padding: 6px 12px; font-size: 0.8rem; }
+}
 
 /* --- Responsive Design --- */
 @media (max-width: 1300px) {
@@ -269,8 +672,9 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     .table-wrapper:not(.expanded) .name { display: none !important; }
     .table-wrapper:not(.expanded) .symbol { font-size: 0.95rem !important; margin: 0 !important; line-height: 1 !important; }
 
-    /* Full Screen Table */
-    .table-wrapper.expanded { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #f8faff; z-index: 1000000; overflow: auto; padding: 70px 20px 95px 20px; }
+    /* Full Screen Table — mobile-specific font/spacing adjustments only;
+       the base fixed-position rule now lives above, outside this media query. */
+    .table-wrapper.expanded { padding: 70px 20px 140px 20px; }
     .table-wrapper.expanded .table-grid { min-width: 900px; gap: 5px; padding: 15px; }
     .table-wrapper.expanded .atomic-number { display: block !important; font-size: 0.6rem !important; top: 3px !important; left: 3px !important; }
     .table-wrapper.expanded .name { display: block !important; font-size: 0.45rem !important; }

@@ -7,9 +7,6 @@ import { auth, db } from './firebase';
 import { deleteUser } from 'firebase/auth';
 
 const generateEmojiAvatar = (emoji) => {
-    // NOTE: iOS/WebKit's Canvas 2D `fillText()` cannot render color emoji — it
-    // draws them blank or monochrome. SVG <text>, however, renders color emoji
-    // correctly on iOS, so we build the avatar as an SVG and convert that to PNG.
     const svgMarkup = `
         <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
             <defs>
@@ -120,7 +117,7 @@ export default function StudentHome() {
         const savedSection = localStorage.getItem(`joinedRoomSection_${userName}`);
         return savedId && savedSection ? { id: savedId, section: savedSection } : null;
     });
-    const [stats, setStats] = useState({ learned: 0, compounds: 0, timeAttack: 0, matching: 999, recallGame: 0 });
+    const [stats, setStats] = useState({ learned: 0, compounds: 0, timeAttack: 0, matching: 999, recallGame: 0, puzzlesCompleted: 0 });
     const [leaderboard, setLeaderboard] = useState([]);
     const [matchingLeaderboard, setMatchingLeaderboard] = useState([]);
     const [lastReadTime, setLastReadTime] = useState(0);
@@ -176,7 +173,8 @@ export default function StudentHome() {
         let matchingScore = parseInt(localStorage.getItem(`matchingGameBestScore_${userName}`), 10);
         if (isNaN(matchingScore) || matchingScore <= 0) matchingScore = 999;
         const recallGameScore = parseInt(localStorage.getItem(`compoundRecallBestScore_${userName}`) || '0', 10);
-        setStats({ learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingScore, recallGame: recallGameScore });
+        const puzzlesCompletedCount = parseInt(localStorage.getItem(`puzzlesCompleted_${userName}`) || '0', 10);
+        setStats({ learned: learnedCount, compounds: discoveredCompoundsCount, timeAttack: timeAttackScore, matching: matchingScore, recallGame: recallGameScore, puzzlesCompleted: puzzlesCompletedCount });
 
         let unsubscribeRoom = null;
         let unsubscribeUser = null;
@@ -213,6 +211,9 @@ export default function StudentHome() {
                         if (data.compoundRecallBestScore !== undefined) {
                             localStorage.setItem(`compoundRecallBestScore_${userName}`, data.compoundRecallBestScore.toString());
                         }
+                        if (data.puzzlesCompleted !== undefined) {
+                            localStorage.setItem(`puzzlesCompleted_${userName}`, data.puzzlesCompleted.toString());
+                        }
                         if (data.avatarUrl !== undefined) {
                             if (data.avatarUrl === '') {
                                 localStorage.removeItem(`userAvatar_${userName}`);
@@ -233,7 +234,8 @@ export default function StudentHome() {
                             compounds: data.discoveredCompounds ? data.discoveredCompounds.length : discoveredCompoundsCount,
                             timeAttack: data.timeAttackBestCorrect !== undefined ? data.timeAttackBestCorrect : timeAttackScore,
                             matching: (data.matchingGameBestScore !== undefined && data.matchingGameBestScore > 0) ? data.matchingGameBestScore : matchingScore,
-                            recallGame: data.compoundRecallBestScore !== undefined ? data.compoundRecallBestScore : recallGameScore
+                            recallGame: data.compoundRecallBestScore !== undefined ? data.compoundRecallBestScore : recallGameScore,
+                            puzzlesCompleted: data.puzzlesCompleted !== undefined ? data.puzzlesCompleted : puzzlesCompletedCount
                         });
                     }
 
@@ -955,7 +957,11 @@ export default function StudentHome() {
                     </div>
                 )}
                 
-                {/* Stats Overview */}
+                {/* Your Progress — learning milestones, not game scores */}
+                <div className="dashboard-section-header">
+                    <h2><i className="fas fa-chart-line"></i> Your Progress</h2>
+                    <p>How much of the periodic table you've explored so far</p>
+                </div>
                 <div className="progress-stats-container">
                     <div className="progress-stat-card">
                         <div className="circular-progress-wrap" style={{ background: `conic-gradient(#f1c40f ${animElementsPct}%, #f0f2f5 0)` }}>
@@ -975,6 +981,14 @@ export default function StudentHome() {
                             {isLoading ? <span className="skeleton" style={{ width: '60px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.compounds}/37</span>}
                         </div>
                     </div>
+                </div>
+
+                {/* Games — scores and play buttons, separated from progress milestones above */}
+                <div className="dashboard-section-header">
+                    <h2><i className="fas fa-gamepad"></i> Games</h2>
+                    <p>Practice and compete on your personal bests</p>
+                </div>
+                <div className="games-stats-container">
                     <div className="score-stat-card">
                         <div className="score-icon-box time-attack">
                             <i className="fas fa-stopwatch"></i>
@@ -1008,6 +1022,18 @@ export default function StudentHome() {
                             {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.recallGame}/8 <small>correct</small></span>}
                         </div>
                         <button className="btn-play-game recall" onClick={() => navigate('/laboratory')}>
+                            Play Now
+                        </button>
+                    </div>
+                    <div className="score-stat-card">
+                        <div className="score-icon-box puzzle">
+                            <i className="fas fa-puzzle-piece"></i>
+                        </div>
+                        <div className="score-details">
+                            <h4>Periodic Puzzle</h4>
+                            {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.puzzlesCompleted} <small>completed</small></span>}
+                        </div>
+                        <button className="btn-play-game puzzle" onClick={() => navigate('/periodic-table', { state: { autoOpenPuzzle: true } })}>
                             Play Now
                         </button>
                     </div>
