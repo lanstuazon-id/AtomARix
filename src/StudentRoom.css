@@ -54,6 +54,17 @@
 }
 
 
+/* --- Schedule Badges (time limit / deadline) --- */
+.schedule-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.schedule-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.78rem; font-weight: 700; padding: 4px 10px;
+    border-radius: 20px; white-space: nowrap;
+}
+.badge-time-limit { background: #fff4e0; color: #f39c12; }
+.badge-deadline { background: #eaf4ff; color: #4facfe; }
+.badge-deadline.is-past { background: #fcf3f2; color: #e74c3c; }
+
 /* --- Responsive Design --- */
 @media (max-width: 900px), (pointer: coarse) {
     .navbar { 

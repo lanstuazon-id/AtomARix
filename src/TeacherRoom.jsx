@@ -5,6 +5,7 @@ import { doc, updateDoc, onSnapshot, collection, query, where } from 'firebase/f
 import { db } from './firebase';
 import { getApp } from 'firebase/app';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 const roomColorPresets = [
     { id: 'purple', bg: 'linear-gradient(135deg, #6e45e2 0%, #8e44ad 100%)' },
@@ -61,6 +62,8 @@ export default function TeacherRoom() {
     
     // Report States
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+    const [analyticsStudent, setAnalyticsStudent] = useState(null);
     const [selectedReportCw, setSelectedReportCw] = useState(null);
     const [expandedStudentId, setExpandedStudentId] = useState(null);
 
@@ -297,10 +300,10 @@ Example format:
     }, [previewAttachment]);
 
     useEffect(() => {
-        const anyOpen = isPostModalOpen || isCwModalOpen || isEditPostModalOpen || isDeletePostModalOpen || isDeleteCwModalOpen || isReportModalOpen || isRemoveStudentModalOpen || previewAttachment || isLinkModalOpen || isRemoveQuestionModalOpen || isAiErrorModalOpen;
+        const anyOpen = isPostModalOpen || isCwModalOpen || isEditPostModalOpen || isDeletePostModalOpen || isDeleteCwModalOpen || isReportModalOpen || isRemoveStudentModalOpen || previewAttachment || isLinkModalOpen || isRemoveQuestionModalOpen || isAiErrorModalOpen || isAnalyticsModalOpen;
         document.body.style.overflow = anyOpen ? 'hidden' : '';
         return () => { document.body.style.overflow = ''; };
-    }, [isPostModalOpen, isCwModalOpen, isEditPostModalOpen, isDeletePostModalOpen, isDeleteCwModalOpen, isReportModalOpen, isRemoveStudentModalOpen, previewAttachment, isLinkModalOpen, isRemoveQuestionModalOpen, isAiErrorModalOpen]);
+    }, [isPostModalOpen, isCwModalOpen, isEditPostModalOpen, isDeletePostModalOpen, isDeleteCwModalOpen, isReportModalOpen, isRemoveStudentModalOpen, previewAttachment, isLinkModalOpen, isRemoveQuestionModalOpen, isAiErrorModalOpen, isAnalyticsModalOpen]);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -521,6 +524,33 @@ Example format:
         </div>
     );
 
+    // Gathers one student's submissions across every activity posted in this
+    // room (classwork already holds all of it client-side), sorted oldest
+    // to newest so a line chart of their scores reads as a real timeline.
+    const getStudentActivityHistory = (studentId) => {
+        const history = [];
+        classwork.forEach(cw => {
+            if (cw.type !== 'assessment' || !cw.submissions) return;
+            const sub = cw.submissions.find(s => s.studentId === studentId);
+            if (sub) {
+                history.push({
+                    title: cw.title,
+                    score: sub.score,
+                    total: sub.total,
+                    percent: sub.total > 0 ? Math.round((sub.score / sub.total) * 100) : 0,
+                    timestamp: sub.timestamp,
+                    assessmentType: cw.assessmentType,
+                });
+            }
+        });
+        return history.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    };
+
+    const openAnalyticsModal = (student) => {
+        setAnalyticsStudent(student);
+        setIsAnalyticsModalOpen(true);
+    };
+
     const renderMembers = () => {
         const filteredStudents = students.filter(s => (s.fullname || s.username).toLowerCase().includes(studentSearch.toLowerCase()));
         return (
@@ -554,9 +584,14 @@ Example format:
                                         </div>
                                         <span style={{ fontWeight: 600, fontSize: '1.05rem', color: '#2d3436' }}>{student.fullname || student.username}</span>
                                     </div>
-                                    <button onClick={(e) => { e.preventDefault(); promptRemoveStudent(student.id, student.fullname || student.username); }} style={{ background: '#fff0f0', border: 'none', color: '#e74c3c', width: '35px', height: '35px', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'all 0.2s', fontSize: '1rem' }} title="Remove Student" onMouseEnter={e => { e.currentTarget.style.background = '#e74c3c'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff0f0'; e.currentTarget.style.color = '#e74c3c'; }}>
-                                        <i className="fas fa-user-minus"></i>
-                                    </button>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <button onClick={(e) => { e.preventDefault(); openAnalyticsModal(student); }} style={{ background: '#f3f0ff', border: 'none', color: '#6e45e2', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 'bold', transition: 'all 0.2s' }} title="View Analytics" onMouseEnter={e => { e.currentTarget.style.background = '#6e45e2'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={e => { e.currentTarget.style.background = '#f3f0ff'; e.currentTarget.style.color = '#6e45e2'; }}>
+                                            <i className="fas fa-chart-line"></i> Analytics
+                                        </button>
+                                        <button onClick={(e) => { e.preventDefault(); promptRemoveStudent(student.id, student.fullname || student.username); }} style={{ background: '#fff0f0', border: 'none', color: '#e74c3c', width: '35px', height: '35px', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'all 0.2s', fontSize: '1rem' }} title="Remove Student" onMouseEnter={e => { e.currentTarget.style.background = '#e74c3c'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={e => { e.currentTarget.style.background = '#fff0f0'; e.currentTarget.style.color = '#e74c3c'; }}>
+                                            <i className="fas fa-user-minus"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1070,7 +1105,9 @@ Example format:
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: sub.score >= sub.total / 2 ? '#1dd1a1' : '#e74c3c' }}>{sub.score}/{sub.total}</span>
-                                                    <span style={{ fontSize: '0.8rem', color: '#888', display: 'block', textTransform: 'uppercase', fontWeight: '600' }}>Score</span>
+                                                    <span style={{ fontSize: '0.8rem', color: '#888', display: 'block', textTransform: 'uppercase', fontWeight: '600' }}>
+                                                        {selectedReportCw.assessmentType === 'time_attack' ? 'Correct / Answered' : 'Score'}
+                                                    </span>
                                                 </div>
                                                 {(selectedReportCw.assessmentType === 'custom' || selectedReportCw.assessmentType === 'time_attack') && (
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: expandedStudentId === sub.studentId ? '#fff' : '#4facfe', background: expandedStudentId === sub.studentId ? '#4facfe' : '#eaf4ff', padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', transition: 'all 0.2s' }}>View Details <i className={`fas fa-chevron-${expandedStudentId === sub.studentId ? 'up' : 'down'}`}></i></div>
@@ -1099,10 +1136,16 @@ Example format:
                                         )}
                                         {expandedStudentId === sub.studentId && selectedReportCw.assessmentType === 'time_attack' && (
                                             <div style={{ padding: '20px', borderTop: '1px solid #eee', background: '#fff' }}>
-                                                <h4 style={{ margin: '0 0 15px 0', color: '#555' }}>Performance Summary</h4>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                                    <h4 style={{ margin: 0, color: '#555' }}>Performance Summary</h4>
+                                                    <span style={{ fontSize: '0.78rem', color: '#888', background: '#f8f9fa', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <i className="fas fa-lock"></i> Final attempt — one try only
+                                                    </span>
+                                                </div>
                                                 <div style={{ display: 'flex', gap: '20px' }}>
                                                     <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', textAlign: 'center' }}><i className="fas fa-check-circle" style={{ fontSize: '2rem', color: '#16a34a', marginBottom: '10px' }}></i><h3 style={{ margin: 0, color: '#16a34a', fontSize: '1.5rem' }}>{sub.score}</h3><p style={{ margin: 0, color: '#15803d', fontWeight: '600' }}>Correct Answers</p></div>
                                                     <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: '#fff0f0', border: '1px solid #fecaca', textAlign: 'center' }}><i className="fas fa-times-circle" style={{ fontSize: '2rem', color: '#ef4444', marginBottom: '10px' }}></i><h3 style={{ margin: 0, color: '#ef4444', fontSize: '1.5rem' }}>{sub.wrong || 0}</h3><p style={{ margin: 0, color: '#b91c1c', fontWeight: '600' }}>Wrong Answers</p></div>
+                                                    <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: '#f8f9fa', border: '1px solid #eee', textAlign: 'center' }}><i className="fas fa-list-ol" style={{ fontSize: '2rem', color: '#6e45e2', marginBottom: '10px' }}></i><h3 style={{ margin: 0, color: '#2d3436', fontSize: '1.5rem' }}>{sub.total}</h3><p style={{ margin: 0, color: '#555', fontWeight: '600' }}>Total Answered</p></div>
                                                 </div>
                                             </div>
                                         )}
@@ -1113,6 +1156,155 @@ Example format:
                     </div>
                 </div>
             )}
+
+            {/* ── Student Analytics Modal ── */}
+            {isAnalyticsModalOpen && analyticsStudent && (() => {
+                const history = getStudentActivityHistory(analyticsStudent.id);
+                const studentName = analyticsStudent.fullname || analyticsStudent.username;
+
+                // recharts wants a flat array of plain objects — reuse the same
+                // history data, just labeled for the chart's axes/tooltip.
+                const lineChartData = history.map((h, i) => ({
+                    name: `#${i + 1}`,
+                    title: h.title,
+                    percent: h.percent,
+                    score: h.score,
+                    total: h.total,
+                }));
+                const recentHistory = history.slice(-8);
+                const barChartData = recentHistory.map(h => ({
+                    title: h.title.length > 12 ? h.title.slice(0, 11) + '…' : h.title,
+                    fullTitle: h.title,
+                    score: h.score,
+                    total: h.total,
+                    percent: h.percent,
+                }));
+
+                // --- App-wide progress ---
+                const learnedCount = (analyticsStudent.learnedElements || []).length;
+                const compoundsCount = (analyticsStudent.discoveredCompounds || []).length;
+                const elementsPct = Math.min(100, Math.round((learnedCount / 118) * 100));
+                const compoundsPct = Math.min(100, Math.round((compoundsCount / 37) * 100));
+
+                return (
+                    <div className="modal-container show" style={{ zIndex: 10004 }} onClick={() => setIsAnalyticsModalOpen(false)}>
+                        <div className="modal-content" style={{ maxWidth: '680px', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                            <button className="close-modal" onClick={() => setIsAnalyticsModalOpen(false)}>&times;</button>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px' }}>
+                                <div style={{ width: '50px', height: '50px', borderRadius: '50%', background: analyticsStudent.avatarUrl ? 'transparent' : '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.4rem', backgroundImage: analyticsStudent.avatarUrl ? `url('${analyticsStudent.avatarUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 }}>
+                                    {!analyticsStudent.avatarUrl && <i className="fas fa-user"></i>}
+                                </div>
+                                <div>
+                                    <h2 style={{ margin: 0, color: '#2d3436' }}>{studentName}</h2>
+                                    <p style={{ margin: 0, color: '#888', fontSize: '0.9rem' }}>Student Analytics — {room?.section}</p>
+                                </div>
+                            </div>
+
+                            {/* --- This Room's Activity Performance --- */}
+                            <h3 style={{ color: '#6e45e2', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginBottom: '18px' }}>
+                                <i className="fas fa-chart-line"></i> Activity Performance in This Room
+                            </h3>
+
+                            {history.length === 0 ? (
+                                <p style={{ color: '#888', textAlign: 'center', padding: '20px 0' }}>This student hasn't submitted any activities in this room yet.</p>
+                            ) : (
+                                <>
+                                    <p style={{ color: '#888', fontSize: '0.85rem', marginTop: 0, marginBottom: '8px' }}>Score trend over time (%)</p>
+                                    <div style={{ width: '100%', minWidth: '300px', height: 220, marginBottom: '10px' }}>
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={220} initialDimension={{ width: 520, height: 220 }}>
+                                            <LineChart data={lineChartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f5" vertical={false} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#aaa' }} axisLine={false} tickLine={false} />
+                                                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#aaa' }} axisLine={false} tickLine={false} width={36} />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '10px', border: '1px solid #eee', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', fontSize: '0.85rem' }}
+                                                    formatter={(value, name, props) => [`${props.payload.score}/${props.payload.total} (${value}%)`, props.payload.title]}
+                                                    labelFormatter={() => ''}
+                                                />
+                                                <Line type="monotone" dataKey="percent" stroke="#6e45e2" strokeWidth={2.5} dot={{ r: 4, fill: '#6e45e2', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                    <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '8px' }}>Score per activity{history.length > 8 ? ' (most recent 8)' : ''}</p>
+                                    <div style={{ width: '100%', minWidth: '300px', height: 200, marginBottom: '20px' }}>
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200} initialDimension={{ width: 520, height: 200 }}>
+                                            <BarChart data={barChartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f5" vertical={false} />
+                                                <XAxis dataKey="title" tick={{ fontSize: 10, fill: '#aaa' }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={40} />
+                                                <YAxis tick={{ fontSize: 11, fill: '#aaa' }} axisLine={false} tickLine={false} width={30} />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '10px', border: '1px solid #eee', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', fontSize: '0.85rem' }}
+                                                    formatter={(value, name, props) => [`${props.payload.score}/${props.payload.total} (${props.payload.percent}%)`, 'Score']}
+                                                    labelFormatter={(label, payload) => payload?.[0]?.payload?.fullTitle || label}
+                                                />
+                                                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                                                    {barChartData.map((entry, index) => (
+                                                        <Cell key={index} fill={entry.percent < 50 ? '#ff6b6b' : '#1dd1a1'} />
+                                                    ))}
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* --- App-Wide Progress --- */}
+                            <h3 style={{ color: '#4facfe', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginBottom: '18px' }}>
+                                <i className="fas fa-seedling"></i> Overall App Progress
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '22px' }}>
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', marginBottom: '5px' }}>
+                                        <span style={{ color: '#2d3436', fontWeight: '600' }}><i className="fas fa-atom" style={{ color: '#f1c40f' }}></i> Elements Learned</span>
+                                        <span style={{ color: '#888' }}>{learnedCount}/118</span>
+                                    </div>
+                                    <div style={{ height: '10px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden' }}>
+                                        <div style={{ height: '100%', width: `${elementsPct}%`, background: 'linear-gradient(90deg, #f1c40f, #f39c12)', borderRadius: '99px' }}></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', marginBottom: '5px' }}>
+                                        <span style={{ color: '#2d3436', fontWeight: '600' }}><i className="fas fa-vial" style={{ color: '#1dd1a1' }}></i> Compounds Found</span>
+                                        <span style={{ color: '#888' }}>{compoundsCount}/37</span>
+                                    </div>
+                                    <div style={{ height: '10px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden' }}>
+                                        <div style={{ height: '100%', width: `${compoundsPct}%`, background: 'linear-gradient(90deg, #1dd1a1, #10ac84)', borderRadius: '99px' }}></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* --- Game Best Scores --- */}
+                            <h3 style={{ color: '#ff6b6b', borderBottom: '2px solid #f0f2f5', paddingBottom: '12px', marginBottom: '18px' }}>
+                                <i className="fas fa-gamepad"></i> Game Best Scores
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+                                <div style={{ background: '#fff0f0', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+                                    <i className="fas fa-stopwatch" style={{ color: '#ff6b6b', fontSize: '1.3rem', marginBottom: '6px' }}></i>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#2d3436' }}>{analyticsStudent.timeAttackBestCorrect ?? 0}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Time Attack pts</div>
+                                </div>
+                                <div style={{ background: '#eaf4ff', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+                                    <i className="fas fa-puzzle-piece" style={{ color: '#4facfe', fontSize: '1.3rem', marginBottom: '6px' }}></i>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#2d3436' }}>{analyticsStudent.matchingGameBestScore > 0 ? analyticsStudent.matchingGameBestScore : '—'}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Matching moves</div>
+                                </div>
+                                <div style={{ background: '#f3f0ff', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+                                    <i className="fas fa-brain" style={{ color: '#6e45e2', fontSize: '1.3rem', marginBottom: '6px' }}></i>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#2d3436' }}>{analyticsStudent.compoundRecallBestScore ?? 0}/8</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Compound Recall</div>
+                                </div>
+                                <div style={{ background: '#f8f9fa', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+                                    <i className="fas fa-th" style={{ color: '#2d3436', fontSize: '1.3rem', marginBottom: '6px' }}></i>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#2d3436' }}>{analyticsStudent.puzzlesCompleted ?? 0}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Puzzles done</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── Remove Student Modal ── */}
             {isRemoveStudentModalOpen && studentToRemove && (

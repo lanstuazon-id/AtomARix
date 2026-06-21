@@ -183,27 +183,31 @@ export default function StudentRoom() {
     // Submit Time Attack Score Effect
     useEffect(() => {
         if (taGameState === 'end' && activeTimeAttack) {
+            // If we're just re-opening a past result ("View Results"), a submission
+            // already exists for this activity — skip writing anything.
+            const alreadySubmitted = (activeTimeAttack.submissions || []).some(sub => sub.studentId === userName);
+            if (alreadySubmitted) return;
+
             const submitTaScore = async () => {
                 try {
                     const roomRef = doc(db, "teacher_rooms", roomId);
                     const updatedClasswork = classwork.map(cw => {
                         if (cw.id === activeTimeAttack.id) {
                             const existingSubmissions = cw.submissions || [];
-                            const filteredSubmissions = existingSubmissions.filter(sub => sub.studentId !== userName);
-                            // Only update if new score is higher
+                            // One attempt only — if a submission already exists, never overwrite it.
                             const oldSub = existingSubmissions.find(sub => sub.studentId === userName);
-                            if (oldSub && oldSub.score >= taCorrect) return cw;
+                            if (oldSub) return cw;
 
                             return {
                                 ...cw,
                                 submissions: [
-                                    ...filteredSubmissions,
+                                    ...existingSubmissions,
                                     {
                                         studentId: userName,
                                         studentName: sessionStorage.getItem('userFullname') || userName,
                                         score: taCorrect,
                                         wrong: taWrong,
-                                        total: 60, // Represents 60 seconds
+                                        total: taCorrect + taWrong, // Total questions answered in 60 seconds
                                         timestamp: new Date().toISOString()
                                     }
                                 ]
@@ -218,7 +222,7 @@ export default function StudentRoom() {
             };
             submitTaScore();
         }
-    }, [taGameState, activeTimeAttack, classwork, roomId, userName, taCorrect]);
+    }, [taGameState, activeTimeAttack, classwork, roomId, userName, taCorrect, taWrong]);
 
     const startTaGame = () => {
         setTaCorrect(0);
@@ -227,6 +231,7 @@ export default function StudentRoom() {
         setTaGameState('playing');
         generateTaQuestion();
     };
+
 
     const generateTaQuestion = () => {
         const el = taElements[Math.floor(Math.random() * taElements.length)];
@@ -314,6 +319,19 @@ export default function StudentRoom() {
         }
     };
 
+    const formatDeadline = (deadline) => {
+        const due = new Date(deadline);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isPast = due < today;
+        return {
+            isPast,
+            label: isPast ? 'Closed' : 'Due',
+            icon: isPast ? 'fa-lock' : 'fa-calendar-alt',
+            date: due.toLocaleDateString([], { month: 'short', day: 'numeric' })
+        };
+    };
+
     const renderTextWithFormatting = (text) => {
         if (!text) return null;
         const parts = text.split(/(\*\*.*?\*\*|https?:\/\/[^\s]+)/g);
@@ -387,6 +405,8 @@ export default function StudentRoom() {
                     const color = cw.assessmentType === 'time_attack' ? '#f39c12' : '#e74c3c';
                     const bg = cw.assessmentType === 'time_attack' ? '#fffdf7' : '#fcf3f2';
                     const mySubmission = cw.submissions?.find(sub => sub.studentId === userName);
+                    const deadlineInfo = cw.deadline ? formatDeadline(cw.deadline) : null;
+                    const isLocked = deadlineInfo?.isPast && !mySubmission;
                     return (
                         <div key={cw.id} className="post-card">
                             <div className="post-icon" style={{ background: bg, color: color }}><i className={`fas ${icon}`}></i></div>
@@ -395,6 +415,12 @@ export default function StudentRoom() {
                                     {cw.assessmentType === 'time_attack' && <span style={{fontSize: '0.75rem', background: '#f39c12', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-stopwatch"></i> Time Attack</span>}
                                     {cw.assessmentType === 'custom' && cw.questions && <span style={{fontSize: '0.75rem', background: '#e74c3c', color: 'white', padding: '3px 8px', borderRadius: '12px', marginLeft: '10px', verticalAlign: 'middle', fontWeight: 'bold'}}><i className="fas fa-tasks"></i> Custom Quiz</span>}
                                 </h4>
+                                {(cw.timeLimit || cw.deadline) && (
+                                    <div className="schedule-badges">
+                                        {cw.timeLimit && <span className="schedule-badge badge-time-limit"><i className="fas fa-hourglass-half"></i> {cw.timeLimit} min limit</span>}
+                                        {deadlineInfo && <span className={`schedule-badge badge-deadline ${deadlineInfo.isPast ? 'is-past' : ''}`}><i className={`fas ${deadlineInfo.icon}`}></i> {deadlineInfo.label} {deadlineInfo.date}</span>}
+                                    </div>
+                                )}
                                 <span>Posted by {room?.teacherFullName || room?.teacher} • {new Date(cw.timestamp).toLocaleString()}</span>
                                 <p>{cw.desc}</p>
                                 {cw.attachment && (
@@ -411,14 +437,28 @@ export default function StudentRoom() {
                                     </div>
                                 )}
                                 {cw.assessmentType === 'time_attack' && (
-                                    <button onClick={() => { setActiveTimeAttack(cw); setTaGameState('start'); }} style={{ marginTop: '15px', background: '#f39c12', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(243, 156, 18, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-                                        <i className="fas fa-gamepad"></i> Play Time Attack
-                                    </button>
+                                    mySubmission ? (
+                                        <button onClick={() => { setActiveTimeAttack(cw); setTaCorrect(mySubmission.score); setTaWrong(mySubmission.wrong || 0); setTaGameState('end'); }} style={{ marginTop: '15px', background: '#1dd1a1', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(29, 209, 161, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                            <i className="fas fa-check-double"></i> View Results
+                                        </button>
+                                    ) : isLocked ? (
+                                        <button disabled style={{ marginTop: '15px', background: '#ddd', color: '#999', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                            <i className="fas fa-lock"></i> Closed
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => { setActiveTimeAttack(cw); setTaGameState('start'); }} style={{ marginTop: '15px', background: '#f39c12', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(243, 156, 18, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                            <i className="fas fa-gamepad"></i> Play Time Attack
+                                        </button>
+                                    )
                                 )}
                                 {cw.assessmentType === 'custom' && cw.questions && (
                                     mySubmission ? (
                                         <button onClick={() => { setActiveQuiz(cw); setQuizResult(mySubmission.score); setQuizAnswers(mySubmission.answers); setIsReviewingQuiz(false); }} style={{ marginTop: '15px', background: '#1dd1a1', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(29, 209, 161, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
                                             <i className="fas fa-check-double"></i> View Results
+                                        </button>
+                                    ) : isLocked ? (
+                                        <button disabled style={{ marginTop: '15px', background: '#ddd', color: '#999', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                            <i className="fas fa-lock"></i> Closed
                                         </button>
                                     ) : (
                                         <button onClick={() => { setActiveQuiz(cw); setCurrentQuestionIndex(0); setQuizAnswers({}); setQuizResult(null); setIsReviewingQuiz(false); }} style={{ marginTop: '15px', background: '#e74c3c', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 10px rgba(231, 76, 60, 0.2)', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
@@ -835,7 +875,7 @@ export default function StudentRoom() {
                             <>
                                 <i className="fas fa-stopwatch" style={{ fontSize: '4rem', color: '#f39c12', margin: '0 auto 15px auto', display: 'block' }}></i>
                                 <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>{activeTimeAttack.title}</h2>
-                                <p style={{ color: '#666', marginBottom: '25px' }}>You have 60 seconds to answer as many chemistry questions as you can. Your highest score will be submitted to your teacher.</p>
+                                <p style={{ color: '#666', marginBottom: '25px' }}>You have 60 seconds to answer as many chemistry questions as you can. You only get one attempt, so make it count!</p>
                                 <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
                                     <button className="btn-cancel" onClick={() => setActiveTimeAttack(null)}>Cancel</button>
                                     <button className="btn-confirm" style={{ background: '#f39c12' }} onClick={startTaGame}>Start Challenge</button>
@@ -879,18 +919,23 @@ export default function StudentRoom() {
                             </>
                         )}
 
-                        {taGameState === 'end' && (
-                            <>
-                                <i className="fas fa-flag-checkered" style={{ fontSize: '4rem', color: '#1dd1a1', margin: '0 auto 15px auto', display: 'block' }}></i>
-                                <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>Time's Up!</h2>
-                                <p style={{ color: '#666', fontSize: '1.2rem', marginBottom: '10px' }}>You answered</p>
-                                <h1 style={{ fontSize: '3.5rem', color: '#4facfe', margin: '0 0 25px 0' }}>{taCorrect}</h1>
-                                <p style={{ color: '#1dd1a1', fontWeight: 'bold', marginBottom: '25px' }}><i className="fas fa-check"></i> Score successfully submitted to your teacher.</p>
-                                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-                                    <button className="btn-cancel" onClick={() => { setActiveTimeAttack(null); setTaGameState('start'); }}>Close</button>
-                                </div>
-                            </>
-                        )}
+                        {taGameState === 'end' && (() => {
+                            const alreadyHadSubmission = (activeTimeAttack?.submissions || []).some(sub => sub.studentId === userName);
+                            return (
+                                <>
+                                    <i className="fas fa-flag-checkered" style={{ fontSize: '4rem', color: '#1dd1a1', margin: '0 auto 15px auto', display: 'block' }}></i>
+                                    <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>Time's Up!</h2>
+                                    <p style={{ color: '#666', fontSize: '1.2rem', marginBottom: '10px' }}>You answered</p>
+                                    <h1 style={{ fontSize: '3.5rem', color: '#4facfe', margin: '0 0 25px 0' }}>{taCorrect}/{taCorrect + taWrong}</h1>
+                                    <p style={{ color: '#1dd1a1', fontWeight: 'bold', marginBottom: '25px' }}>
+                                        <i className="fas fa-check"></i> {alreadyHadSubmission ? 'This was your submitted score.' : 'Score successfully submitted to your teacher.'}
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                                        <button className="btn-cancel" onClick={() => { setActiveTimeAttack(null); setTaGameState('start'); }}>Close</button>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
