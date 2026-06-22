@@ -374,33 +374,30 @@ function Tokens() {
         });
     };
 
-    // Builds a mailto: link with the invite pre-filled in the subject/body.
-    // This opens the admin's own email client (Gmail web, Outlook, Mail app,
-    // etc.) with everything ready to go — the admin just reviews and hits
-    // Send themselves. No backend email service or API keys required.
-    const buildMailtoLink = () => {
-        const expiryDate = new Date(Date.now() + expiryDays * 86400000).toLocaleDateString('en-PH', {
-            year: 'numeric', month: 'long', day: 'numeric'
-        });
-        const subject = 'Your AtomARix Teacher Invite';
-        const body = [
-            'Hello,',
-            '',
-            "You've been invited to register as a teacher on AtomARix.",
-            '',
-            `Invite link: ${generatedLink}`,
-            `Token (if asked manually): ${generatedToken}`,
-            `This invite expires on: ${expiryDate}`,
-            '',
-            'Just click the link above to create your teacher account.',
-            '',
-            'Thanks!'
-        ].join('\n');
-
-        const subjectEncoded = encodeURIComponent(subject);
-        const bodyEncoded = encodeURIComponent(body);
-        return `mailto:${teacherEmail}?subject=${subjectEncoded}&body=${bodyEncoded}`;
-    };
+    // Pre-built the moment a token exists and an email is typed — a plain
+    // computed string, not a function only run inside an onClick handler.
+    // The link itself does all the work via a real <a href="mailto:...">,
+    // with no JavaScript execution needed to actually navigate.
+    const mailtoSubject = 'Your AtomARix Teacher Invite';
+    const mailtoExpiryDate = new Date(Date.now() + expiryDays * 86400000).toLocaleDateString('en-PH', {
+        year: 'numeric', month: 'long', day: 'numeric'
+    });
+    const mailtoBody = [
+        'Hello,',
+        '',
+        "You've been invited to register as a teacher on AtomARix.",
+        '',
+        `Invite link: ${generatedLink}`,
+        `Token (if asked manually): ${generatedToken}`,
+        `This invite expires on: ${mailtoExpiryDate}`,
+        '',
+        'Just click the link above to create your teacher account.',
+        '',
+        'Thanks!'
+    ].join('\n');
+    const mailtoHref = teacherEmail
+        ? `mailto:${teacherEmail}?subject=${encodeURIComponent(mailtoSubject)}&body=${encodeURIComponent(mailtoBody)}`
+        : '';
 
     return (
         <>
@@ -462,22 +459,21 @@ function Tokens() {
                                     onChange={e => setTeacherEmail(e.target.value)}
                                     style={{ ...S.input, flex: '1 1 220px' }}
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => { if (teacherEmail) window.location.href = buildMailtoLink(); }}
+                                <a
+                                    href={mailtoHref || undefined}
                                     style={{
                                         ...S.btn,
-                                        border: 'none',
+                                        textDecoration: 'none',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '6px',
                                         opacity: teacherEmail ? 1 : 0.5,
+                                        pointerEvents: teacherEmail ? 'auto' : 'none',
                                         cursor: teacherEmail ? 'pointer' : 'not-allowed',
                                     }}
-                                    disabled={!teacherEmail}
                                 >
                                     ✉️ Send via Email
-                                </button>
+                                </a>
                             </div>
                             <div style={{ fontSize: '12px', color: C.muted, marginTop: '6px' }}>
                                 Opens your email app with the invite pre-filled — just hit Send.
