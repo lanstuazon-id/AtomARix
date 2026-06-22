@@ -113,7 +113,7 @@ const LAB_BADGES = [
     { id: 'lab-mad',       title: 'Mad Scientist',    icon: '🧪', bg: 'bg-purple', desc: 'Discover 15 compounds',                  check: (d) => d >= 15 },
     { id: 'lab-master',    title: 'Master Chemist',   icon: '🏅', bg: 'bg-gold',   desc: 'Discover all 36 compounds',              check: (d) => d >= 36 },
     { id: 'lab-speed',     title: 'Speed Mixer',      icon: '⚡', bg: 'bg-green',  desc: 'Discover 5 compounds in one session',    check: (d, sess) => sess >= 5 },
-    { id: 'lab-recall',    title: 'Recall Master',    icon: '🧠', bg: 'bg-purple', desc: 'Score 7+ in the Compound Recall game',  check: (d, sess, f, b, recall) => recall >= 7 },
+    { id: 'lab-recall',    title: 'Recall Master',    icon: '🧠', bg: 'bg-purple', desc: 'Score 7+ correct in one Compound Recall sprint',  check: (d, sess, f, b, recall) => recall >= 7 },
 ];
 
 // ── Daily challenge pool ─────────────────────────────────────────────────────

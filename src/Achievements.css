@@ -130,6 +130,20 @@
     }
     .nav-links li.active i { transform: scale(1.15); }
 
-    .hero-banner.achievements-banner { padding: 20px; flex-direction: column; text-align: center; gap: 10px;}
+    /* Same bug found and fixed in StudentHome.css, Laboratory.jsx,
+       MatchingGame.css, and TimeAttack.css — the base .hero-banner (shared
+       stylesheet) bleeds wider than its container on desktop via a
+       calc(100% + Npx) width + negative margins trick. This file already
+       had a mobile override for padding/direction, but never reset
+       width/margin, so it still overflowed past the screen edges. */
+    .hero-banner.achievements-banner {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: 20px !important;
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
     .achievements-banner .hero-icon { display: none; }
 }

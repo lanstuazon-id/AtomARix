@@ -7,6 +7,9 @@ import { auth, db } from './firebase';
 import { deleteUser } from 'firebase/auth';
 
 const generateEmojiAvatar = (emoji) => {
+    // NOTE: iOS/WebKit's Canvas 2D `fillText()` cannot render color emoji — it
+    // draws them blank or monochrome. SVG <text>, however, renders color emoji
+    // correctly on iOS, so we build the avatar as an SVG and convert that to PNG.
     const svgMarkup = `
         <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
             <defs>
@@ -43,6 +46,8 @@ const generateEmojiAvatar = (emoji) => {
 const getCroppedImg = (imageSrc, pixelCrop) => {
     return new Promise((resolve, reject) => {
         const image = new Image();
+        // Attach handlers BEFORE setting src — on iOS Safari a cached/fast image
+        // can fire 'load' immediately, and if onload isn't attached yet it's missed.
         image.onload = () => {
             const canvas = document.createElement('canvas');
             const targetSize = 200;
@@ -61,6 +66,7 @@ const getCroppedImg = (imageSrc, pixelCrop) => {
                 targetSize,
                 targetSize
             );
+            // Compress to JPEG with 80% quality
             resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
         image.onerror = (error) => reject(error);
@@ -103,7 +109,7 @@ const fireConfetti = (x, y) => {
 export default function StudentHome() {
     const navigate = useNavigate();
     const menuRef = useRef(null);
-    const GAME_CARD_COUNT = 4; 
+    const GAME_CARD_COUNT = 4; // Time Attack, Matching, Compound Recall, Periodic Puzzle — used for the mobile horizontal-scroll dot indicators
 
     // User and Room State
     const [userName, setUserName] = useState(sessionStorage.getItem('loggedInUser'));
@@ -1033,7 +1039,7 @@ export default function StudentHome() {
                         </div>
                         <div className="score-details">
                             <h4>Compound Recall Best</h4>
-                            {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.recallGame}/8 <small>correct</small></span>}
+                            {isLoading ? <span className="skeleton" style={{ width: '80px', height: '32px', display: 'inline-block' }}></span> : <span>{stats.recallGame} <small>correct in 30s</small></span>}
                         </div>
                         <button className="btn-play-game recall" onClick={() => navigate('/laboratory')}>
                             Play Now

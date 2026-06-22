@@ -283,6 +283,7 @@ export default function PeriodicTable() {
     const [learnedElements, setLearnedElements] = useState(() => new Set(JSON.parse(localStorage.getItem(storageKey)) || []));
     const [showModal, setShowModal] = useState(false);
     const [selectedElement, setSelectedElement] = useState(null);
+    const [isSpeakingSummary, setIsSpeakingSummary] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('all');
     const [learningFilter, setLearningFilter] = useState('none'); // 'none', 'learned', 'not-learned'
@@ -452,6 +453,10 @@ export default function PeriodicTable() {
         setShowModal(true);
         document.body.style.overflow = 'hidden';
         markElementLearned(symbol);
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+        setIsSpeakingSummary(false);
     };
 
     const closeModal = () => {
@@ -461,6 +466,7 @@ export default function PeriodicTable() {
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
         }
+        setIsSpeakingSummary(false);
     };
 
     // ── Periodic Puzzle mini-game ────────────────────────────────────────────
@@ -729,6 +735,29 @@ export default function PeriodicTable() {
         window.speechSynthesis.speak(utterance);
     };
 
+    // Reads just the element's summary paragraph aloud — separate from
+    // handlePronounce above, which only speaks the element's name for
+    // pronunciation purposes. Tracks speaking state so the button can show
+    // a "stop" affordance and toggle off cleanly instead of only ever starting.
+    const handleReadSummary = () => {
+        if (!selectedElement || !('speechSynthesis' in window) || !selectedElement.summary) return;
+
+        // If already reading (this or anything else), stop — acts as a toggle.
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            setIsSpeakingSummary(false);
+            return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(selectedElement.summary);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.95;
+        utterance.onend = () => setIsSpeakingSummary(false);
+        utterance.onerror = () => setIsSpeakingSummary(false);
+        setIsSpeakingSummary(true);
+        window.speechSynthesis.speak(utterance);
+    };
+
     const getTileStyle = (symbol, category) => {
         let opacity = '1';
         let highlighted = false;
@@ -817,7 +846,20 @@ export default function PeriodicTable() {
                         </header>
                         <div className="detailed-info-container">
                             <div className="info-col">
-                                <p style={{ color: '#444', fontSize: '1.05rem', marginBottom: '15px', lineHeight: '1.6', textAlign: 'justify' }}>{selectedElement.summary}</p>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '15px' }}>
+                                    <p style={{ color: '#444', fontSize: '1.05rem', lineHeight: '1.6', textAlign: 'justify', margin: 0, flex: 1 }}>{selectedElement.summary}</p>
+                                    <button
+                                        onClick={handleReadSummary}
+                                        title={isSpeakingSummary ? 'Stop reading' : 'Read summary aloud'}
+                                        style={{
+                                            flexShrink: 0, width: '34px', height: '34px', borderRadius: '50%', border: 'none', cursor: 'pointer',
+                                            background: isSpeakingSummary ? '#6e45e2' : '#f3f0ff', color: isSpeakingSummary ? '#fff' : '#6e45e2',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', transition: 'all 0.2s',
+                                        }}
+                                    >
+                                        <i className={`fas ${isSpeakingSummary ? 'fa-stop' : 'fa-volume-up'}`}></i>
+                                    </button>
+                                </div>
                                 <div className="data-grid">
                                     <div className="data-item"><p className="data-label">Atomic Mass</p><p className="data-value">{selectedElement.mass}</p></div>
                                     <div className="data-item"><p className="data-label">Category</p><p className="data-value" style={{ textTransform: 'capitalize' }}>{selectedElement.cat.replace('-', ' ')}</p></div>

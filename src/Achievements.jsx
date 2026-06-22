@@ -103,7 +103,7 @@ export default function Achievements() {
         { id: 'lab-mad',        title: 'Mad Scientist',     desc: 'Discover 15 different compounds.',                       icon: 'fa-flask', bg: 'bg-purple', unlocked: (stats.labBadges || []).includes('lab-mad')        },
         { id: 'lab-master',     title: 'Master Chemist',    desc: 'Discover all 36 compounds in the Laboratory.',           icon: 'fa-medal', bg: 'bg-gold',   unlocked: (stats.labBadges || []).includes('lab-master')     },
         { id: 'lab-speed',      title: 'Speed Mixer',       desc: 'Discover 5 compounds in a single lab session.',          icon: 'fa-bolt',  bg: 'bg-green',  unlocked: (stats.labBadges || []).includes('lab-speed')      },
-        { id: 'lab-recall',     title: 'Recall Master',     desc: 'Score 7 or more out of 8 in the Compound Recall mini-game.', icon: 'fa-brain', bg: 'bg-purple', unlocked: (stats.labBadges || []).includes('lab-recall')     },
+        { id: 'lab-recall',     title: 'Recall Master',     desc: 'Score 7 or more correct in one Compound Recall sprint.', icon: 'fa-brain', bg: 'bg-purple', unlocked: (stats.labBadges || []).includes('lab-recall')     },
     ];
 
     const unlockedCount = badges.filter(b => b.unlocked).length;
