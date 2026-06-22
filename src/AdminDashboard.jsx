@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import {
-    collection, getDocs, doc, setDoc, updateDoc,
+    collection, getDocs, doc, setDoc, updateDoc, deleteDoc,
     orderBy, query, getCountFromServer
 } from 'firebase/firestore';
 
@@ -313,6 +313,7 @@ function Tokens() {
     const [copied, setCopied]         = useState('');
     const [tokens, setTokens]         = useState([]);
     const [loadingList, setLoadingList] = useState(true);
+    const [deletingTokenId, setDeletingTokenId] = useState(null);
 
     useEffect(() => { fetchTokens(); }, []);
 
@@ -324,6 +325,24 @@ function Tokens() {
             setTokens(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (err) { console.error(err); }
         setLoadingList(false);
+    };
+
+    // Only ever called for unused tokens (active or expired) — the delete
+    // button itself is hidden for already-used tokens, so a teacher's
+    // registration history via a used token is never lost from this UI.
+    const handleDeleteToken = async (tokenId) => {
+        const confirmed = window.confirm(`Delete token ${tokenId}? This cannot be undone.`);
+        if (!confirmed) return;
+
+        setDeletingTokenId(tokenId);
+        try {
+            await deleteDoc(doc(db, 'teacherInvites', tokenId));
+            setTokens(prev => prev.filter(t => t.id !== tokenId));
+        } catch (err) {
+            console.error('Failed to delete token:', err);
+            alert('Error deleting token. Check your Firestore permissions.');
+        }
+        setDeletingTokenId(null);
     };
 
     const handleGenerate = async () => {
@@ -443,21 +462,22 @@ function Tokens() {
                                     onChange={e => setTeacherEmail(e.target.value)}
                                     style={{ ...S.input, flex: '1 1 220px' }}
                                 />
-                                <a
-                                    href={teacherEmail ? buildMailtoLink() : undefined}
-                                    onClick={e => { if (!teacherEmail) e.preventDefault(); }}
+                                <button
+                                    type="button"
+                                    onClick={() => { if (teacherEmail) window.location.href = buildMailtoLink(); }}
                                     style={{
                                         ...S.btn,
-                                        textDecoration: 'none',
+                                        border: 'none',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '6px',
                                         opacity: teacherEmail ? 1 : 0.5,
                                         cursor: teacherEmail ? 'pointer' : 'not-allowed',
                                     }}
+                                    disabled={!teacherEmail}
                                 >
                                     ✉️ Send via Email
-                                </a>
+                                </button>
                             </div>
                             <div style={{ fontSize: '12px', color: C.muted, marginTop: '6px' }}>
                                 Opens your email app with the invite pre-filled — just hit Send.
@@ -490,6 +510,7 @@ function Tokens() {
                                     <th style={S.th}>Created</th>
                                     <th style={S.th}>Expires</th>
                                     <th style={S.th}>Used by</th>
+                                    <th style={S.th}>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -503,6 +524,26 @@ function Tokens() {
                                             <td style={S.td}>{formatDate(t.createdAt)}</td>
                                             <td style={S.td}>{formatDate(t.expiresAt)}</td>
                                             <td style={S.td}>{t.usedBy || '—'}</td>
+                                            <td style={S.td}>
+                                                {!t.used && (
+                                                    <button
+                                                        onClick={() => handleDeleteToken(t.id)}
+                                                        disabled={deletingTokenId === t.id}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: deletingTokenId === t.id ? C.muted : '#e53e3e',
+                                                            cursor: deletingTokenId === t.id ? 'not-allowed' : 'pointer',
+                                                            fontSize: '13px',
+                                                            fontWeight: '600',
+                                                            padding: '4px 8px',
+                                                        }}
+                                                        title="Delete this token"
+                                                    >
+                                                        {deletingTokenId === t.id ? 'Deleting…' : '🗑 Delete'}
+                                                    </button>
+                                                )}
+                                            </td>
                                         </tr>
                                     );
                                 })}
