@@ -3,12 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { elementData } from './PeriodicTable.jsx';
 import { recipes, getModelFilename } from './Laboratory.jsx';
 
-// Public AR viewer — intentionally NOT wrapped in ProtectedRoute. When a
-// student scans a QR code shown on desktop (from the Periodic Table or the
-// Laboratory), their phone is a separate, unauthenticated browser session,
-// so this page must work without login. It only ever shows one item's 3D
-// model — either a single element or a single discovered compound — nothing
-// else from the app.
 export default function ArViewer() {
     const [searchParams] = useSearchParams();
     const elementSymbol = searchParams.get('element');
@@ -16,15 +10,12 @@ export default function ArViewer() {
 
     const element = elementSymbol ? elementData[elementSymbol] : null;
 
-    // Compounds are looked up by their formula (e.g. "H₂O"), since that's
-    // what's encoded in the QR code from Laboratory.jsx, not the recipe key.
     const compound = compoundFormula
         ? Object.values(recipes).find(r => r.formula === compoundFormula)
         : null;
 
     const [modelFailed, setModelFailed] = useState(false);
 
-    // Load Google's <model-viewer> component, same as PeriodicTable.jsx / Laboratory.jsx
     useEffect(() => {
         if (!document.getElementById('model-viewer-script')) {
             const script = document.createElement('script');

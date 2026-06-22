@@ -357,7 +357,7 @@ export default function MatchingGame() {
                                     <div key={card.uniqueId} className={`card ${isFlipped ? 'flipped' : ''} ${isMatched ? 'matched' : ''}`} onClick={() => handleCardClick(index)}>
                                         <div className="card-inner">
                                             <div className="card-front"><i className="fas fa-atom"></i></div>
-                                            <div className="card-back">{card.display}</div>
+                                            <div className={`card-back ${card.display.length >= 8 ? 'long-text' : card.display.length >= 6 ? 'medium-text' : ''}`}>{card.display}</div>
                                         </div>
                                     </div>
                                 );

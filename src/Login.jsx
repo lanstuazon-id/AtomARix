@@ -28,9 +28,6 @@ export default function Login() {
     // Modal state
     const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'error' });
 
-    // Clears all form inputs — used after a successful registration so the
-    // login screen the user lands on next is blank, not pre-filled with
-    // whatever they just typed to create their account.
     const resetFormFields = () => {
         setUsername('');
         setPassword('');
@@ -42,19 +39,16 @@ export default function Login() {
         setShowConfirmPassword(false);
     };
 
-    // On mount: check for invite token in URL, then check remembered user
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const urlToken = params.get('token');
 
         if (urlToken) {
-            // Pre-fill token, switch to register view, lock role to teacher
             setTeacherCode(urlToken);
             setTokenFromUrl(true);
             setIsLoginView(false);
             setRole('teacher');
         } else {
-            // Normal remembered-user logic
             const savedUser = localStorage.getItem('rememberedUser');
             const savedRole = localStorage.getItem('rememberedRole');
             if (savedUser) {

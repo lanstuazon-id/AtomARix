@@ -251,6 +251,24 @@ export const puzzleHints = {
     "Og": "The heaviest element ever confirmed on the periodic table.",
 };
 
+// Periodic Puzzle sound effects — created once at module load (not inside
+// the component, where useRef(new Audio(...)) would otherwise construct a
+// new Audio() on every single render, most of which get discarded immediately).
+const puzzleSndHint = new Audio('/assets/audio/hint.mp3');
+const puzzleSndError = new Audio('/assets/audio/error.mp3');
+const puzzleSndCorrect = new Audio('/assets/audio/correct.mp3');
+const puzzleSndComplete = new Audio('/assets/audio/complete.mp3');
+const puzzleSndGameOver = new Audio('/assets/audio/gameover.mp3');
+
+// Plays a sound from the start, tolerating browsers that block autoplay
+// before any user interaction has occurred on the page (common on first
+// load) — failures here are silently logged, never thrown, so a blocked
+// sound never breaks the actual game logic around it.
+const playPuzzleSound = (audio) => {
+    audio.currentTime = 0;
+    audio.play().catch(err => console.warn('Could not play sound:', err));
+};
+
 
 export default function PeriodicTable() {
     const navigate = useNavigate();
@@ -511,6 +529,7 @@ export default function PeriodicTable() {
     const selectPuzzleTile = (symbol) => {
         setSelectedTileSymbol(symbol);
         setPuzzleModalOptions(getFilteredTray(symbol));
+        playPuzzleSound(puzzleSndHint);
     };
 
     const openPuzzleSetup = () => {
@@ -622,6 +641,7 @@ export default function PeriodicTable() {
 
         if (chosenSymbol === targetSymbol) {
             // Correct placement
+            playPuzzleSound(puzzleSndCorrect);
             const newPlaced = { ...puzzlePlaced, [targetSymbol]: true };
             setPuzzlePlaced(newPlaced);
             setPuzzleTray(prev => prev.filter(s => s !== chosenSymbol));
@@ -639,6 +659,7 @@ export default function PeriodicTable() {
             // whole-game wrong-attempt limit (not per-tile). Hitting the
             // limit ends the game with a Game Over modal. The question
             // modal (selectedTileSymbol) stays open so they can try again.
+            playPuzzleSound(puzzleSndError);
             setPuzzleWrongTile(targetSymbol);
             setTimeout(() => setPuzzleWrongTile(null), 600);
 
@@ -650,6 +671,7 @@ export default function PeriodicTable() {
                 if (newCount >= limit) {
                     setSelectedTileSymbol(null); // close the question modal
                     setPuzzleGameOver(true);
+                    playPuzzleSound(puzzleSndGameOver);
                 } else {
                     // Transient toast — keyed by Date.now() so retriggering
                     // it (e.g. two wrong guesses in a row) restarts its
@@ -682,6 +704,7 @@ export default function PeriodicTable() {
             const placedCount = Object.keys(puzzlePlaced).length;
             if (placedCount >= totalInCategory) {
                 setPuzzleComplete(true);
+                playPuzzleSound(puzzleSndComplete);
                 savePuzzleCompletion(puzzleCategory);
             }
         }

@@ -43,8 +43,6 @@ const generateEmojiAvatar = (emoji) => {
 const getCroppedImg = (imageSrc, pixelCrop) => {
     return new Promise((resolve, reject) => {
         const image = new Image();
-        // Attach handlers BEFORE setting src — on iOS Safari a cached/fast image
-        // can fire 'load' immediately, and if onload isn't attached yet it's missed.
         image.onload = () => {
             const canvas = document.createElement('canvas');
             const targetSize = 200;
@@ -63,7 +61,6 @@ const getCroppedImg = (imageSrc, pixelCrop) => {
                 targetSize,
                 targetSize
             );
-            // Compress to JPEG with 80% quality
             resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
         image.onerror = (error) => reject(error);
@@ -106,6 +103,7 @@ const fireConfetti = (x, y) => {
 export default function StudentHome() {
     const navigate = useNavigate();
     const menuRef = useRef(null);
+    const GAME_CARD_COUNT = 4; 
 
     // User and Room State
     const [userName, setUserName] = useState(sessionStorage.getItem('loggedInUser'));
@@ -135,6 +133,8 @@ export default function StudentHome() {
     const [avatarUrl, setAvatarUrl] = useState(localStorage.getItem(`userAvatar_${userName}`) || '');
     const [editedAvatarUrl, setEditedAvatarUrl] = useState('');
     const fileInputRef = useRef(null);
+    const gamesScrollRef = useRef(null);
+    const [activeGameDot, setActiveGameDot] = useState(0);
     const [selectedEmoji, setSelectedEmoji] = useState(null);
 
     // Cropper State
@@ -542,6 +542,17 @@ export default function StudentHome() {
         }
     };
 
+    // Tracks which game card is currently centered in the horizontal-scroll
+    // row (mobile/tablet only — desktop keeps the grid layout) so the dot
+    // indicators below can highlight the active one as the student swipes.
+    const handleGamesScroll = () => {
+        const el = gamesScrollRef.current;
+        if (!el) return;
+        const cardWidth = el.scrollWidth / GAME_CARD_COUNT;
+        const index = Math.round(el.scrollLeft / cardWidth);
+        setActiveGameDot(Math.max(0, Math.min(GAME_CARD_COUNT - 1, index)));
+    };
+
     const handleConfirmJoin = async () => {
         const code = classCode.trim().toUpperCase();
         if (!code) {
@@ -750,6 +761,9 @@ export default function StudentHome() {
                     /* Mobile Hero Banner Redesign */
                     @media (max-width: 768px) {
                         .hero-banner {
+                            width: 100% !important;
+                            margin-left: 0 !important;
+                            margin-right: 0 !important;
                             padding: 30px 25px !important;
                             display: flex !important;
                             flex-direction: column !important;
@@ -988,7 +1002,7 @@ export default function StudentHome() {
                     <h2><i className="fas fa-gamepad"></i> Games</h2>
                     <p>Practice and compete on your personal bests</p>
                 </div>
-                <div className="games-stats-container">
+                <div className="games-stats-container" ref={gamesScrollRef} onScroll={handleGamesScroll}>
                     <div className="score-stat-card">
                         <div className="score-icon-box time-attack">
                             <i className="fas fa-stopwatch"></i>
@@ -1037,6 +1051,14 @@ export default function StudentHome() {
                             Play Now
                         </button>
                     </div>
+                </div>
+
+                {/* Dot indicators — only visible on mobile/tablet via CSS, where the
+                    games row becomes horizontally scrollable instead of a grid. */}
+                <div className="games-scroll-dots">
+                    {Array.from({ length: GAME_CARD_COUNT }).map((_, i) => (
+                        <span key={i} className={`games-scroll-dot ${activeGameDot === i ? 'active' : ''}`}></span>
+                    ))}
                 </div>
 
                 <div className="bottom-widgets-grid">

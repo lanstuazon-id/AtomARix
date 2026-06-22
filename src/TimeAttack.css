@@ -1,4 +1,3 @@
-/* --- Main Container --- */
 .timeattack-container { padding: 15px 50px; max-width: 1000px; margin: 0 auto; text-align: left; }
 
 .hero-banner.timeattack-banner {
@@ -149,6 +148,23 @@
     .nav-links li i { font-size: 1.2rem; margin: 0; }
     .nav-links li span { display: block; font-size: 0.55rem; line-height: 1.1; white-space: normal; overflow-wrap: break-word; }
     .timeattack-container { padding: 15px 25px 100px 25px; }
+
+    /* Same bug found and fixed in StudentHome.css, Laboratory.jsx, and
+       MatchingGame.css — the base .hero-banner (shared stylesheet, not this
+       file) bleeds wider than its container on desktop via a calc(100% +
+       Npx) width + negative margins trick, never reset on mobile here. */
+    .hero-banner.timeattack-banner {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: 18px 22px !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px;
+    }
+    .timeattack-banner .hero-text h1 { font-size: 1.4rem !important; }
+    .timeattack-banner .hero-text p { font-size: 0.88rem !important; }
+    .timeattack-banner .hero-icon { display: none; }
 
     .nav-links li.active {
         background: transparent !important;

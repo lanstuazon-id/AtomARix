@@ -137,7 +137,7 @@ export default function TeacherRoom() {
 
             let lessonContent = aiLessonText.trim();
 
-            // Step 1: If PDF uploaded, extract its text first via Claude
+            // Step 1
             if (aiPdfFile) {
                 const base64Data = await new Promise((res, rej) => {
                     const r = new FileReader();
@@ -166,7 +166,7 @@ export default function TeacherRoom() {
 
             if (!lessonContent) throw new Error('No content to generate from. Upload a PDF or paste your lesson text.');
 
-            // Step 2: Validate if content is chemistry-related
+            // Step 2
             const validateResult = await generateQuiz({
                 payload: {
                     model: 'claude-sonnet-4-6',
@@ -188,7 +188,7 @@ ${lessonContent}`
                 throw new Error('The uploaded material does not appear to be related to chemistry. Please upload a chemistry lesson or module only.');
             }
 
-            // Step 3: Generate quiz questions
+            // Step 3
             const prompt = `You are a professional quiz generator for a Grade 7-8 chemistry classroom. Based on the lesson content below, generate exactly ${aiQuestionCount} multiple-choice questions.
 
 LESSON CONTENT:

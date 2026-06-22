@@ -1,4 +1,3 @@
-/* --- Main Container --- */
 .matching-container { padding: 15px 50px; max-width: 1000px; margin: 0 auto; text-align: left; }
 
 .hero-banner.matching-banner {
@@ -96,8 +95,21 @@
     color: #2d3436;
     transform: rotateY(180deg);
     border: 2px solid #e1e1e1;
-    font-size: clamp(1rem, 2.5vh, 1.4rem);
+    font-size: clamp(0.7rem, 2.5vh, 1.4rem);
+    /* Long names (e.g. "Phosphorus", "Aluminium") need to shrink rather than
+       wrap or hyphenate — splitting a chemical name mid-word with a hyphen
+       reads oddly, so .medium-text/.long-text (applied based on the actual
+       string length in the JSX) scale the font down instead, keeping every
+       name on one line regardless of tile width. */
+    padding: 6px 8px;
+    box-sizing: border-box;
+    text-align: center;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
 }
+.card-back.medium-text { font-size: clamp(0.6rem, 2vh, 1.15rem); }
+.card-back.long-text { font-size: clamp(0.5rem, 1.7vh, 0.95rem); }
 
 .card.matched .card-back {
     background-color: #e3fdf5;
@@ -140,6 +152,24 @@
     .nav-links li span { display: block; font-size: 0.55rem; line-height: 1.1; white-space: normal; overflow-wrap: break-word; }
     .matching-container { padding: 15px 25px 100px 25px; }
 
+    /* The base .hero-banner (defined in a shared stylesheet, not this file)
+       bleeds slightly wider than its container on desktop via a calc(100% +
+       Npx) width + negative margins trick. Never reset on mobile here before,
+       so it overflowed past the screen edges — same bug found and fixed in
+       StudentHome.css and Laboratory.jsx earlier. */
+    .hero-banner.matching-banner {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding: 18px 22px !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px;
+    }
+    .matching-banner .hero-text h1 { font-size: 1.4rem !important; }
+    .matching-banner .hero-text p { font-size: 0.88rem !important; }
+    .matching-banner .hero-icon { display: none; } /* decorative icon isn't worth the space it takes on a small screen */
+
     .nav-links li.active {
         background: transparent !important;
         box-shadow: 0 4px 4px rgba(111, 69, 226, 0.226) !important;
@@ -150,4 +180,46 @@
         font-weight: 800 !important; 
     }
     .nav-links li.active i { transform: scale(1.15); }
+
+    /* Game header (Moves/Time/Best + Categories/Restart buttons) had zero
+       mobile-specific styling before — on a narrow phone, this row wrapped
+       awkwardly with no clear structure. Stack stats above the action
+       buttons instead, each centered and full-width for easy tapping. */
+    .game-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .stats-container {
+        justify-content: center;
+        gap: 14px;
+        font-size: 0.95rem;
+    }
+    .stats { font-size: 0.95rem; }
+    .game-header > div:last-child {
+        display: flex;
+        gap: 10px;
+    }
+    .game-header > div:last-child .btn-restart {
+        flex: 1;
+        justify-content: center;
+        padding: 10px 12px;
+        font-size: 0.9rem;
+    }
+
+    /* The desktop sizing (max-width: min(100%, 60vh)) can misbehave at
+       phone-specific aspect ratios — on a short landscape phone, 60vh
+       computes quite small even though there's plenty of width available,
+       cramping the grid for no real reason. Use both viewport dimensions
+       together via clamp() so sizing stays sensible across both portrait
+       and landscape phone orientations. */
+    .game-grid {
+        max-width: min(100%, clamp(280px, 75vmin, 500px));
+    }
+    .card-back {
+        font-size: clamp(0.6rem, 2.2vh, 1.1rem);
+        padding: 4px 6px;
+    }
+    .card-back.medium-text { font-size: clamp(0.5rem, 1.8vh, 0.9rem); }
+    .card-back.long-text { font-size: clamp(0.42rem, 1.5vh, 0.75rem); }
 }

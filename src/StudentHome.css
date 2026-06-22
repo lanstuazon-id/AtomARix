@@ -525,7 +525,49 @@
         font-weight: 800 !important; 
     }
     .nav-links li.active i { transform: scale(1.15); }
-    .progress-stats-container, .games-stats-container { gap: 15px; }
+    .progress-stats-container { gap: 15px; }
+
+    /* Games row becomes a horizontally-scrollable, swipeable strip on mobile
+       and tablet instead of a 2-column grid — takes up far less vertical
+       space, and scroll-snap makes each card settle neatly into view. */
+    .games-stats-container {
+        display: flex;
+        grid-template-columns: unset;
+        align-items: flex-start;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        gap: 14px;
+        padding-bottom: 4px;
+        margin-bottom: 10px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .games-stats-container::-webkit-scrollbar { display: none; }
+    .games-stats-container .score-stat-card {
+        flex: 0 0 280px;
+        scroll-snap-align: center;
+        justify-content: flex-start;
+    }
+    .games-stats-container .score-stat-card .score-details {
+        flex: 0 0 auto; /* cancels flex:1 1 120px from the desktop row layout — in column direction that rule meant "grow to fill height", which was the actual cause of the big gap before the button */
+    }
+    .games-scroll-dots {
+        display: flex;
+        justify-content: center;
+        gap: 7px;
+        margin-bottom: 30px;
+    }
+    .games-scroll-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #dcd6f7;
+        transition: background 0.25s ease, transform 0.25s ease;
+    }
+    .games-scroll-dot.active {
+        background: #6e45e2;
+        transform: scale(1.3);
+    }
 
     /* --- Modals as Bottom Sheets on Mobile --- */
     .modal-container { z-index: 1000005 !important; }
@@ -552,18 +594,21 @@
 
 @media (max-width: 600px) {
     .progress-stats-container { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .games-stats-container { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .progress-stat-card { flex-direction: column; padding: 15px 10px; gap: 10px; text-align: center; }
     .circular-progress-wrap { width: 60px; height: 60px; }
     .circular-progress-inner { width: 44px; height: 44px; font-size: 1.3rem; }
     .stat-details h4 { font-size: 0.7rem; }
     .stat-details span { font-size: 1.4rem; }
-    .score-stat-card { flex-direction: column; padding: 15px 10px; gap: 10px; text-align: center; }
+    .score-stat-card { flex-direction: column; padding: 15px 10px; gap: 8px; text-align: center; }
+    .score-stat-card .score-details { margin-bottom: 0; }
+    .score-stat-card .btn-play-game { margin-top: 0; }
+    .score-stat-card .btn-play-game { flex-basis: auto; } /* override the desktop flex-basis:100% (a height directive once flex-direction is column), which was stretching the button's box and causing visual overlap/ghosting */
+    .games-stats-container .score-stat-card { flex: 0 0 78%; } /* narrower card on small phones specifically, vs the 280px default for tablets */
     .score-icon-box { width: 50px; height: 50px; font-size: 1.5rem; border-radius: 12px; }
     .score-details { text-align: center; }
-    .score-details h4 { font-size: 0.7rem; }
+    .score-details h4 { font-size: 0.7rem; white-space: normal; } /* allow wrapping on mobile now that the card is narrower and centered, instead of forcing ellipsis truncation */
     .score-details span { font-size: 1.4rem; justify-content: center; }
-    .btn-play-game { width: 100%; padding: 8px; font-size: 0.85rem; }
+    .btn-play-game { width: 100%; padding: 8px; font-size: 0.85rem; box-sizing: border-box; }
     .hero-banner { padding: 40px 30px; flex-direction: column; text-align: center; gap: 20px; }
     .hero-text h1 { font-size: 2rem; }
     .updates-header { flex-direction: column; align-items: flex-start; gap: 15px; }

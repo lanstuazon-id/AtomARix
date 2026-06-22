@@ -515,7 +515,7 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     align-items: center;
     gap: 8px;
     box-shadow: 0 6px 20px rgba(231,76,60,0.2);
-    z-index: 10010;
+    z-index: 1000010; /* must exceed .modal-container's z-index:1000005 — the question modal stays open on a wrong guess, and its full-screen blurred backdrop was sitting on top of (and visually blurring) this toast */
     animation: puzzle-toast-in-out 2.2s ease forwards;
     white-space: nowrap;
 }
@@ -556,6 +556,54 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     .puzzle-fs-header { padding: 8px 12px; flex-wrap: wrap; gap: 8px; row-gap: 6px; }
     .puzzle-fs-title { flex: 1 1 100%; order: -1; } /* title takes its own full-width row on top, badges+exit wrap below it */
     .puzzle-exit-btn { padding: 6px 12px; font-size: 0.8rem; }
+
+    /* On narrow phones, 18 columns squeezed to fit the screen width makes
+       each tile only ~20px — too small to tap reliably. Instead, give the
+       grid a comfortable minimum total width and let the wrapper scroll
+       horizontally, so each tile keeps a reasonable minimum size regardless
+       of screen width. */
+    .puzzle-grid-wrapper {
+        overflow-x: auto;
+        overflow-y: hidden;
+        justify-content: flex-start;
+        -webkit-overflow-scrolling: touch;
+        /* Subtle right-edge shadow hints that there's more content to scroll
+           to, since a swipeable grid isn't otherwise obviously scrollable. */
+        background: linear-gradient(to right, transparent calc(100% - 24px), rgba(0,0,0,0.06));
+    }
+    .puzzle-grid {
+        height: auto;
+        width: 700px; /* fixed width drives sizing now, not height:100% of a possibly-tall portrait viewport, which was making each row taller than it was wide and spreading tiles apart vertically */
+        min-width: 700px;
+        max-width: none;
+        max-height: 100%;
+        aspect-ratio: 18 / 10; /* re-enabled with a fixed width basis instead of max-width:100%, so rows stay proportional to columns instead of stretching tall */
+        gap: 3px; /* fixed small gap instead of the vh-based clamp(), which was computing too generously against a tall portrait viewport height */
+    }
+    .puzzle-grid .atomic-number { font-size: 0.55rem; }
+    .puzzle-grid .symbol { font-size: 0.85rem; }
+    .puzzle-grid .name { display: none; } /* element name doesn't fit at this tile size; symbol + atomic number remain, full name is still shown in the question/success modals */
+
+    /* Modals get tighter padding on phones so more content fits without scrolling within the modal itself */
+    .puzzle-question-modal, .puzzle-success-modal {
+        padding: 25px 20px;
+    }
+    .puzzle-question-options {
+        grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+        gap: 8px;
+    }
+
+    /* The header wraps to 2 rows on phones (title on top, badges+exit below),
+       so the toast's fixed top:70px from the desktop layout would sit too
+       high and risk overlapping the header's second row. */
+    .puzzle-mistake-toast {
+        top: 110px;
+        font-size: 0.8rem;
+        padding: 8px 16px;
+        max-width: 85vw;
+        white-space: normal;
+        text-align: center;
+    }
 }
 
 /* --- Responsive Design --- */

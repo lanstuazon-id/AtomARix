@@ -155,6 +155,35 @@ const getCategory = (name) => {
     return 'other';
 };
 
+// Lab sound effects — created once at module load, not inside the component
+// (useRef(new Audio(...)) still constructs a new Audio() argument on every
+// single render even though useRef only keeps the first one — wasteful, and
+// each discarded instance still kicks off its own loading/decoding work).
+// preload = 'auto' tells the browser to start fetching/decoding the file
+// immediately at load time, rather than waiting until the first .play() —
+// that initial fetch-and-decode is what was likely causing the "sometimes
+// delayed" sound on a sound's very first play each session.
+const createPreloadedAudio = (src) => {
+    const audio = new Audio(src);
+    audio.preload = 'auto';
+    audio.load();
+    return audio;
+};
+const labSndDrop = createPreloadedAudio('/assets/audio/drop.mp3');
+const labSndSuccess = createPreloadedAudio('/assets/audio/success.mp3');
+const labSndError = createPreloadedAudio('/assets/audio/error.mp3');
+const labSndClear = createPreloadedAudio('/assets/audio/clear.mp3');
+const labSndOpen = createPreloadedAudio('/assets/audio/open.mp3');
+
+// Plays a lab sound from the start every time, even if it's already
+// mid-playback from a rapid prior trigger — avoids the "nothing happens
+// because it's still playing the last cue" feeling some delayed-sound
+// reports actually turn out to be.
+const playLabSound = (audio) => {
+    audio.currentTime = 0;
+    audio.play().catch(err => console.warn('Could not play lab sound:', err));
+};
+
 
 
 export default function Laboratory() {
@@ -164,6 +193,7 @@ export default function Laboratory() {
 
     // State
     const [inventorySearch, setInventorySearch] = useState('');
+    const [activeInventoryGroup, setActiveInventoryGroup] = useState('all'); // 'all' or one of GROUP_COLORS' keys — filters the horizontal-scroll inventory row
     const [recipeSearch, setRecipeSearch] = useState('');
     const [recipeCategory, setRecipeCategory] = useState('all');
     const [currentFlask, setCurrentFlask] = useState([]);
@@ -205,16 +235,19 @@ export default function Laboratory() {
     );
     const [recallGameFinished, setRecallGameFinished] = useState(false);
     const [isNewRecallBest, setIsNewRecallBest] = useState(false);
-    const RECALL_TOTAL_ROUNDS = 8;
+    const [recallTimeLeft, setRecallTimeLeft] = useState(30); // whole-game countdown, not per-question
+    const [recallQueue, setRecallQueue] = useState([]); // shuffled compound keys for this playthrough, consumed one per round so the same compound doesn't repeat until the pool is exhausted
+    const RECALL_TOTAL_ROUNDS = 20;
+    const RECALL_TIME_LIMIT = 30;
 
     // Refs
     const particlesContainerRef = useRef(null);
     const modalEffectsRef = useRef(null);
-    const sndDrop = useRef(new Audio('/assets/audio/drop.mp3'));
-    const sndSuccess = useRef(new Audio('/assets/audio/success.mp3'));
-    const sndError = useRef(new Audio('/assets/audio/error.mp3'));
-    const sndClear = useRef(new Audio('/assets/audio/clear.mp3'));
-    const sndOpen = useRef(new Audio('/assets/audio/open.mp3'));
+    const sndDrop = useRef(labSndDrop);
+    const sndSuccess = useRef(labSndSuccess);
+    const sndError = useRef(labSndError);
+    const sndClear = useRef(labSndClear);
+    const sndOpen = useRef(labSndOpen);
 
     // Fetch discovered compounds from the cloud in real-time
     useEffect(() => {
@@ -246,8 +279,7 @@ export default function Laboratory() {
     };
 
     const addToFlask = (sym) => {
-        sndDrop.current.currentTime = 0; 
-        sndDrop.current.play().catch(e => console.warn(e));
+        playLabSound(sndDrop.current);
         
         // Provide haptic feedback for mobile users
         if (navigator.vibrate) {
@@ -272,8 +304,7 @@ export default function Laboratory() {
     const clearFlask = () => {
         setCurrentFlask([]);
         setFlaskState({ height: 0, color: 'transparent', mixed: false });
-        sndClear.current.currentTime = 0; 
-        sndClear.current.play().catch(e => console.warn(e));
+        playLabSound(sndClear.current);
         if (isHeating) setIsHeating(false);
     };
 
@@ -283,8 +314,7 @@ export default function Laboratory() {
             setFlaskState({ height: Math.min(newFlask.length * 10, 50), color: '#e0e4e8', mixed: false });
             return newFlask;
         });
-        sndDrop.current.currentTime = 0;
-        sndDrop.current.play().catch(e => console.warn(e));
+        playLabSound(sndDrop.current);
     };
 
 
@@ -293,7 +323,7 @@ export default function Laboratory() {
             if (flaskState.height > 0) {
                 const newHeight = Math.max(0, flaskState.height - 10);
                 setFlaskState(prev => ({ ...prev, height: newHeight }));
-                sndDrop.current.currentTime = 0; sndDrop.current.play().catch(e => console.warn(e));
+                playLabSound(sndDrop.current);
                 if (newHeight === 0) clearFlask();
             }
         } else {
@@ -303,7 +333,7 @@ export default function Laboratory() {
                     setFlaskState({ height: Math.min(newFlask.length * 10, 50), color: '#e0e4e8', mixed: false });
                     return newFlask;
                 });
-                sndDrop.current.currentTime = 0; sndDrop.current.play().catch(e => console.warn(e));
+                playLabSound(sndDrop.current);
             }
         }
     };
@@ -341,13 +371,13 @@ export default function Laboratory() {
                 setShowResultModal(true);
                 createParticles('error', particlesContainerRef.current);
                 createParticles('smoke', modalEffectsRef.current);
-                sndError.current.currentTime = 0; sndError.current.play().catch(e => console.warn(e));
+                playLabSound(sndError.current);
             } else if (!needsHeat && isHeating) {
                 setResultData({ type: 'tooHot', res: null });
                 setShowResultModal(true);
                 createParticles('error', particlesContainerRef.current);
                 createParticles('smoke', modalEffectsRef.current);
-                sndError.current.currentTime = 0; sndError.current.play().catch(e => console.warn(e));
+                playLabSound(sndError.current);
             } else {
                 // Success
                 setResultData({ type: 'success', res });
@@ -386,7 +416,7 @@ export default function Laboratory() {
                     awardXp(10, `${res.name} (already known)`);
                 }
                 
-                sndSuccess.current.currentTime = 0; sndSuccess.current.play().catch(e => console.warn(e));
+                playLabSound(sndSuccess.current);
                 setFlaskState({ height: 60, color: res.color || '#6e45e2', mixed: true });
             }
         } else {
@@ -394,7 +424,7 @@ export default function Laboratory() {
             setShowResultModal(true);
             createParticles('error', particlesContainerRef.current);
             createParticles('smoke', modalEffectsRef.current);
-            sndError.current.currentTime = 0; sndError.current.play().catch(e => console.warn(e));
+            playLabSound(sndError.current);
             setFlaskState(prev => ({ ...prev, height: 0 }));
         }
     };
@@ -559,21 +589,52 @@ export default function Laboratory() {
     // A quick popup quiz: shown a compound's formula/icon, the student picks
     // which element was NOT part of the mixture. Reinforces the same recipes
     // data already used in the main lab, just tested in reverse (recall vs. build).
-    const generateRecallRound = () => {
-        const recipeEntries = Object.entries(recipes);
-        const [key, compound] = recipeEntries[Math.floor(Math.random() * recipeEntries.length)];
+    // Builds 3 decoy elements for a multiple-choice round. Prefers wrong
+    // elements from the SAME group as the correct answer (e.g. other alkali
+    // metals when the answer is Sodium) — these are much harder to rule out
+    // by "that doesn't look like it belongs" guessing than a random element
+    // from a completely different category. Falls back to any other wrong
+    // element if a group is too small to supply 3 same-group decoys.
+    const buildRecallDecoys = (correctSym, excludedSyms) => {
+        const correctEl = baseElements.find(e => e.sym === correctSym);
+        const excludeSet = new Set(excludedSyms);
+
+        const sameGroupPool = baseElements.filter(e => e.group === correctEl?.group && !excludeSet.has(e.sym));
+        const otherPool = baseElements.filter(e => e.group !== correctEl?.group && !excludeSet.has(e.sym));
+
+        const shuffledSameGroup = [...sameGroupPool].sort(() => Math.random() - 0.5);
+        const shuffledOther = [...otherPool].sort(() => Math.random() - 0.5);
+
+        const decoys = [...shuffledSameGroup.slice(0, 3)];
+        if (decoys.length < 3) {
+            decoys.push(...shuffledOther.slice(0, 3 - decoys.length));
+        }
+        return decoys.map(e => e.sym);
+    };
+
+    const generateRecallRound = (queue) => {
+        if (!queue || queue.length === 0) return null;
+        const key = queue[0];
+        const compound = recipes[key];
         const correctSymbols = [...new Set(key.split(','))];
 
-        // Pick one correct element as the "answer" plus 3 distractor elements
-        // that are NOT part of this compound, to test recall of its actual makeup.
         const correctSym = correctSymbols[Math.floor(Math.random() * correctSymbols.length)];
-        const wrongPool = baseElements.filter(e => !correctSymbols.includes(e.sym));
-        const shuffledWrong = [...wrongPool].sort(() => Math.random() - 0.5).slice(0, 3);
+        const decoySyms = buildRecallDecoys(correctSym, correctSymbols);
 
-        const choices = [correctSym, ...shuffledWrong.map(e => e.sym)].sort(() => Math.random() - 0.5);
+        const choices = [correctSym, ...decoySyms].sort(() => Math.random() - 0.5);
 
         setRecallRound({ key, compound, correctSym, choices });
         setRecallFeedback(null);
+        return queue.slice(1);
+    };
+
+    const shuffleArrayLocal = (arr) => {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
     };
 
     const startRecallGame = () => {
@@ -583,8 +644,29 @@ export default function Laboratory() {
         setRecallActive(true);
         setRecallGameFinished(false);
         setIsNewRecallBest(false);
-        generateRecallRound();
+        setRecallTimeLeft(RECALL_TIME_LIMIT);
+
+        // Shuffle all 37 compounds once, take the first 20 — guarantees no
+        // repeats across the whole playthrough (20 < 37, so the pool never
+        // needs to wrap around and reuse a compound).
+        const allKeys = Object.keys(recipes);
+        const shuffledKeys = shuffleArrayLocal(allKeys).slice(0, RECALL_TOTAL_ROUNDS);
+        const remainingQueue = generateRecallRound(shuffledKeys);
+        setRecallQueue(remainingQueue || []);
     };
+
+    // Whole-game 30s countdown — ticks only while a round is actively being
+    // shown, and ends the game immediately (per spec) the moment it hits 0,
+    // rather than letting the current question finish first.
+    useEffect(() => {
+        if (!recallActive || recallGameFinished) return;
+        if (recallTimeLeft <= 0) {
+            finishRecallGame();
+            return;
+        }
+        const timer = setTimeout(() => setRecallTimeLeft(prev => prev - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [recallActive, recallTimeLeft, recallGameFinished]);
 
     const answerRecallRound = (chosenSym) => {
         if (recallFeedback) return; // prevent double-answer during feedback display
@@ -602,7 +684,12 @@ export default function Laboratory() {
             const remaining = recallRoundsLeft - 1;
             setRecallRoundsLeft(remaining);
             if (remaining > 0) {
-                generateRecallRound();
+                // generateRecallRound has side effects (setRecallRound/setRecallFeedback),
+                // so it's called directly here rather than nested inside the
+                // setRecallQueue updater function, which React may invoke more
+                // than once (e.g. under Strict Mode) and must stay side-effect-free.
+                const nextQueue = generateRecallRound(recallQueue);
+                setRecallQueue(nextQueue || []);
             } else {
                 finishRecallGame();
             }
@@ -637,6 +724,8 @@ export default function Laboratory() {
         setRecallRound(null);
         setRecallFeedback(null);
         setRecallGameFinished(false);
+        setRecallTimeLeft(RECALL_TIME_LIMIT);
+        setRecallQueue([]);
     };
 
 
@@ -739,6 +828,9 @@ export default function Laboratory() {
 
                     /* Laboratory Header Height Reduction */
                     .hero-banner {
+                        width: 100% !important;
+                        margin-left: 0 !important;
+                        margin-right: 0 !important;
                         padding: 20px 30px !important;
                         min-height: 110px !important;
                     }
@@ -822,9 +914,14 @@ export default function Laboratory() {
                             background: #fff;
                             border-radius: 20px;
                             padding: 20px;
+                            min-width: 0; /* flex children default to min-width:auto (their content's natural size) — without this, the unclipped scroll row inside was forcing this panel (and the whole page) to expand wide instead of actually scrolling/clipping */
+                            width: 100%;
                         }
 
                         .hero-banner {
+                            width: 100% !important;
+                            margin-left: 0 !important;
+                            margin-right: 0 !important;
                             padding: 15px 20px !important;
                             min-height: unset !important;
                             margin-bottom: 10px !important;
@@ -906,7 +1003,7 @@ export default function Laboratory() {
                                 >
                                     💡 Hint ({hintsLeft})
                                 </button>
-                                <button className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.8rem' }} onClick={() => { setShowRecipeModal(true); sndOpen.current.currentTime = 0; sndOpen.current.play().catch(e=>e); }}>
+                                <button className="btn-secondary" style={{ padding: '6px 14px', fontSize: '0.8rem' }} onClick={() => { setShowRecipeModal(true); playLabSound(sndOpen.current); }}>
                                     <i className="fas fa-book"></i> Guide
                                 </button>
                             </div>
@@ -923,10 +1020,27 @@ export default function Laboratory() {
                             </div>
                         </div>
 
-                        {/* Group legend */}
+                        {/* Group legend — now clickable filters for the inventory row below,
+                            instead of purely decorative labels. */}
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                            <button
+                                onClick={() => setActiveInventoryGroup('all')}
+                                style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', background: activeInventoryGroup === 'all' ? '#2d3436' : '#f0f0f0', color: activeInventoryGroup === 'all' ? '#fff' : '#888', fontWeight: '700', textTransform: 'capitalize', border: 'none', cursor: 'pointer' }}
+                            >
+                                All
+                            </button>
                             {Object.entries(GROUP_COLORS).map(([group, c]) => (
-                                <span key={group} style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', background: c.bg, color: c.accent, fontWeight: '700', textTransform: 'capitalize' }}>{group}</span>
+                                <button
+                                    key={group}
+                                    onClick={() => setActiveInventoryGroup(group)}
+                                    style={{
+                                        fontSize: '0.65rem', padding: '2px 8px', borderRadius: '99px', fontWeight: '700', textTransform: 'capitalize', border: activeInventoryGroup === group ? `2px solid ${c.accent}` : 'none', cursor: 'pointer',
+                                        background: c.bg, color: c.accent,
+                                        opacity: activeInventoryGroup === 'all' || activeInventoryGroup === group ? 1 : 0.4,
+                                    }}
+                                >
+                                    {group}
+                                </button>
                             ))}
                         </div>
 
@@ -937,8 +1051,9 @@ export default function Laboratory() {
                             {inventorySearch && <i className="fas fa-times clear-search-icon" style={{ display: 'block' }} onClick={() => setInventorySearch('')}></i>}
                         </div>
 
-                        <div className="inventory-grid" style={{ marginTop: '14px' }}>
+                        <div className="inventory-scroll" style={{ marginTop: '14px' }}>
                             {baseElements
+                                .filter(el => activeInventoryGroup === 'all' || el.group === activeInventoryGroup)
                                 .filter(el => el.name.toLowerCase().includes(inventorySearch.toLowerCase()) || el.sym.toLowerCase().includes(inventorySearch.toLowerCase()))
                                 .map(el => {
                                     const gc = GROUP_COLORS[el.group] || GROUP_COLORS.metal;
@@ -959,8 +1074,8 @@ export default function Laboratory() {
                                     );
                                 })
                             }
-                            {inventorySearch && baseElements.filter(el => el.name.toLowerCase().includes(inventorySearch.toLowerCase()) || el.sym.toLowerCase().includes(inventorySearch.toLowerCase())).length === 0 && (
-                                <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#aaa', fontSize: '0.85rem', padding: '20px 0' }}>
+                            {baseElements.filter(el => activeInventoryGroup === 'all' || el.group === activeInventoryGroup).filter(el => el.name.toLowerCase().includes(inventorySearch.toLowerCase()) || el.sym.toLowerCase().includes(inventorySearch.toLowerCase())).length === 0 && (
+                                <div style={{ textAlign: 'center', color: '#aaa', fontSize: '0.85rem', padding: '20px 30px', whiteSpace: 'nowrap' }}>
                                     <i className="fas fa-search" style={{ display: 'block', fontSize: '1.5rem', marginBottom: '8px', opacity: 0.4 }}></i>
                                     No elements found
                                 </div>
@@ -1253,18 +1368,36 @@ export default function Laboratory() {
             )}
             {/* ── Compound Recall Mini-Game ── */}
             {showRecallGame && (
-                <div className="modal-container show" style={{ zIndex: 10002 }} onClick={(e) => { if (e.target === e.currentTarget && !recallActive) closeRecallGame(); }}>
-                    <div className="modal-content" style={{ maxWidth: '460px', textAlign: 'center', padding: '30px' }}>
+                <div className="modal-container show" style={{ zIndex: 10002 }} onClick={(e) => { if (e.target === e.currentTarget) closeRecallGame(); }}>
+                    <div className="modal-content" style={{ maxWidth: '460px', textAlign: 'center', padding: '30px', position: 'relative' }}>
+                        {recallActive && recallRound && (
+                            <button
+                                onClick={closeRecallGame}
+                                title="Exit game"
+                                style={{ position: 'absolute', top: '14px', right: '14px', width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: '#f0f0f0', color: '#888', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                            >
+                                &times;
+                            </button>
+                        )}
                         {recallActive && recallRound ? (
                             <>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#6e45e2', background: '#f3f0ff', padding: '4px 12px', borderRadius: '20px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', marginTop: '20px', paddingRight: '36px', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#6e45e2', background: '#f3f0ff', padding: '4px 12px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
                                         Round {RECALL_TOTAL_ROUNDS - recallRoundsLeft + 1}/{RECALL_TOTAL_ROUNDS}
                                     </span>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1dd1a1' }}>
-                                        <i className="fas fa-check-circle"></i> Score: {recallScore}
+                                    <span style={{
+                                        fontSize: '0.8rem', fontWeight: '700', padding: '4px 12px', borderRadius: '20px', whiteSpace: 'nowrap',
+                                        color: recallTimeLeft <= 5 ? '#e74c3c' : '#f39c12',
+                                        background: recallTimeLeft <= 5 ? '#fff0f0' : '#fff7e0',
+                                        animation: recallTimeLeft <= 5 ? 'recall-timer-pulse 1s infinite' : 'none',
+                                    }}>
+                                        <i className="fas fa-stopwatch"></i> {recallTimeLeft}s
+                                    </span>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#1dd1a1', whiteSpace: 'nowrap' }}>
+                                        <i className="fas fa-check-circle"></i> {recallScore}
                                     </span>
                                 </div>
+                                <style>{`@keyframes recall-timer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
 
                                 <div style={{ fontSize: '3rem', marginBottom: '5px' }}>{recallRound.compound.icon}</div>
                                 <h2 style={{ color: '#2d3436', marginBottom: '5px' }}>{recallRound.compound.name}</h2>
@@ -1306,11 +1439,12 @@ export default function Laboratory() {
                                 {recallGameFinished ? (
                                     <>
                                         <p style={{ color: '#666', marginBottom: '15px' }}>Great work! Here's how you did:</p>
-                                        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#6e45e2', marginBottom: '5px' }}>{recallScore}/{RECALL_TOTAL_ROUNDS}</div>
+                                        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#6e45e2', marginBottom: '5px' }}>{recallScore}</div>
+                                        <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '5px' }}>correct out of {RECALL_TOTAL_ROUNDS - recallRoundsLeft} answered</p>
                                         {isNewRecallBest && (
                                             <p style={{ color: '#f39c12', fontWeight: '700', marginBottom: '10px' }}><i className="fas fa-trophy"></i> New personal best!</p>
                                         )}
-                                        <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '20px' }}>Best score: {recallBestScore}/{RECALL_TOTAL_ROUNDS}</p>
+                                        <p style={{ color: '#888', fontSize: '0.85rem', marginBottom: '20px' }}>Best score: {recallBestScore}</p>
                                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                                             <button className="btn-secondary" onClick={closeRecallGame}>Close</button>
                                             <button className="btn-primary" onClick={startRecallGame}>Play Again</button>
@@ -1318,7 +1452,7 @@ export default function Laboratory() {
                                     </>
                                 ) : (
                                     <>
-                                        <p style={{ color: '#666', marginBottom: '20px' }}>You'll see a compound's name and formula — pick which element was used to make it. {RECALL_TOTAL_ROUNDS} rounds, test your memory!</p>
+                                        <p style={{ color: '#666', marginBottom: '20px' }}>You'll see a compound's name and formula — pick which element was used to make it. {RECALL_TOTAL_ROUNDS} questions, but you've only got {RECALL_TIME_LIMIT} seconds — answer as many as you can!</p>
                                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                                             <button className="btn-secondary" onClick={closeRecallGame}>Cancel</button>
                                             <button className="btn-primary" onClick={startRecallGame}>Start Game</button>

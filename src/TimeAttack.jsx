@@ -60,10 +60,8 @@ export default function TimeAttack() {
     
     // Tracking State
     const [elementsToReview, setElementsToReview] = useState(new Set());
-    // SRS data per element: { interval (minutes), easeFactor, dueDate (timestamp ms), repetitions }
     const [srsData, setSrsData] = useState({});
 
-    // Default SRS card for an element with no history yet — due immediately so new elements surface early
     const createDefaultSrsCard = () => ({
         interval: 0,
         easeFactor: 2.5,
