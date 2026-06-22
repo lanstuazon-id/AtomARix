@@ -309,6 +309,7 @@ function Tokens() {
     const [loading, setLoading]       = useState(false);
     const [generatedToken, setGeneratedToken] = useState('');
     const [generatedLink, setGeneratedLink]   = useState('');
+    const [teacherEmail, setTeacherEmail]     = useState('');
     const [copied, setCopied]         = useState('');
     const [tokens, setTokens]         = useState([]);
     const [loadingList, setLoadingList] = useState(true);
@@ -338,6 +339,7 @@ function Tokens() {
             });
             setGeneratedToken(token);
             setGeneratedLink(link);
+            setTeacherEmail('');
             await fetchTokens();
         } catch (err) {
             console.error(err);
@@ -351,6 +353,34 @@ function Tokens() {
             setCopied(label);
             setTimeout(() => setCopied(''), 2000);
         });
+    };
+
+    // Builds a mailto: link with the invite pre-filled in the subject/body.
+    // This opens the admin's own email client (Gmail web, Outlook, Mail app,
+    // etc.) with everything ready to go — the admin just reviews and hits
+    // Send themselves. No backend email service or API keys required.
+    const buildMailtoLink = () => {
+        const expiryDate = new Date(Date.now() + expiryDays * 86400000).toLocaleDateString('en-PH', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const subject = 'Your AtomARix Teacher Invite';
+        const body = [
+            'Hello,',
+            '',
+            "You've been invited to register as a teacher on AtomARix.",
+            '',
+            `Invite link: ${generatedLink}`,
+            `Token (if asked manually): ${generatedToken}`,
+            `This invite expires on: ${expiryDate}`,
+            '',
+            'Just click the link above to create your teacher account.',
+            '',
+            'Thanks!'
+        ].join('\n');
+
+        const subjectEncoded = encodeURIComponent(subject);
+        const bodyEncoded = encodeURIComponent(body);
+        return `mailto:${teacherEmail}?subject=${subjectEncoded}&body=${bodyEncoded}`;
     };
 
     return (
@@ -399,6 +429,39 @@ function Tokens() {
                             <button style={{ ...S.btnOutline, marginTop: '8px', fontSize: '12px' }} onClick={() => copy(generatedToken, 'token')}>
                                 {copied === 'token' ? '✓ Copied!' : 'Copy Token Only'}
                             </button>
+                        </div>
+
+                        <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: `1px solid ${C.purpleBorder}` }}>
+                            <div style={{ fontSize: '11px', fontWeight: '700', color: C.purple, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+                                Send Directly to Teacher
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <input
+                                    type="email"
+                                    placeholder="teacher@email.com"
+                                    value={teacherEmail}
+                                    onChange={e => setTeacherEmail(e.target.value)}
+                                    style={{ ...S.input, flex: '1 1 220px' }}
+                                />
+                                <a
+                                    href={teacherEmail ? buildMailtoLink() : undefined}
+                                    onClick={e => { if (!teacherEmail) e.preventDefault(); }}
+                                    style={{
+                                        ...S.btn,
+                                        textDecoration: 'none',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        opacity: teacherEmail ? 1 : 0.5,
+                                        cursor: teacherEmail ? 'pointer' : 'not-allowed',
+                                    }}
+                                >
+                                    ✉️ Send via Email
+                                </a>
+                            </div>
+                            <div style={{ fontSize: '12px', color: C.muted, marginTop: '6px' }}>
+                                Opens your email app with the invite pre-filled — just hit Send.
+                            </div>
                         </div>
                     </div>
                 )}

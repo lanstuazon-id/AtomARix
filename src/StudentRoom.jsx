@@ -35,10 +35,6 @@ export default function StudentRoom() {
     const [room, setRoom] = useState(null);
     const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'feed');
 
-    // If the student navigates here again with a target tab (e.g. tapping
-    // "Go to Classroom" from a notification while already on this page),
-    // jump to that tab. useState only reads location.state on first mount,
-    // so this effect catches subsequent navigations to the same route.
     useEffect(() => {
         if (location.state?.activeTab) {
             setActiveTab(location.state.activeTab);
@@ -921,12 +917,42 @@ export default function StudentRoom() {
 
                         {taGameState === 'end' && (() => {
                             const alreadyHadSubmission = (activeTimeAttack?.submissions || []).some(sub => sub.studentId === userName);
+                            const totalAnswered = taCorrect + taWrong;
+                            const accuracy = totalAnswered > 0 ? Math.round((taCorrect / totalAnswered) * 100) : 0;
+
+                            // Simple, encouraging performance tiers rather than letter grades —
+                            // friendlier framing for a learning app aimed at students.
+                            let tier, tierColor, tierBg;
+                            if (accuracy >= 90) { tier = 'Excellent!'; tierColor = '#16a34a'; tierBg = '#f0fdf4'; }
+                            else if (accuracy >= 70) { tier = 'Good Job!'; tierColor = '#f39c12'; tierBg = '#fff7e0'; }
+                            else { tier = 'Needs Practice'; tierColor = '#e74c3c'; tierBg = '#fff0f0'; }
+
                             return (
                                 <>
                                     <i className="fas fa-flag-checkered" style={{ fontSize: '4rem', color: '#1dd1a1', margin: '0 auto 15px auto', display: 'block' }}></i>
                                     <h2 style={{ color: '#2d3436', marginBottom: '10px' }}>Time's Up!</h2>
                                     <p style={{ color: '#666', fontSize: '1.2rem', marginBottom: '10px' }}>You answered</p>
-                                    <h1 style={{ fontSize: '3.5rem', color: '#4facfe', margin: '0 0 25px 0' }}>{taCorrect}/{taCorrect + taWrong}</h1>
+                                    <h1 style={{ fontSize: '3.5rem', color: '#4facfe', margin: '0 0 10px 0' }}>{taCorrect}/{totalAnswered}</h1>
+
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: tierBg, color: tierColor, padding: '6px 16px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '20px' }}>
+                                        <i className="fas fa-star"></i> {tier} — {accuracy}% Accuracy
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '20px' }}>
+                                        <div style={{ flex: 1, maxWidth: '110px', padding: '12px 8px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                                            <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#16a34a' }}>{taCorrect}</div>
+                                            <div style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: '600', textTransform: 'uppercase' }}>Correct</div>
+                                        </div>
+                                        <div style={{ flex: 1, maxWidth: '110px', padding: '12px 8px', borderRadius: '12px', background: '#fff0f0', border: '1px solid #fecaca' }}>
+                                            <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#e74c3c' }}>{taWrong}</div>
+                                            <div style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: '600', textTransform: 'uppercase' }}>Wrong</div>
+                                        </div>
+                                        <div style={{ flex: 1, maxWidth: '110px', padding: '12px 8px', borderRadius: '12px', background: '#f8f9fa', border: '1px solid #eee' }}>
+                                            <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#2d3436' }}>{totalAnswered}</div>
+                                            <div style={{ fontSize: '0.7rem', color: '#555', fontWeight: '600', textTransform: 'uppercase' }}>Answered</div>
+                                        </div>
+                                    </div>
+
                                     <p style={{ color: '#1dd1a1', fontWeight: 'bold', marginBottom: '25px' }}>
                                         <i className="fas fa-check"></i> {alreadyHadSubmission ? 'This was your submitted score.' : 'Score successfully submitted to your teacher.'}
                                     </p>
