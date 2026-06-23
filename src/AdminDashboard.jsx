@@ -4,6 +4,8 @@ import {
     collection, getDocs, doc, setDoc, updateDoc, deleteDoc,
     orderBy, query, getCountFromServer
 } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +107,7 @@ const S = {
 const NAV = [
     { id: 'overview',  icon: '📊', label: 'Overview'       },
     { id: 'users',     icon: '👥', label: 'Users'          },
+    { id: 'requests',  icon: '📨', label: 'Pending Requests' },
     { id: 'tokens',    icon: '🔑', label: 'Invite Tokens'  },
 ];
 
@@ -293,6 +296,174 @@ function Users({ users, loading, onRefresh }) {
                                 {working ? 'Saving…' : confirm.action === 'deactivate' ? 'Deactivate' : 'Activate'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION: Pending Requests
+// ═════════════════════════════════════════════════════════════════════════════
+
+function PendingRequests() {
+    const [requests, setRequests] = useState([]);
+    const [loadingList, setLoadingList] = useState(true);
+    const [processingId, setProcessingId] = useState(null); // request currently being approved/rejected
+    const [expiryDays, setExpiryDays] = useState(7);
+
+    useEffect(() => { fetchRequests(); }, []);
+
+    const fetchRequests = async () => {
+        setLoadingList(true);
+        try {
+            const q = query(collection(db, 'teacherRequests'), orderBy('requestedAt', 'desc'));
+            const snap = await getDocs(q);
+            setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (err) { console.error(err); }
+        setLoadingList(false);
+    };
+
+    // Calls the approveTeacherRequest Cloud Function — it generates the
+    // token AND sends the email itself in one atomic server-side step, so
+    // there's no separate "now go click send" action left for the admin.
+    const handleApprove = async (request) => {
+        const confirmed = window.confirm(`Approve ${request.fullName} (${request.email})? A token will be generated and emailed to them automatically.`);
+        if (!confirmed) return;
+
+        setProcessingId(request.id);
+        try {
+            const functions = getFunctions(getApp());
+            const approveTeacherRequest = httpsCallable(functions, 'approveTeacherRequest');
+            await approveTeacherRequest({ requestId: request.id, expiryDays });
+            await fetchRequests();
+        } catch (err) {
+            console.error('Failed to approve request:', err);
+            alert(`Error approving request: ${err.message || 'Please try again.'}`);
+        }
+        setProcessingId(null);
+    };
+
+    const handleReject = async (request) => {
+        const confirmed = window.confirm(`Reject ${request.fullName}'s request? They will not receive a token.`);
+        if (!confirmed) return;
+
+        setProcessingId(request.id);
+        try {
+            await updateDoc(doc(db, 'teacherRequests', request.id), {
+                status: 'rejected',
+                reviewedAt: new Date().toISOString(),
+                reviewedBy: 'admin',
+            });
+            await fetchRequests();
+        } catch (err) {
+            console.error('Failed to reject request:', err);
+            alert('Error rejecting request. Check Firestore permissions.');
+        }
+        setProcessingId(null);
+    };
+
+    const pendingRequests = requests.filter(r => r.status === 'pending');
+    const reviewedRequests = requests.filter(r => r.status !== 'pending');
+
+    return (
+        <>
+            <div style={S.pageTitle}>Pending Requests</div>
+            <div style={S.pageSub}>Review teachers requesting access — approving sends them a token by email automatically</div>
+
+            <div style={S.card}>
+                <div style={S.cardHead}>
+                    <div>
+                        <div style={S.cardTitle}>New token expires after</div>
+                    </div>
+                </div>
+                <select style={S.select} value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value))}>
+                    <option value={1}>1 day</option>
+                    <option value={3}>3 days</option>
+                    <option value={7}>7 days</option>
+                    <option value={14}>14 days</option>
+                    <option value={30}>30 days</option>
+                </select>
+                <div style={{ fontSize: '12px', color: C.muted, marginTop: '8px' }}>
+                    Applied to the token generated when you approve a request below.
+                </div>
+            </div>
+
+            <div style={S.card}>
+                <div style={S.cardHead}>
+                    <div>
+                        <div style={S.cardTitle}>Awaiting Review</div>
+                        <div style={{ fontSize: '13px', color: C.muted }}>{pendingRequests.length} pending</div>
+                    </div>
+                    <button onClick={fetchRequests} style={{ ...S.btnOutline, fontSize: '12px' }}>↻ Refresh</button>
+                </div>
+
+                {loadingList ? (
+                    <div style={{ color: C.muted, fontSize: '14px' }}>Loading requests...</div>
+                ) : pendingRequests.length === 0 ? (
+                    <div style={{ color: C.muted, fontSize: '14px' }}>No pending requests right now.</div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {pendingRequests.map(r => (
+                            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderRadius: '12px', border: `1px solid ${C.border}`, background: C.white, flexWrap: 'wrap', gap: '10px' }}>
+                                <div>
+                                    <div style={{ fontWeight: '700', color: C.dark, fontSize: '14px' }}>{r.fullName}</div>
+                                    <div style={{ fontSize: '13px', color: C.muted }}>{r.email}</div>
+                                    <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Requested {formatDate(r.requestedAt)}</div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={() => handleReject(r)}
+                                        disabled={processingId === r.id}
+                                        style={{ padding: '8px 16px', borderRadius: '9px', border: `1px solid #e53e3e`, background: 'white', color: '#e53e3e', fontWeight: '700', fontSize: '13px', cursor: processingId === r.id ? 'not-allowed' : 'pointer', opacity: processingId === r.id ? 0.6 : 1 }}
+                                    >
+                                        Reject
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprove(r)}
+                                        disabled={processingId === r.id}
+                                        style={{ ...S.btn, padding: '8px 16px', fontSize: '13px', cursor: processingId === r.id ? 'not-allowed' : 'pointer', opacity: processingId === r.id ? 0.6 : 1 }}
+                                    >
+                                        {processingId === r.id ? 'Approving...' : '✓ Approve & Send'}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {reviewedRequests.length > 0 && (
+                <div style={S.card}>
+                    <div style={S.cardHead}>
+                        <div style={S.cardTitle}>Reviewed</div>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={S.table}>
+                            <thead>
+                                <tr>
+                                    <th style={S.th}>Name</th>
+                                    <th style={S.th}>Email</th>
+                                    <th style={S.th}>Status</th>
+                                    <th style={S.th}>Reviewed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {reviewedRequests.map(r => (
+                                    <tr key={r.id}>
+                                        <td style={S.td}>{r.fullName}</td>
+                                        <td style={S.td}>{r.email}</td>
+                                        <td style={S.td}>
+                                            <span style={S.badge(r.status === 'approved' ? 'active' : 'inactive')}>
+                                                {r.status === 'approved' ? 'Approved' : 'Rejected'}
+                                            </span>
+                                        </td>
+                                        <td style={S.td}>{formatDate(r.reviewedAt)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
@@ -635,6 +806,9 @@ export default function AdminDashboard() {
                 )}
                 {page === 'users' && (
                     <Users users={users} loading={loadingUsers} onRefresh={fetchUsers} />
+                )}
+                {page === 'requests' && (
+                    <PendingRequests />
                 )}
                 {page === 'tokens' && (
                     <Tokens />

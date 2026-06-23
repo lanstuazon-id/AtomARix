@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
 
 export default function Login() {
     const navigate = useNavigate();
@@ -24,6 +24,14 @@ export default function Login() {
 
     // Token state — tracks whether the token came from a URL invite link
     const [tokenFromUrl, setTokenFromUrl] = useState(false);
+
+    // Request-access flow — lets a teacher without a token ask the admin to
+    // review and approve them, instead of requiring a pre-existing token.
+    const [showRequestAccess, setShowRequestAccess] = useState(false);
+    const [requestFullName, setRequestFullName] = useState('');
+    const [requestEmail, setRequestEmail] = useState('');
+    const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+    const [requestSubmitted, setRequestSubmitted] = useState(false);
 
     // Modal state
     const [modal, setModal] = useState({ show: false, title: '', message: '', type: 'error' });
@@ -94,6 +102,41 @@ export default function Login() {
             usedBy: usedByUsername,
             usedAt: new Date().toISOString()
         }, { merge: true });
+    };
+
+    // ─── Teacher access request (no token yet) ─────────────────────────────────
+    // Writes a pending request the admin reviews in AdminDashboard.jsx. On
+    // approval, a Cloud Function generates a token and emails it directly
+    // to this address — nothing further is needed here once submitted.
+    const submitAccessRequest = async (e) => {
+        e.preventDefault();
+        if (!requestFullName.trim() || !requestEmail.trim()) {
+            setModal({ show: true, title: 'Missing Information', message: 'Please enter your full name and email address.', type: 'error' });
+            return;
+        }
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(requestEmail.trim())) {
+            setModal({ show: true, title: 'Invalid Email', message: 'Please enter a valid email address.', type: 'error' });
+            return;
+        }
+
+        setIsSubmittingRequest(true);
+        try {
+            await addDoc(collection(db, 'teacherRequests'), {
+                fullName: requestFullName.trim(),
+                email: requestEmail.trim().toLowerCase(),
+                status: 'pending',
+                requestedAt: new Date().toISOString(),
+                reviewedAt: null,
+                reviewedBy: null,
+                tokenGenerated: null,
+            });
+            setRequestSubmitted(true);
+        } catch (err) {
+            console.error('Failed to submit access request:', err);
+            setModal({ show: true, title: 'Something Went Wrong', message: 'Could not submit your request. Please try again.', type: 'error' });
+        }
+        setIsSubmittingRequest(false);
     };
 
     // ─── Form submit ──────────────────────────────────────────────────────────
@@ -368,7 +411,7 @@ export default function Login() {
                 {roleSelectorJSX}
 
                 {/* Invite token field — shown only for teacher registration */}
-                {role === 'teacher' && (
+                {role === 'teacher' && !showRequestAccess && (
                     <div className="input-group">
                         <label htmlFor="teacherCode">
                             Invite Token
@@ -395,8 +438,74 @@ export default function Login() {
                         </div>
                         {!tokenFromUrl && (
                             <small style={{ color: '#999', marginTop: '4px', display: 'block' }}>
-                                Ask your admin for an invite token or link.
+                                Ask your admin for an invite token or link, or{' '}
+                                <span
+                                    onClick={() => setShowRequestAccess(true)}
+                                    style={{ color: '#4facfe', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                                >
+                                    request one here
+                                </span>.
                             </small>
+                        )}
+                    </div>
+                )}
+
+                {/* Request-access form — for a teacher with no token yet. Submits a
+                    pending request the admin reviews; nothing else happens here
+                    until the admin approves it on their end. */}
+                {role === 'teacher' && showRequestAccess && (
+                    <div className="input-group" style={{ background: '#f8f9fa', padding: '20px', borderRadius: '12px', border: '1px solid #e1e1e1' }}>
+                        {requestSubmitted ? (
+                            <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                                <i className="fas fa-paper-plane" style={{ fontSize: '2rem', color: '#10ac84', marginBottom: '12px', display: 'block' }}></i>
+                                <p style={{ color: '#2d3436', fontWeight: 600, marginBottom: '6px' }}>Request submitted!</p>
+                                <p style={{ color: '#666', fontSize: '0.88rem', margin: 0 }}>
+                                    Once an admin approves your request, you'll receive an invite token by email at <strong>{requestEmail}</strong>.
+                                </p>
+                                <span
+                                    onClick={() => { setShowRequestAccess(false); setRequestSubmitted(false); setRequestFullName(''); setRequestEmail(''); }}
+                                    style={{ display: 'inline-block', marginTop: '14px', color: '#4facfe', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline' }}
+                                >
+                                    Back to login
+                                </span>
+                            </div>
+                        ) : (
+                            <>
+                                <p style={{ color: '#2d3436', fontWeight: 600, marginBottom: '12px', fontSize: '0.95rem' }}>
+                                    <i className="fas fa-user-clock" style={{ marginRight: '6px', color: '#4facfe' }}></i>
+                                    Request Teacher Access
+                                </p>
+                                <input
+                                    type="text"
+                                    value={requestFullName}
+                                    onChange={e => setRequestFullName(e.target.value)}
+                                    placeholder="Full name"
+                                    style={{ marginBottom: '10px' }}
+                                />
+                                <input
+                                    type="email"
+                                    value={requestEmail}
+                                    onChange={e => setRequestEmail(e.target.value)}
+                                    placeholder="Email address"
+                                />
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRequestAccess(false)}
+                                        style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid #e1e1e1', background: 'white', color: '#666', fontWeight: 600, cursor: 'pointer' }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={submitAccessRequest}
+                                        disabled={isSubmittingRequest}
+                                        style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: '#4facfe', color: 'white', fontWeight: 600, cursor: isSubmittingRequest ? 'not-allowed' : 'pointer', opacity: isSubmittingRequest ? 0.7 : 1 }}
+                                    >
+                                        {isSubmittingRequest ? 'Submitting...' : 'Submit Request'}
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
                 )}
