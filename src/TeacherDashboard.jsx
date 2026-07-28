@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import './TeacherDashboard.css'; 
 import { collection, query, where, doc, setDoc, onSnapshot, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { deleteUser, updateEmail } from 'firebase/auth';
+import { ThemeContext } from './App.jsx';
 
 const generateEmojiAvatar = (emoji) => {
     const canvas = document.createElement('canvas');
@@ -61,6 +62,7 @@ const roomColorPresets = [
 
 export default function TeacherDashboard() {
     const navigate = useNavigate();
+    const { theme, toggleTheme } = useContext(ThemeContext);
     const [rooms, setRooms] = useState([]);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newRoomSection, setNewRoomSection] = useState('');
@@ -585,8 +587,8 @@ export default function TeacherDashboard() {
                         }
                         .floating-item {
                             position: absolute;
-                            color: #6e45e2;
-                            opacity: 0.08;
+                            color: var(--floating-icon-color);
+                            opacity: var(--floating-icon-opacity);
                             bottom: -100px;
                             animation: float-up infinite linear;
                         }
@@ -1021,6 +1023,19 @@ export default function TeacherDashboard() {
                         <i className="fas fa-cog modal-icon-box" style={{ color: '#6e45e2' }}></i>
                         <h2 style={{ marginBottom: '10px' }}>Account Settings</h2>
                         <p style={{ color: '#666', marginBottom: '20px' }}>Manage your account preferences and data.</p>
+                        <div style={{ textAlign: 'left', background: '#fdfdfd', border: '1px solid #eee', borderRadius: '10px', padding: '15px', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <h4 style={{ color: '#6e45e2', margin: '0 0 5px 0' }}>Dark Mode</h4>
+                                    <p style={{ fontSize: '0.85rem', color: '#888', margin: 0 }}>Switch between light and dark themes.</p>
+                                </div>
+                                <label className="theme-switch">
+                                    <input type="checkbox" checked={theme === 'dark'} onChange={toggleTheme} />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div style={{ textAlign: 'left', background: '#fdfdfd', border: '1px solid #eee', borderRadius: '10px', padding: '15px', marginBottom: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>

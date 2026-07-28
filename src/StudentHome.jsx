@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import './StudentHome.css'; 
 import { collection, getDocs, doc, getDoc, setDoc, onSnapshot, deleteDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { deleteUser } from 'firebase/auth';
+import { ThemeContext } from './App.jsx';
 
 const generateEmojiAvatar = (emoji) => {
     // NOTE: iOS/WebKit's Canvas 2D `fillText()` cannot render color emoji — it
@@ -108,6 +109,7 @@ const fireConfetti = (x, y) => {
 
 export default function StudentHome() {
     const navigate = useNavigate();
+    const { theme, toggleTheme } = useContext(ThemeContext);
     const menuRef = useRef(null);
     const GAME_CARD_COUNT = 4; // Time Attack, Matching, Compound Recall, Periodic Puzzle — used for the mobile horizontal-scroll dot indicators
 
@@ -746,8 +748,8 @@ export default function StudentHome() {
                     }
                     .floating-item {
                         position: absolute;
-                        color: #6e45e2;
-                        opacity: 0.08;
+                        color: var(--floating-icon-color);
+                        opacity: var(--floating-icon-opacity);
                         bottom: -100px;
                         animation: float-up infinite linear;
                     }
@@ -844,7 +846,7 @@ export default function StudentHome() {
                         >
                             {!avatarUrl && <i className="fas fa-user"></i>}
                         </button>
-                        {isMenuOpen && (
+                        {isMenuOpen && ( // The mobile-menu-backdrop was inside the conditional, but on desktop it's hidden by CSS. This is fine, but for consistency with other components, let's adjust the structure slightly.
                             <>
                                 <div className="mobile-menu-backdrop"></div>
                                 <div className="dropdown-menu show">
@@ -861,13 +863,13 @@ export default function StudentHome() {
                                             <p>@{userName}</p>
                                         </div>
                                     </div>
-                                    <div className="dropdown-item" onClick={openEditProfile}>
+                                    <div className="dropdown-item" onClick={openEditProfile} style={{ whiteSpace: 'nowrap' }}>
                                         <div className="dropdown-icon-box"><i className="fas fa-user-edit"></i></div> Edit Profile
                                     </div>
-                                    <div className="dropdown-item" onClick={() => { setIsSettingsModalOpen(true); setIsMenuOpen(false); }}>
+                                    <div className="dropdown-item" onClick={() => { setIsSettingsModalOpen(true); setIsMenuOpen(false); }} style={{ whiteSpace: 'nowrap' }}>
                                         <div className="dropdown-icon-box"><i className="fas fa-cog"></i></div> Account Settings
                                     </div>
-                                    <div className="dropdown-item danger" onClick={() => { setIsLogoutModalOpen(true); setIsMenuOpen(false); }}>
+                                    <div className="dropdown-item danger" onClick={() => { setIsLogoutModalOpen(true); setIsMenuOpen(false); }} style={{ whiteSpace: 'nowrap' }}>
                                         <div className="dropdown-icon-box"><i className="fas fa-sign-out-alt"></i></div> Logout
                                     </div>
                                 </div>
@@ -1231,6 +1233,19 @@ export default function StudentHome() {
                         <h2 style={{ marginBottom: '10px' }}>Account Settings</h2>
                         <p style={{ color: '#666', marginBottom: '20px' }}>Manage your account preferences and data.</p>
                         
+                        <div style={{ textAlign: 'left', background: '#fdfdfd', border: '1px solid #eee', borderRadius: '10px', padding: '15px', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <h4 style={{ color: '#6e45e2', margin: '0 0 5px 0' }}>Dark Mode</h4>
+                                    <p style={{ fontSize: '0.85rem', color: '#888', margin: 0 }}>Switch between light and dark themes.</p>
+                                </div>
+                                <label className="theme-switch">
+                                    <input type="checkbox" checked={theme === 'dark'} onChange={toggleTheme} />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div style={{ textAlign: 'left', background: '#fdfdfd', border: '1px solid #eee', borderRadius: '10px', padding: '15px', marginBottom: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>

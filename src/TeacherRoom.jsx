@@ -66,6 +66,9 @@ export default function TeacherRoom() {
     const [analyticsStudent, setAnalyticsStudent] = useState(null);
     const [selectedReportCw, setSelectedReportCw] = useState(null);
     const [expandedStudentId, setExpandedStudentId] = useState(null);
+    const [expandedWeakStudents, setExpandedWeakStudents] = useState(new Set());
+    const [isMostMissedOpen, setIsMostMissedOpen] = useState(false);
+    const [analysisModal, setAnalysisModal] = useState(null); // { type: 'avg'|'participation'|'atrisk'|'range' }
 
     // Student Management States
     const [isRemoveStudentModalOpen, setIsRemoveStudentModalOpen] = useState(false);
@@ -551,6 +554,634 @@ Example format:
         setIsAnalyticsModalOpen(true);
     };
 
+    const renderAnalysis = () => {
+        const customCw = classwork.filter(cw => cw.type === 'assessment' && cw.assessmentType === 'custom' && cw.questions?.length > 0);
+        const allCw    = classwork.filter(cw => cw.type === 'assessment');
+
+        const scoreColor = p => p >= 70 ? '#1dd1a1' : p >= 50 ? '#f39c12' : '#e74c3c';
+        const scoreBg    = p => p >= 70 ? '#e3fdf5' : p >= 50 ? '#fff7e0' : '#fff0f0';
+        const diffLabel  = p => p >= 70 ? 'Easy' : p >= 50 ? 'Medium' : 'Hard';
+
+        const studentData = students.map(student => {
+            const actScores = allCw.map(cw => {
+                const sub = (cw.submissions || []).find(s => s.studentId === student.id);
+                if (!sub) return null;
+                const pct = sub.total > 0 ? Math.round((sub.score / sub.total) * 100) : 0;
+                return { cwId: cw.id, title: cw.title, score: sub.score, total: sub.total, pct, assessmentType: cw.assessmentType };
+            });
+            const submitted = actScores.filter(Boolean);
+            const avg = submitted.length > 0 ? Math.round(submitted.reduce((a, b) => a + b.pct, 0) / submitted.length) : null;
+            const weakTopics = [];
+            customCw.forEach(cw => {
+                const sub = (cw.submissions || []).find(s => s.studentId === student.id);
+                if (!sub?.answers) return;
+                cw.questions.forEach((q, qi) => {
+                    if (sub.answers[qi] !== q.correctOption) weakTopics.push({ question: q.question, activity: cw.title });
+                });
+            });
+            return { student, actScores, avg, submitted: submitted.length, weakTopics };
+        }).sort((a, b) => {
+            if (a.avg === null && b.avg === null) return 0;
+            if (a.avg === null) return 1;
+            if (b.avg === null) return -1;
+            return b.avg - a.avg;
+        });
+
+        const questionMissMap = {};
+        customCw.forEach(cw => {
+            cw.questions.forEach((q, qi) => {
+                const total = (cw.submissions || []).length;
+                if (total === 0) return;
+                const wrong = (cw.submissions || []).filter(s => !s.answers || s.answers[qi] !== q.correctOption).length;
+                questionMissMap[`${cw.id}-${qi}`] = { question: q.question, activity: cw.title, wrong, total, missRate: Math.round((wrong / total) * 100) };
+            });
+        });
+        const hardestQuestions = Object.values(questionMissMap).filter(q => q.missRate > 0).sort((a, b) => b.missRate - a.missRate).slice(0, 8);
+
+        const allAvgs = studentData.filter(s => s.avg !== null).map(s => s.avg);
+        const classAvg = allAvgs.length > 0 ? Math.round(allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length) : null;
+        const atRisk = studentData.filter(s => s.avg !== null && s.avg < 50).length;
+        const topStudent = studentData.find(s => s.avg !== null);
+        const mostMissed = hardestQuestions[0];
+
+        const toggleWeakStudent = (id) => {
+            setExpandedWeakStudents(prev => {
+                const next = new Set(prev);
+                next.has(id) ? next.delete(id) : next.add(id);
+                return next;
+            });
+        };
+
+        const card = { background: 'white', border: '1px solid #eee', borderRadius: '16px', padding: '22px 24px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' };
+
+        if (students.length === 0) return (
+            <div style={{ ...card, textAlign: 'center', padding: '60px 20px' }}>
+                <i className="fas fa-users" style={{ fontSize: '3rem', color: '#ddd', marginBottom: '16px', display: 'block' }}></i>
+                <h3 style={{ color: '#aaa', fontWeight: '600' }}>No students have joined yet</h3>
+                <p style={{ color: '#bbb', marginTop: '8px' }}>Item analysis will appear once students join and submit activities.</p>
+            </div>
+        );
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+
+                {/* ── stat cards ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+
+                    {/* Class Average */}
+                    <div onClick={() => setAnalysisModal({ type: 'avg' })} style={{ background: 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#6e45e2'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(110,69,226,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'; }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Class Average</span>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f3f0ff', color: '#6e45e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}><i className="fas fa-chart-line"></i></div>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: '800', color: classAvg !== null ? (classAvg >= 70 ? '#1dd1a1' : classAvg >= 50 ? '#f39c12' : '#e74c3c') : '#ccc', lineHeight: 1 }}>
+                            {classAvg !== null ? `${classAvg}%` : '—'}
+                        </div>
+                        {classAvg !== null && (
+                            <div>
+                                <div style={{ height: '6px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' }}>
+                                    <div style={{ height: '100%', width: `${classAvg}%`, background: classAvg >= 70 ? '#1dd1a1' : classAvg >= 50 ? '#f39c12' : '#e74c3c', borderRadius: '99px', transition: 'width 0.6s ease' }}></div>
+                                </div>
+                                <span style={{ fontSize: '0.75rem', color: '#888' }}>
+                                    {classAvg >= 70 ? '✓ Class is performing well' : classAvg >= 50 ? '⚠ Needs some improvement' : '✗ Class needs attention'}
+                                </span>
+                            </div>
+                        )}
+                        <span style={{ fontSize: '0.72rem', color: '#6e45e2', fontWeight: '600', marginTop: '2px' }}>Tap to see breakdown →</span>
+                    </div>
+
+                    {/* Participation */}
+                    <div onClick={() => setAnalysisModal({ type: 'participation' })} style={{ background: 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#4facfe'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(79,172,254,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'; }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Participation</span>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}><i className="fas fa-users"></i></div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', lineHeight: 1 }}>
+                            <span style={{ fontSize: '2rem', fontWeight: '800', color: '#2d3436' }}>{studentData.filter(s => s.submitted > 0).length}</span>
+                            <span style={{ fontSize: '1rem', color: '#aaa', fontWeight: '600', marginBottom: '4px' }}>/ {students.length}</span>
+                        </div>
+                        <div>
+                            <div style={{ height: '6px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' }}>
+                                <div style={{ height: '100%', width: students.length > 0 ? `${Math.round((studentData.filter(s => s.submitted > 0).length / students.length) * 100)}%` : '0%', background: '#4facfe', borderRadius: '99px', transition: 'width 0.6s ease' }}></div>
+                            </div>
+                            <span style={{ fontSize: '0.75rem', color: '#888' }}>students submitted at least one activity</span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: '#4facfe', fontWeight: '600', marginTop: '2px' }}>Tap to see who submitted →</span>
+                    </div>
+
+                    {/* At Risk */}
+                    <div onClick={() => setAnalysisModal({ type: 'atrisk' })} style={{ background: atRisk > 0 ? '#fff8f8' : 'white', border: `1px solid ${atRisk > 0 ? '#fecaca' : '#eee'}`, borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#e74c3c'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(231,76,60,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = atRisk > 0 ? '#fecaca' : '#eee'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'; }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: atRisk > 0 ? '#e74c3c' : '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>At Risk</span>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fff0f0', color: '#e74c3c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}><i className="fas fa-exclamation-triangle"></i></div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', lineHeight: 1 }}>
+                            <span style={{ fontSize: '2rem', fontWeight: '800', color: atRisk > 0 ? '#e74c3c' : '#1dd1a1' }}>{atRisk}</span>
+                            <span style={{ fontSize: '0.85rem', color: '#aaa', fontWeight: '600', marginBottom: '4px' }}>student{atRisk !== 1 ? 's' : ''}</span>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: atRisk > 0 ? '#e74c3c' : '#1dd1a1' }}>
+                            {atRisk > 0 ? 'averaging below 50% — needs intervention' : '✓ No students at risk'}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: '#e74c3c', fontWeight: '600', marginTop: '2px' }}>Tap to see at-risk students →</span>
+                    </div>
+
+                    {/* Score Range */}
+                    <div onClick={() => setAnalysisModal({ type: 'range' })} style={{ background: 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#f39c12'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(243,156,18,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'; }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score Range</span>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fff7e0', color: '#f39c12', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}><i className="fas fa-arrows-alt-v"></i></div>
+                        </div>
+                        {(() => {
+                            const withAvg = studentData.filter(s => s.avg !== null);
+                            const highest = withAvg[0];
+                            const lowest = withAvg[withAvg.length - 1];
+                            if (!highest) return <span style={{ fontSize: '0.85rem', color: '#ccc' }}>No data yet</span>;
+                            return (
+                                <>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <i className="fas fa-arrow-up" style={{ fontSize: '0.7rem', color: '#1dd1a1' }}></i>
+                                                <span style={{ fontSize: '0.82rem', color: '#555', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{highest.student.fullname || highest.student.username}</span>
+                                            </div>
+                                            <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1dd1a1' }}>{highest.avg}%</span>
+                                        </div>
+                                        {lowest && lowest.student.id !== highest.student.id && (
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <i className="fas fa-arrow-down" style={{ fontSize: '0.7rem', color: '#e74c3c' }}></i>
+                                                    <span style={{ fontSize: '0.82rem', color: '#555', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{lowest.student.fullname || lowest.student.username}</span>
+                                                </div>
+                                                <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#e74c3c' }}>{lowest.avg}%</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span style={{ fontSize: '0.75rem', color: '#888' }}>
+                                        {lowest && lowest.student.id !== highest.student.id ? `${highest.avg - lowest.avg}pt gap between top and bottom` : 'Only one student has submitted'}
+                                    </span>
+                                </>
+                            );
+                        })()}
+                        <span style={{ fontSize: '0.72rem', color: '#f39c12', fontWeight: '600', marginTop: '2px' }}>Tap to see full ranking →</span>
+                    </div>
+
+                </div>
+
+                {/* ── stat card modals ── */}
+                {analysisModal && (() => {
+                    const scoreColor = p => p >= 70 ? '#1dd1a1' : p >= 50 ? '#f39c12' : '#e74c3c';
+                    const scoreBg   = p => p >= 70 ? '#e3fdf5' : p >= 50 ? '#fff7e0' : '#fff0f0';
+                    const withAvg   = studentData.filter(s => s.avg !== null);
+
+                    const configs = {
+                        avg: {
+                            icon: 'fa-chart-line', iconColor: '#6e45e2', iconBg: '#f3f0ff',
+                            title: 'Class Average Breakdown',
+                            subtitle: `Overall average across ${allCw.length} activit${allCw.length !== 1 ? 'ies' : 'y'}`,
+                        },
+                        participation: {
+                            icon: 'fa-users', iconColor: '#4facfe', iconBg: '#eaf4ff',
+                            title: 'Participation Details',
+                            subtitle: 'Who has and hasn\'t submitted at least one activity',
+                        },
+                        atrisk: {
+                            icon: 'fa-exclamation-triangle', iconColor: '#e74c3c', iconBg: '#fff0f0',
+                            title: 'At-Risk Students',
+                            subtitle: 'Students averaging below 50% across all activities',
+                        },
+                        range: {
+                            icon: 'fa-arrows-alt-v', iconColor: '#f39c12', iconBg: '#fff7e0',
+                            title: 'Full Score Ranking',
+                            subtitle: 'All students ranked by overall average, highest to lowest',
+                        },
+                    };
+                    const cfg = configs[analysisModal.type];
+
+                    return (
+                        <div className="modal-container show" onClick={() => setAnalysisModal(null)}>
+                            <div className="modal-content" onClick={e => e.stopPropagation()}
+                                style={{ maxWidth: '520px', maxHeight: '82vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', borderRadius: '18px' }}>
+
+                                {/* header */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '18px 22px', borderBottom: '1px solid #f0f2f5', flexShrink: 0 }}>
+                                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: cfg.iconBg, color: cfg.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                                        <i className={`fas ${cfg.icon}`}></i>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: '800', color: '#2d3436', fontSize: '1rem' }}>{cfg.title}</div>
+                                        <div style={{ fontSize: '0.78rem', color: '#888', marginTop: '1px' }}>{cfg.subtitle}</div>
+                                    </div>
+                                    <button onClick={() => setAnalysisModal(null)} style={{ background: 'none', border: 'none', fontSize: '1.4rem', color: '#aaa', cursor: 'pointer', lineHeight: 1, padding: '4px' }}>&times;</button>
+                                </div>
+
+                                {/* body */}
+                                <div style={{ overflowY: 'auto', padding: '18px 22px', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+                                    {/* ── CLASS AVERAGE modal ── */}
+                                    {analysisModal.type === 'avg' && (
+                                        <>
+                                            {/* big avg + bar */}
+                                            <div style={{ textAlign: 'center', padding: '16px', background: scoreBg(classAvg ?? 0), borderRadius: '12px', marginBottom: '4px' }}>
+                                                <div style={{ fontSize: '3rem', fontWeight: '800', color: scoreColor(classAvg ?? 0), lineHeight: 1 }}>{classAvg !== null ? `${classAvg}%` : '—'}</div>
+                                                <div style={{ fontSize: '0.82rem', color: '#888', marginTop: '6px' }}>{classAvg >= 70 ? '✓ Class is performing well' : classAvg >= 50 ? '⚠ Needs some improvement' : '✗ Class needs attention'}</div>
+                                                <div style={{ height: '8px', background: 'rgba(0,0,0,0.08)', borderRadius: '99px', overflow: 'hidden', marginTop: '12px' }}>
+                                                    <div style={{ height: '100%', width: `${classAvg ?? 0}%`, background: scoreColor(classAvg ?? 0), borderRadius: '99px' }}></div>
+                                                </div>
+                                            </div>
+                                            {/* per-activity averages */}
+                                            <p style={{ fontSize: '0.78rem', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Per-activity averages</p>
+                                            {allCw.map(cw => {
+                                                const subs = cw.submissions || [];
+                                                const pcts = subs.map(s => s.total > 0 ? Math.round((s.score / s.total) * 100) : 0);
+                                                const avg2 = pcts.length > 0 ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+                                                return (
+                                                    <div key={cw.id} style={{ padding: '11px 14px', background: '#f8f9fa', borderRadius: '10px', border: '1px solid #eee' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+                                                            <span style={{ fontWeight: '700', fontSize: '0.88rem', color: '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>{cw.title}</span>
+                                                            <span style={{ fontWeight: '800', fontSize: '0.95rem', color: avg2 !== null ? scoreColor(avg2) : '#ccc', flexShrink: 0, marginLeft: '10px' }}>{avg2 !== null ? `${avg2}%` : '—'}</span>
+                                                        </div>
+                                                        <div style={{ height: '6px', background: '#e9ecef', borderRadius: '99px', overflow: 'hidden' }}>
+                                                            <div style={{ height: '100%', width: `${avg2 ?? 0}%`, background: avg2 !== null ? scoreColor(avg2) : '#ddd', borderRadius: '99px' }}></div>
+                                                        </div>
+                                                        <div style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '5px' }}>{subs.length} submission{subs.length !== 1 ? 's' : ''}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {allCw.length === 0 && <div style={{ textAlign: 'center', padding: '20px', color: '#ccc' }}>No activities yet.</div>}
+                                        </>
+                                    )}
+
+                                    {/* ── PARTICIPATION modal ── */}
+                                    {analysisModal.type === 'participation' && (
+                                        <>
+                                            {/* submitted */}
+                                            <p style={{ fontSize: '0.78rem', color: '#4facfe', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Submitted ({studentData.filter(s => s.submitted > 0).length})</p>
+                                            {studentData.filter(s => s.submitted > 0).map(({ student, submitted, avg }) => {
+                                                const name = student.fullname || student.username;
+                                                return (
+                                                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 13px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px' }}>
+                                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                                                            <div style={{ fontSize: '0.72rem', color: '#888' }}>{submitted} / {allCw.length} activit{allCw.length !== 1 ? 'ies' : 'y'} submitted</div>
+                                                        </div>
+                                                        {avg !== null && <span style={{ fontSize: '0.85rem', fontWeight: '800', color: scoreColor(avg) }}>{avg}%</span>}
+                                                        <i className="fas fa-check-circle" style={{ color: '#4facfe', fontSize: '1rem', flexShrink: 0 }}></i>
+                                                    </div>
+                                                );
+                                            })}
+                                            {/* not submitted */}
+                                            {studentData.filter(s => s.submitted === 0).length > 0 && (
+                                                <>
+                                                    <p style={{ fontSize: '0.78rem', color: '#e74c3c', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '8px' }}>Not yet submitted ({studentData.filter(s => s.submitted === 0).length})</p>
+                                                    {studentData.filter(s => s.submitted === 0).map(({ student }) => {
+                                                        const name = student.fullname || student.username;
+                                                        return (
+                                                            <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 13px', background: '#fff8f8', border: '1px solid #fecaca', borderRadius: '10px' }}>
+                                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff0f0', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#2d3436' }}>{name}</div>
+                                                                    <div style={{ fontSize: '0.72rem', color: '#e74c3c' }}>No submissions yet</div>
+                                                                </div>
+                                                                <i className="fas fa-times-circle" style={{ color: '#e74c3c', fontSize: '1rem', flexShrink: 0 }}></i>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {/* ── AT RISK modal ── */}
+                                    {analysisModal.type === 'atrisk' && (
+                                        <>
+                                            {studentData.filter(s => s.avg !== null && s.avg < 50).length === 0 ? (
+                                                <div style={{ textAlign: 'center', padding: '30px' }}>
+                                                    <i className="fas fa-check-circle" style={{ fontSize: '3rem', color: '#1dd1a1', marginBottom: '12px', display: 'block' }}></i>
+                                                    <p style={{ fontWeight: '700', color: '#2d3436' }}>No at-risk students!</p>
+                                                    <p style={{ fontSize: '0.82rem', color: '#888', marginTop: '6px' }}>All students who have submitted are averaging 50% or above.</p>
+                                                </div>
+                                            ) : studentData.filter(s => s.avg !== null && s.avg < 50).map(({ student, avg, submitted, weakTopics }) => {
+                                                const name = student.fullname || student.username;
+                                                return (
+                                                    <div key={student.id} style={{ padding: '13px 15px', background: '#fff8f8', border: '1px solid #fecaca', borderRadius: '12px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: weakTopics.length > 0 ? '10px' : 0 }}>
+                                                            <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#fff0f0', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.95rem' }}>{name}</div>
+                                                                <div style={{ fontSize: '0.72rem', color: '#888' }}>{submitted} / {allCw.length} activities submitted</div>
+                                                            </div>
+                                                            <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#e74c3c' }}>{avg}%</span>
+                                                        </div>
+                                                        {weakTopics.length > 0 && (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                <p style={{ fontSize: '0.72rem', color: '#e74c3c', fontWeight: '700', marginBottom: '2px' }}>MISSED QUESTIONS</p>
+                                                                {weakTopics.slice(0, 3).map((w, wi) => (
+                                                                    <div key={wi} style={{ fontSize: '0.8rem', color: '#7d3c3c', background: '#fff0f0', border: '1px solid #fecaca', borderRadius: '7px', padding: '6px 10px', display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
+                                                                        <i className="fas fa-times" style={{ color: '#e74c3c', marginTop: '2px', flexShrink: 0, fontSize: '0.75rem' }}></i>
+                                                                        <span style={{ lineHeight: '1.4' }}>{w.question}</span>
+                                                                    </div>
+                                                                ))}
+                                                                {weakTopics.length > 3 && <p style={{ fontSize: '0.72rem', color: '#aaa', marginTop: '2px' }}>+{weakTopics.length - 3} more missed questions</p>}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </>
+                                    )}
+
+                                    {/* ── SCORE RANGE modal ── */}
+                                    {analysisModal.type === 'range' && (
+                                        <>
+                                            {withAvg.length === 0 ? (
+                                                <div style={{ textAlign: 'center', padding: '30px', color: '#ccc' }}>No submissions yet.</div>
+                                            ) : withAvg.map(({ student, avg, submitted }, i) => {
+                                                const name = student.fullname || student.username;
+                                                const isTop = i === 0;
+                                                const isLast = i === withAvg.length - 1 && withAvg.length > 1;
+                                                return (
+                                                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px', background: isTop ? '#f0fdf4' : isLast ? '#fff8f8' : '#f8f9fa', border: `1px solid ${isTop ? '#bbf7d0' : isLast ? '#fecaca' : '#eee'}`, borderRadius: '11px' }}>
+                                                        {/* rank */}
+                                                        <div style={{ width: '26px', textAlign: 'center', fontSize: i < 3 ? '1.1rem' : '0.85rem', color: '#aaa', fontWeight: '700', flexShrink: 0 }}>
+                                                            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                                                        </div>
+                                                        {/* avatar */}
+                                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
+                                                        {/* name */}
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                                                            <div style={{ fontSize: '0.72rem', color: '#aaa' }}>{submitted} activit{submitted !== 1 ? 'ies' : 'y'} submitted</div>
+                                                        </div>
+                                                        {/* avg pill + bar */}
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                                                            <span style={{ fontSize: '1rem', fontWeight: '800', color: scoreColor(avg) }}>{avg}%</span>
+                                                            <div style={{ width: '60px', height: '5px', background: '#e9ecef', borderRadius: '99px', overflow: 'hidden' }}>
+                                                                <div style={{ height: '100%', width: `${avg}%`, background: scoreColor(avg), borderRadius: '99px' }}></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {/* students who haven't submitted */}
+                                            {studentData.filter(s => s.avg === null).length > 0 && (
+                                                <>
+                                                    <p style={{ fontSize: '0.78rem', color: '#aaa', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>No submissions</p>
+                                                    {studentData.filter(s => s.avg === null).map(({ student }) => {
+                                                        const name = student.fullname || student.username;
+                                                        return (
+                                                            <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '11px', opacity: 0.6 }}>
+                                                                <div style={{ width: '26px', textAlign: 'center', fontSize: '0.85rem', color: '#ccc' }}>—</div>
+                                                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f0f2f5', color: '#ccc', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem' }}>{name.charAt(0).toUpperCase()}</div>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#aaa' }}>{name}</div>
+                                                                    <div style={{ fontSize: '0.72rem', color: '#ccc' }}>No submissions yet</div>
+                                                                </div>
+                                                                <span style={{ fontSize: '0.85rem', color: '#ccc', fontWeight: '700' }}>—</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
+                                        </>
+                                    )}
+
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* ── performance table ── */}
+                <div style={card}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                        <i className="fas fa-table" style={{ color: '#6e45e2', fontSize: '1rem' }}></i>
+                        <h3 style={{ margin: 0, color: '#2d3436', fontSize: '1.05rem', fontWeight: '800' }}>Student performance table</h3>
+                    </div>
+                    <p style={{ color: '#888', fontSize: '0.83rem', margin: '0 0 20px 0' }}>Every student's score per activity, sorted best to worst.</p>
+                    {allCw.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '30px', color: '#aaa' }}><i className="fas fa-tasks" style={{ fontSize: '2rem', marginBottom: '10px', display: 'block' }}></i>No activities posted yet.</div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '500px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid #f0f2f5' }}>
+                                        <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '0.8rem', color: '#888', fontWeight: '700', textTransform: 'uppercase', width: '180px' }}>Student</th>
+                                        {allCw.map(cw => (
+                                            <th key={cw.id} style={{ textAlign: 'center', padding: '10px 8px', fontSize: '0.75rem', color: '#888', fontWeight: '700', maxWidth: '90px' }}>
+                                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85px' }} title={cw.title}>{cw.title.length > 12 ? cw.title.slice(0, 11) + '…' : cw.title}</div>
+                                                <div style={{ fontSize: '0.65rem', color: cw.assessmentType === 'time_attack' ? '#f39c12' : '#e74c3c', fontWeight: '600', marginTop: '2px' }}>{cw.assessmentType === 'time_attack' ? 'Time Attack' : 'Quiz'}</div>
+                                            </th>
+                                        ))}
+                                        <th style={{ textAlign: 'center', padding: '10px 12px', fontSize: '0.8rem', color: '#6e45e2', fontWeight: '700', textTransform: 'uppercase' }}>Avg</th>
+                                        <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '0.8rem', color: '#888', fontWeight: '700', textTransform: 'uppercase' }}>Weak areas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {studentData.map(({ student, actScores, avg, weakTopics }, si) => {
+                                        const name = student.fullname || student.username;
+                                        const isAtRisk = avg !== null && avg < 50;
+                                        const topWeakTopics = weakTopics.slice(0, 2);
+                                        return (
+                                            <tr key={student.id} style={{ borderBottom: '1px solid #f0f2f5', background: si % 2 === 0 ? '#fff' : '#fafafa', transition: 'background 0.15s' }}
+                                                onMouseEnter={e => e.currentTarget.style.background = '#f3f0ff22'}
+                                                onMouseLeave={e => e.currentTarget.style.background = si % 2 === 0 ? '#fff' : '#fafafa'}>
+                                                <td style={{ padding: '12px 12px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: student.avatarUrl ? 'transparent' : '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.85rem', fontWeight: '700', flexShrink: 0, backgroundImage: student.avatarUrl ? `url('${student.avatarUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                                                            {!student.avatarUrl && name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>{name}</div>
+                                                            {isAtRisk && <div style={{ fontSize: '0.65rem', color: '#e74c3c', fontWeight: '700' }}>⚠ At risk</div>}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                {actScores.map((sc, ci) => (
+                                                    <td key={ci} style={{ textAlign: 'center', padding: '12px 8px' }}>
+                                                        {sc ? (
+                                                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                                                <span style={{ fontSize: '0.88rem', fontWeight: '800', color: scoreColor(sc.pct) }}>{sc.score}/{sc.total}</span>
+                                                                <div style={{ width: '36px', height: '5px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden' }}>
+                                                                    <div style={{ height: '100%', width: `${sc.pct}%`, background: scoreColor(sc.pct), borderRadius: '99px' }}></div>
+                                                                </div>
+                                                            </div>
+                                                        ) : <span style={{ fontSize: '0.82rem', color: '#ccc', fontWeight: '600' }}>—</span>}
+                                                    </td>
+                                                ))}
+                                                <td style={{ textAlign: 'center', padding: '12px 12px' }}>
+                                                    {avg !== null
+                                                        ? <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#fff', background: scoreColor(avg), padding: '4px 10px', borderRadius: '20px', display: 'inline-block' }}>{avg}%</span>
+                                                        : <span style={{ color: '#ccc', fontSize: '0.85rem' }}>—</span>}
+                                                </td>
+                                                <td style={{ padding: '12px 12px', maxWidth: '200px' }}>
+                                                    {topWeakTopics.length > 0 ? (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                            {topWeakTopics.map((w, wi) => (
+                                                                <span key={wi} title={`${w.activity}: ${w.question}`} style={{ fontSize: '0.7rem', background: '#fff0f0', color: '#c0392b', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '20px', fontWeight: '600', cursor: 'default', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                                                                    {w.question.length > 28 ? w.question.slice(0, 27) + '…' : w.question}
+                                                                </span>
+                                                            ))}
+                                                            {weakTopics.length > 2 && <span style={{ fontSize: '0.7rem', background: '#f0f2f5', color: '#888', padding: '3px 8px', borderRadius: '20px', fontWeight: '600' }}>+{weakTopics.length - 2} more</span>}
+                                                        </div>
+                                                    ) : avg !== null
+                                                        ? <span style={{ fontSize: '0.78rem', color: '#1dd1a1', fontWeight: '700' }}>✓ No weak areas</span>
+                                                        : <span style={{ fontSize: '0.78rem', color: '#ccc' }}>No submissions</span>}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* ── student weak-topic breakdown (collapsible) ── */}
+                <div style={card}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                        <i className="fas fa-user-graduate" style={{ color: '#4facfe', fontSize: '1rem' }}></i>
+                        <h3 style={{ margin: 0, color: '#2d3436', fontSize: '1.05rem', fontWeight: '800' }}>Student weak-topic breakdown</h3>
+                    </div>
+                    <p style={{ color: '#888', fontSize: '0.83rem', margin: '0 0 20px 0' }}>Tap any student to expand the full list of questions they got wrong.</p>
+
+                    {studentData.filter(s => s.weakTopics.length > 0).length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '30px', color: '#aaa' }}>
+                            <i className="fas fa-check-circle" style={{ fontSize: '2.5rem', marginBottom: '10px', display: 'block', color: '#1dd1a1' }}></i>
+                            <p style={{ fontWeight: '600' }}>No weak areas found — all students answered every question correctly!</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {studentData.filter(s => s.weakTopics.length > 0).map(({ student, avg, weakTopics }) => {
+                                const name = student.fullname || student.username;
+                                const isOpen = expandedWeakStudents.has(student.id);
+                                const isAtRisk = avg !== null && avg < 50;
+                                return (
+                                    <div key={student.id} style={{ border: `1px solid ${isAtRisk ? '#fecaca' : '#eee'}`, borderRadius: '12px', overflow: 'hidden', transition: 'box-shadow 0.2s' }}>
+
+                                        {/* ── clickable header row ── */}
+                                        <div
+                                            onClick={() => toggleWeakStudent(student.id)}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 16px', background: isOpen ? '#f3f0ff' : isAtRisk ? '#fff8f8' : '#f8f9fa', cursor: 'pointer', transition: 'background 0.2s', borderBottom: isOpen ? '1px solid #e8e0ff' : 'none', userSelect: 'none' }}
+                                            onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = '#f0eeff'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.background = isOpen ? '#f3f0ff' : isAtRisk ? '#fff8f8' : '#f8f9fa'; }}>
+
+                                            {/* avatar */}
+                                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: student.avatarUrl ? 'transparent' : '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.9rem', fontWeight: '700', flexShrink: 0, backgroundImage: student.avatarUrl ? `url('${student.avatarUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                                                {!student.avatarUrl && name.charAt(0).toUpperCase()}
+                                            </div>
+
+                                            {/* name + at-risk badge */}
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontWeight: '700', color: isOpen ? '#6e45e2' : '#2d3436', fontSize: '0.95rem', transition: 'color 0.2s' }}>{name}</div>
+                                                {isAtRisk && <div style={{ fontSize: '0.65rem', color: '#e74c3c', fontWeight: '700', marginTop: '1px' }}>⚠ At risk</div>}
+                                            </div>
+
+                                            {/* avg pill */}
+                                            {avg !== null && (
+                                                <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#fff', background: avg >= 70 ? '#1dd1a1' : avg >= 50 ? '#f39c12' : '#e74c3c', padding: '3px 11px', borderRadius: '20px', flexShrink: 0 }}>{avg}% avg</span>
+                                            )}
+
+                                            {/* weak count pill */}
+                                            <span style={{ fontSize: '0.75rem', color: '#e74c3c', background: '#fff0f0', border: '1px solid #fecaca', padding: '3px 10px', borderRadius: '20px', fontWeight: '700', flexShrink: 0 }}>
+                                                {weakTopics.length} weak item{weakTopics.length !== 1 ? 's' : ''}
+                                            </span>
+
+                                            {/* chevron */}
+                                            <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isOpen ? '#6e45e2' : '#eee', color: isOpen ? '#fff' : '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s', fontSize: '0.8rem' }}>
+                                                <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'}`}></i>
+                                            </div>
+                                        </div>
+
+                                        {/* ── collapsible body ── */}
+                                        {isOpen && (
+                                            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff', animation: 'fadeIn 0.2s ease' }}>
+                                                {weakTopics.map((w, wi) => (
+                                                    <div key={wi} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 13px', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '9px' }}>
+                                                        <i className="fas fa-times-circle" style={{ color: '#e74c3c', marginTop: '2px', flexShrink: 0, fontSize: '0.9rem' }}></i>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ fontSize: '0.87rem', color: '#2d3436', fontWeight: '600', lineHeight: '1.5' }}>{w.question}</div>
+                                                            <div style={{ fontSize: '0.73rem', color: '#888', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                <i className="fas fa-book" style={{ fontSize: '0.65rem' }}></i> {w.activity}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── most-missed questions (collapsible) ── */}
+                {hardestQuestions.length > 0 && (
+                    <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+
+                        {/* clickable header */}
+                        <div
+                            onClick={() => setIsMostMissedOpen(o => !o)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', background: isMostMissedOpen ? '#fff5f5' : '#f8f9fa', cursor: 'pointer', transition: 'background 0.2s', borderBottom: isMostMissedOpen ? '1px solid #fecaca' : 'none', userSelect: 'none' }}
+                            onMouseEnter={e => { if (!isMostMissedOpen) e.currentTarget.style.background = '#feefef'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = isMostMissedOpen ? '#fff5f5' : '#f8f9fa'; }}>
+
+                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: isMostMissedOpen ? '#e74c3c' : '#fff0f0', color: isMostMissedOpen ? '#fff' : '#e74c3c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0, transition: 'all 0.2s' }}>
+                                <i className="fas fa-fire"></i>
+                            </div>
+
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: '800', color: isMostMissedOpen ? '#c0392b' : '#2d3436', fontSize: '1.02rem', transition: 'color 0.2s' }}>Most-missed questions</div>
+                                <div style={{ fontSize: '0.78rem', color: '#888', marginTop: '2px' }}>{hardestQuestions.length} question{hardestQuestions.length !== 1 ? 's' : ''} flagged across all quizzes</div>
+                            </div>
+
+                            <span style={{ fontSize: '0.75rem', color: '#e74c3c', background: '#fff0f0', border: '1px solid #fecaca', padding: '3px 10px', borderRadius: '20px', fontWeight: '700', flexShrink: 0 }}>
+                                {hardestQuestions.length} item{hardestQuestions.length !== 1 ? 's' : ''}
+                            </span>
+
+                            <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: isMostMissedOpen ? '#e74c3c' : '#eee', color: isMostMissedOpen ? '#fff' : '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s', fontSize: '0.8rem' }}>
+                                <i className={`fas fa-chevron-${isMostMissedOpen ? 'up' : 'down'}`}></i>
+                            </div>
+                        </div>
+
+                        {/* collapsible body */}
+                        {isMostMissedOpen && (
+                            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px', background: '#fff', animation: 'fadeIn 0.2s ease' }}>
+                                <p style={{ color: '#888', fontSize: '0.83rem', margin: '0 0 6px 0' }}>Questions with the highest wrong-answer rate — prioritise these in your next lesson.</p>
+                                {hardestQuestions.map((q, i) => (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', background: q.missRate >= 70 ? '#fff5f5' : q.missRate >= 50 ? '#fffdf0' : '#f8f9fa', border: `1px solid ${q.missRate >= 70 ? '#fecaca' : q.missRate >= 50 ? '#fde68a' : '#eee'}`, borderRadius: '12px' }}>
+                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: scoreColor(100 - q.missRate), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem', flexShrink: 0 }}>{i + 1}</div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.9rem', marginBottom: '3px' }}>{q.question}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#888' }}>From: {q.activity} · {q.wrong}/{q.total} students missed it</div>
+                                        </div>
+                                        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', minWidth: '80px' }}>
+                                            <span style={{ fontSize: '0.88rem', fontWeight: '800', color: scoreColor(100 - q.missRate) }}>{q.missRate}% missed</span>
+                                            <div style={{ width: '80px', height: '6px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden' }}>
+                                                <div style={{ height: '100%', width: `${q.missRate}%`, background: scoreColor(100 - q.missRate), borderRadius: '99px' }}></div>
+                                            </div>
+                                            <span style={{ fontSize: '0.68rem', color: '#aaa', fontWeight: '600', textTransform: 'uppercase' }}>{diffLabel(100 - q.missRate)} topic</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+            </div>
+        );
+    };
+
     const renderMembers = () => {
         const filteredStudents = students.filter(s => (s.fullname || s.username).toLowerCase().includes(studentSearch.toLowerCase()));
         return (
@@ -706,6 +1337,7 @@ Example format:
                     <li className={activeTab === 'feed' ? 'active' : ''} onClick={() => setActiveTab('feed')}><i className="fas fa-layer-group"></i> <span>Feed</span></li>
                     <li className={activeTab === 'activities' ? 'active' : ''} onClick={() => setActiveTab('activities')}><i className="fas fa-tasks"></i> <span>Activities</span></li>
                     <li className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}><i className="fas fa-users"></i> <span>Members</span></li>
+                    <li className={activeTab === 'analysis' ? 'active' : ''} onClick={() => setActiveTab('analysis')}><i className="fas fa-microscope"></i> <span>Analysis</span></li>
                 </ul>
                 <div style={{ width: '130px' }}></div>
             </nav>
@@ -713,7 +1345,7 @@ Example format:
             <main className="room-container" style={{ position: 'relative', zIndex: 1, padding: '30px 20px 50px 20px', maxWidth: '1200px', margin: '0 auto' }}>
                 <div className="modern-room-header" style={{ background: roomColorPresets.find(c => c.id === (room.colorTheme || 'purple'))?.bg }}>
                     <div className="header-info">
-                        {activeTab === 'members' ? (<><h1>Class Members</h1><p>View who students are in this class here.</p></>) : activeTab === 'activities' ? (<><h1>Class Activities</h1><p>Assign a quiz or create a new activity here.</p></>) : (<><h1>{room.section}</h1><p>{room.grade}</p></>)}
+                        {activeTab === 'members' ? (<><h1>Class Members</h1><p>View who students are in this class here.</p></>) : activeTab === 'activities' ? (<><h1>Class Activities</h1><p>Assign a quiz or create a new activity here.</p></>) : activeTab === 'analysis' ? (<><h1>Item Analysis</h1><p>See every student's strengths, weaknesses, and gaps.</p></>) : (<><h1>{room.section}</h1><p>{room.grade}</p></>)}
                     </div>
                     {activeTab === 'feed' && (
                         <div className="header-actions">
@@ -724,7 +1356,7 @@ Example format:
                             </div>
                         </div>
                     )}
-                    <i className={`fas ${activeTab === 'members' ? 'fa-users' : activeTab === 'activities' ? 'fa-tasks' : 'fa-flask'}`} style={{ position: 'absolute', right: '-20px', bottom: '-40px', fontSize: '14rem', opacity: 0.1, transform: 'rotate(-15deg)' }}></i>
+                    <i className={`fas ${activeTab === 'members' ? 'fa-users' : activeTab === 'activities' ? 'fa-tasks' : activeTab === 'analysis' ? 'fa-microscope' : 'fa-flask'}`} style={{ position: 'absolute', right: '-20px', bottom: '-40px', fontSize: '14rem', opacity: 0.1, transform: 'rotate(-15deg)' }}></i>
                 </div>
 
                 <div className="modern-feed-container">
@@ -749,6 +1381,7 @@ Example format:
                     {activeTab === 'feed' && renderFeed()}
                     {activeTab === 'activities' && renderActivities()}
                     {activeTab === 'members' && renderMembers()}
+                    {activeTab === 'analysis' && renderAnalysis()}
                 </div>
             </main>
 

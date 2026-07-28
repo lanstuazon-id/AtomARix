@@ -883,6 +883,7 @@ export default function PeriodicTable() {
                                 <div className="element-model-box" style={{ width: '100%', maxWidth: '360px', height: '220px', margin: '0 auto 20px', backgroundColor: '#ffffff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e1e1e1', position: 'relative', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.05)' }}>
                                     <model-viewer
                                         src={`/assets/models/${selectedElement.name.toLowerCase()}.glb`}
+                                        ios-src={`/assets/models/${selectedElement.name.toLowerCase()}.usdz`}
                                         alt={`3D model of ${selectedElement.name}`}
                                         auto-rotate
                                         rotation-per-second="45deg"
@@ -940,7 +941,7 @@ export default function PeriodicTable() {
             <style>
             {`
                 .floating-background { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 0; overflow: hidden; }
-                .floating-item { position: absolute; color: #6e45e2; opacity: 0.08; bottom: -100px; animation: float-up infinite linear; }
+                .floating-item { position: absolute; color: var(--floating-icon-color); opacity: var(--floating-icon-opacity); bottom: -100px; animation: float-up infinite linear; }
                 @keyframes float-up { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(-120vh) rotate(360deg); } }
 
                 @media (min-width: 768px) {

@@ -590,8 +590,8 @@ export default function Login() {
                     }
                     .floating-item {
                         position: absolute;
-                        color: #6e45e2;
-                        opacity: 0.08;
+                        color: var(--floating-icon-color);
+                        opacity: var(--floating-icon-opacity);
                         bottom: -100px;
                         animation: float-up infinite linear;
                     }
