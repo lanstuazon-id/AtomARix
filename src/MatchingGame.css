@@ -223,3 +223,11 @@
     .card-back.medium-text { font-size: clamp(0.5rem, 1.8vh, 0.9rem); }
     .card-back.long-text { font-size: clamp(0.42rem, 1.5vh, 0.75rem); }
 }
+/* ── Dark mode overrides ── */
+[data-theme="dark"] .navbar { background: var(--navbar-bg) !important; box-shadow: var(--navbar-shadow) !important; }
+[data-theme="dark"] .nav-links { background: var(--bottom-nav-bg) !important; border-color: var(--bottom-nav-border) !important; }
+[data-theme="dark"] body { background: var(--bg-page) !important; }
+[data-theme="dark"] .stats { color: var(--text-primary) !important; }
+[data-theme="dark"] .card-back { background: var(--bg-card) !important; border-color: var(--border-default) !important; color: var(--text-primary) !important; }
+[data-theme="dark"] .card.matched .card-back { background: var(--color-success-bg) !important; border-color: var(--color-success) !important; color: var(--color-success) !important; }
+[data-theme="dark"] .btn-restart { background: var(--bg-card) !important; color: var(--accent-purple) !important; border-color: var(--accent-purple) !important; }

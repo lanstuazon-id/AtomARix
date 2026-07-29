@@ -1,0 +1,201 @@
+/* ============================================================
+   theme.css — Atomarix shared design tokens
+   Import this once in App.jsx. All other CSS files use
+   var(--token) instead of hardcoded hex values.
+   ============================================================ */
+
+/* ── Light mode (default) ── */
+:root {
+    /* Page & surfaces */
+    --bg-page:          #f8f9fa;
+    --bg-card:          #ffffff;
+    --bg-card-hover:    #fdfdff;
+    --bg-subtle:        #f0f2f5;
+    --bg-subtle-2:      #f8f9fa;
+    --bg-input:         #f8f9fa;
+    --bg-input-focus:   #ffffff;
+
+    /* Text */
+    --text-primary:     #2d3436;
+    --text-secondary:   #555555;
+    --text-muted:       #888888;
+    --text-faint:       #aaaaaa;
+    --text-label:       #7f8fa6;
+
+    /* Borders */
+    --border-default:   #eeeeee;
+    --border-input:     #dddddd;
+    --border-subtle:    #f0f0f0;
+    --border-medium:    #e1e1e1;
+
+    /* Brand / Accent */
+    --accent-purple:    #6e45e2;
+    --accent-purple-bg: #f3f0ff;
+    --accent-purple-border: #d7ccff;
+    --accent-blue:      #4facfe;
+    --accent-blue-bg:   #eaf4ff;
+
+    /* Semantic */
+    --color-success:    #1dd1a1;
+    --color-success-bg: #e3fdf5;
+    --color-danger:     #e74c3c;
+    --color-danger-bg:  #fff0f0;
+    --color-warning:    #f39c12;
+    --color-warning-bg: #fff7e0;
+
+    /* Navigation */
+    --navbar-bg:        rgba(255, 255, 255, 0.75);
+    --navbar-shadow:    0 2px 10px rgba(0,0,0,0.05);
+    --nav-link-hover-bg: #f0f2f5;
+    --nav-link-active-bg: #f3f0ff;
+    --nav-link-active-color: #6e45e2;
+    --nav-link-color:   #666666;
+
+    /* Mobile bottom nav */
+    --bottom-nav-bg:    rgba(255, 255, 255, 0.4);
+    --bottom-nav-border: rgba(255, 255, 255, 0.6);
+
+    /* Cards & shadows */
+    --card-shadow:      0 4px 15px rgba(0,0,0,0.03);
+    --card-shadow-hover: 0 10px 25px rgba(0,0,0,0.05);
+
+    /* Modals */
+    --modal-bg:         #ffffff;
+    --modal-overlay:    rgba(0,0,0,0.4);
+
+    /* Dropdowns & menus */
+    --dropdown-bg:      #ffffff;
+    --dropdown-border:  #eeeeee;
+    --dropdown-item-hover: #f0f2f5;
+
+    /* Inputs */
+    --input-bg:         #f9f9f9;
+    --input-border:     #dddddd;
+    --input-focus-border: #6e45e2;
+
+    /* Leaderboard */
+    --lb-gold-bg:       #fffcf0;
+    --lb-gold-border:   #f1c40f;
+    --lb-silver-bg:     #f8f9fa;
+    --lb-silver-border: #bdc3c7;
+    --lb-bronze-bg:     #fff5f0;
+    --lb-bronze-border: #e67e22;
+    --lb-current-bg:    #f8f6ff;
+
+    /* Floating icons (Achievements) */
+    --floating-icon-color:   #6e45e2;
+    --floating-icon-opacity: 0.05;
+
+    /* Skeleton shimmer */
+    --skeleton-base:    #f0f2f5;
+    --skeleton-shine:   #f8f9fa;
+
+    /* Misc */
+    --divider:          #f8f9fa;
+    --scrollbar-thumb:  #dcdde1;
+
+    /* Theme transition */
+    color-scheme: light;
+}
+
+/* ── Dark mode ── */
+[data-theme="dark"] {
+    /* Page & surfaces */
+    --bg-page:          #0f0f1a;
+    --bg-card:          #1a1a2e;
+    --bg-card-hover:    #1e1e35;
+    --bg-subtle:        #252540;
+    --bg-subtle-2:      #1e1e32;
+    --bg-input:         #252540;
+    --bg-input-focus:   #2d2d55;
+
+    /* Text */
+    --text-primary:     #e8eaf0;
+    --text-secondary:   #b0b8cc;
+    --text-muted:       #7a8299;
+    --text-faint:       #565e78;
+    --text-label:       #8892b0;
+
+    /* Borders */
+    --border-default:   #2d2d55;
+    --border-input:     #3a3a6a;
+    --border-subtle:    #252545;
+    --border-medium:    #33335a;
+
+    /* Brand / Accent — purple stays, just slightly lighter */
+    --accent-purple:    #8b6be8;
+    --accent-purple-bg: #1e1a3a;
+    --accent-purple-border: #4a3a8a;
+    --accent-blue:      #5db8ff;
+    --accent-blue-bg:   #0d1f35;
+
+    /* Semantic */
+    --color-success:    #1dd1a1;
+    --color-success-bg: #0a2e25;
+    --color-danger:     #ff6b6b;
+    --color-danger-bg:  #2e0f0f;
+    --color-warning:    #f39c12;
+    --color-warning-bg: #2e1f00;
+
+    /* Navigation */
+    --navbar-bg:        rgba(15, 15, 26, 0.85);
+    --navbar-shadow:    0 2px 10px rgba(0,0,0,0.3);
+    --nav-link-hover-bg: #252540;
+    --nav-link-active-bg: #1e1a3a;
+    --nav-link-active-color: #8b6be8;
+    --nav-link-color:   #8892b0;
+
+    /* Mobile bottom nav */
+    --bottom-nav-bg:    rgba(26, 26, 46, 0.7);
+    --bottom-nav-border: rgba(100, 100, 180, 0.3);
+
+    /* Cards & shadows */
+    --card-shadow:      0 4px 15px rgba(0,0,0,0.2);
+    --card-shadow-hover: 0 10px 25px rgba(0,0,0,0.35);
+
+    /* Modals */
+    --modal-bg:         #1a1a2e;
+    --modal-overlay:    rgba(0,0,0,0.7);
+
+    /* Dropdowns & menus */
+    --dropdown-bg:      #1e1e38;
+    --dropdown-border:  #2d2d55;
+    --dropdown-item-hover: #252545;
+
+    /* Inputs */
+    --input-bg:         #252540;
+    --input-border:     #3a3a6a;
+    --input-focus-border: #8b6be8;
+
+    /* Leaderboard */
+    --lb-gold-bg:       #2a2200;
+    --lb-gold-border:   #8a6e00;
+    --lb-silver-bg:     #1e1e30;
+    --lb-silver-border: #6a6a80;
+    --lb-bronze-bg:     #2a1800;
+    --lb-bronze-border: #8a4e12;
+    --lb-current-bg:    #1a1530;
+
+    /* Floating icons */
+    --floating-icon-color:   #8b6be8;
+    --floating-icon-opacity: 0.07;
+
+    /* Skeleton shimmer */
+    --skeleton-base:    #252540;
+    --skeleton-shine:   #2d2d55;
+
+    /* Misc */
+    --divider:          #252540;
+    --scrollbar-thumb:  #3a3a6a;
+
+    color-scheme: dark;
+}
+
+/* ── Smooth theme transition on everything except images ── */
+*:not(img):not(svg):not(canvas) {
+    transition:
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.25s ease,
+        box-shadow 0.25s ease;
+}

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './PeriodicTable.css';
+import { ThemeContext } from './App.jsx';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -17,7 +18,7 @@ export const elementData = {
     "Ne": { n: 10, name: "Neon", cat: "noble-gas", x: 18, y: 2, mass: "20.180", config: "[He] 2s² 2p⁶", fact: "Neon is used in bright advertising signs.", period: 2, summary: "Neon is a noble gas that does not react easily with other elements. It glows brightly when electricity passes through it, which is why it is used in neon signs. It is also used in lighting and advertising. Neon is rare in the atmosphere. It was discovered in 1898." },
     "Na": { n: 11, name: "Sodium", cat: "alkali-metal", x: 1, y: 3, mass: "22.990", config: "[Ne] 3s¹", fact: "Sodium is a metal so soft you can cut it with a butter knife, and it explodes in water!", period: 3, summary: "Sodium is a soft metal that reacts strongly with water. It is commonly found in table salt when combined with chlorine. Sodium is important for nerve signals and fluid balance in the body. It must be stored in oil because it reacts quickly with air and water. It was discovered in 1807." },
     "Mg": { n: 12, name: "Magnesium", cat: "alkaline-earth", x: 2, y: 3, mass: "24.305", config: "[Ne] 3s²", fact: "Magnesium is used in flares and pyrotechnics.", period: 3, summary: "Magnesium is a light metal that burns with a bright white flame. It is used in fireworks, flares, and lightweight alloys. It is also important for human health, especially for muscles and bones. Magnesium is found in many foods like nuts and vegetables. It was discovered in 1755." },
-    "Al": { n: 13, name: "Aluminium", cat: "post-transition", x: 13, y: 3, mass: "26.982", config: "[Ne] 3s² 3p¹", fact: "Aluminum is the most abundant metal in Earth's crust.", period: 3, summary: "Aluminum is a lightweight and corrosion-resistant metal. It is widely used in packaging, transportation, and construction. It does not rust easily, making it very useful. Aluminum is also recyclable and environmentally friendly. It was discovered in 1825." },
+    "Al": { n: 13, name: "Aluminum", cat: "post-transition", x: 13, y: 3, mass: "26.982", config: "[Ne] 3s² 3p¹", fact: "Aluminum is the most abundant metal in Earth's crust.", period: 3, summary: "Aluminum is a lightweight and corrosion-resistant metal. It is widely used in packaging, transportation, and construction. It does not rust easily, making it very useful. Aluminum is also recyclable and environmentally friendly. It was discovered in 1825." },
     "Si": { n: 14, name: "Silicon", cat: "metalloid", x: 14, y: 3, mass: "28.085", config: "[Ne] 3s² 3p²", fact: "Silicon is a key component in computer chips.", period: 3, summary: "Silicon is a very important element in technology. It is used to make computer chips and electronic devices. It is also found in sand and glass. Silicon helps in making solar panels for energy. It was discovered in 1824." },
     "P": { n: 15, name: "Phosphorus", cat: "nonmetal", x: 15, y: 3, mass: "30.974", config: "[Ne] 3s² 3p³", fact: "Phosphorus is essential for life.", period: 3, summary: "Phosphorus is an element that can glow in the dark. It is used in fertilizers to help plants grow. It is also found in DNA and is important for life. Some forms of phosphorus are very reactive and must be handled carefully. It was discovered in 1669." },
     "S": { n: 16, name: "Sulfur", cat: "nonmetal", x: 16, y: 3, mass: "32.06", config: "[Ne] 3s² 3p⁴", fact: "Sulfur is used in gunpowder and matches.", period: 3, summary: "Sulfur is a yellow solid that has been known since ancient times. It is used in making chemicals like sulfuric acid. It is also used in rubber and medicines. Sulfur has a strong smell when burned. It has been known since ancient times." },
@@ -272,7 +273,9 @@ const playPuzzleSound = (audio) => {
 
 export default function PeriodicTable() {
     const navigate = useNavigate();
+    const { isDark } = useContext(ThemeContext);
     const location = useLocation();
+    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
     const storageKey = `learnedElements_${currentUser}`;
     const puzzleCategoriesKey = `puzzleCategoriesCompleted_${currentUser}`; // array of category ids completed at least once

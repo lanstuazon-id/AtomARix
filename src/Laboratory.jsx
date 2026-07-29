@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Laboratory.css';
+import { ThemeContext } from './App.jsx';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -188,7 +189,9 @@ const playLabSound = (audio) => {
 
 export default function Laboratory() {
     const navigate = useNavigate();
+    const { isDark } = useContext(ThemeContext);
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
+    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const discoveredCompoundsKey = `discoveredCompounds_${currentUser}`;
 
     // State

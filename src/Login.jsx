@@ -21,6 +21,7 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
+    const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
     // Token state — tracks whether the token came from a URL invite link
     const [tokenFromUrl, setTokenFromUrl] = useState(false);
@@ -131,10 +132,27 @@ export default function Login() {
                 reviewedBy: null,
                 tokenGenerated: null,
             });
+
+            // ── TODO: EmailJS admin notification ──────────────────────────────
+            // Once your Atomarix Gmail + EmailJS is active, add this block:
+            //
+            // import emailjs from '@emailjs/browser';
+            // await emailjs.send(
+            //     'YOUR_SERVICE_ID',
+            //     'YOUR_ADMIN_NOTIFY_TEMPLATE_ID',   // admin notification template
+            //     {
+            //         from_name:  requestFullName.trim(),
+            //         from_email: requestEmail.trim(),
+            //         admin_url:  `${window.location.origin}/admin/tokens`,
+            //     },
+            //     'YOUR_PUBLIC_KEY'
+            // );
+            // ─────────────────────────────────────────────────────────────────
+
             setRequestSubmitted(true);
         } catch (err) {
             console.error('Failed to submit access request:', err);
-            setModal({ show: true, title: 'Something Went Wrong', message: 'Could not submit your request. Please try again.', type: 'error' });
+            setModal({ show: true, title: 'Something went wrong', message: 'Could not submit your request. Please try again.', type: 'error' });
         }
         setIsSubmittingRequest(false);
     };
@@ -328,26 +346,65 @@ export default function Login() {
     // ─── Form field renderer ──────────────────────────────────────────────────
     const renderFormFields = () => {
         const roleSelectorJSX = (
-            <div className="input-group">
+            <div className="input-group" style={{ position: 'relative' }}>
                 <label>I am a:</label>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-                    <button
-                        type="button"
-                        onClick={() => setRole('student')}
-                        style={{ flex: 1, padding: '12px', border: role === 'student' ? '2px solid #4facfe' : '1px solid #e1e1e1', backgroundColor: role === 'student' ? '#eaf4ff' : '#f8f9fa', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', color: role === 'student' ? '#4facfe' : '#666', transition: 'all 0.2s' }}
-                    >
-                        <i className="fas fa-user-graduate" style={{ marginRight: '8px' }}></i> Student
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setRole('teacher')}
-                        // Lock role selector if token came from an invite URL
-                        disabled={tokenFromUrl}
-                        style={{ flex: 1, padding: '12px', border: role === 'teacher' ? '2px solid #6e45e2' : '1px solid #e1e1e1', backgroundColor: role === 'teacher' ? '#f3f0ff' : '#f8f9fa', borderRadius: '10px', cursor: tokenFromUrl ? 'default' : 'pointer', fontWeight: '600', color: role === 'teacher' ? '#6e45e2' : '#666', transition: 'all 0.2s' }}
-                    >
-                        <i className="fas fa-chalkboard-teacher" style={{ marginRight: '8px' }}></i> Teacher
-                    </button>
+
+                {/* ── Trigger ── */}
+                <div
+                    onClick={() => !tokenFromUrl && setRoleDropdownOpen(o => !o)}
+                    style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '12px 16px', marginTop: '5px',
+                        border: roleDropdownOpen ? '2px solid #4facfe' : '1px solid #e1e1e1',
+                        borderRadius: '10px', background: '#f8f9fa',
+                        cursor: tokenFromUrl ? 'default' : 'pointer',
+                        transition: 'border-color 0.2s', userSelect: 'none',
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0, background: role === 'student' ? '#eaf4ff' : '#f3f0ff', color: role === 'student' ? '#4facfe' : '#6e45e2' }}>
+                            <i className={`fas ${role === 'student' ? 'fa-user-graduate' : 'fa-chalkboard-teacher'}`}></i>
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.95rem', lineHeight: 1 }}>{role === 'student' ? 'Student' : 'Teacher'}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#888', marginTop: '3px' }}>{role === 'student' ? 'Learn the elements and more' : 'Create and manage classrooms'}</div>
+                        </div>
+                    </div>
+                    {!tokenFromUrl && (
+                        <i className="fas fa-chevron-down" style={{ color: '#aaa', fontSize: '0.8rem', transition: 'transform 0.2s', transform: roleDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}></i>
+                    )}
                 </div>
+
+                {/* ── Dropdown menu ── */}
+                {roleDropdownOpen && !tokenFromUrl && (
+                    <>
+                        {/* Invisible backdrop to close on outside click */}
+                        <div onClick={() => setRoleDropdownOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }}></div>
+                        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid #e1e1e1', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.10)', zIndex: 20, overflow: 'hidden' }}>
+                            {[
+                                { value: 'student', icon: 'fa-user-graduate',      label: 'Student', sub: 'Learn the elements and more',        color: '#4facfe', bg: '#eaf4ff' },
+                                { value: 'teacher', icon: 'fa-chalkboard-teacher', label: 'Teacher', sub: 'Create and manage classrooms',     color: '#6e45e2', bg: '#f3f0ff' },
+                            ].map(opt => (
+                                <div
+                                    key={opt.value}
+                                    onClick={() => { setRole(opt.value); resetFormFields(); setRoleDropdownOpen(false); }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', cursor: 'pointer', background: role === opt.value ? (opt.value === 'student' ? '#f0f8ff' : '#f5f0ff') : '#fff', borderBottom: '1px solid #f0f2f5', transition: 'background 0.15s' }}
+                                    onMouseEnter={e => { if (role !== opt.value) e.currentTarget.style.background = '#f8f9fa'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = role === opt.value ? (opt.value === 'student' ? '#f0f8ff' : '#f5f0ff') : '#fff'; }}>
+                                    <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: opt.bg, color: opt.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
+                                        <i className={`fas ${opt.icon}`}></i>
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.92rem' }}>{opt.label}</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#888', marginTop: '2px' }}>{opt.sub}</div>
+                                    </div>
+                                    {role === opt.value && (
+                                        <i className="fas fa-check-circle" style={{ color: opt.color, fontSize: '1rem', flexShrink: 0 }}></i>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
         );
 

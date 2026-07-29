@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './MatchingGame.css';
+import { ThemeContext } from './App.jsx';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -35,7 +36,9 @@ const sndErrorAudio = new Audio('/assets/audio/error.mp3');
 
 export default function MatchingGame() {
     const navigate = useNavigate();
+    const { isDark } = useContext(ThemeContext);
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
+    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const instructionsKey = `matchingGameInstructionsSeen_${currentUser}`;
     const bestScoreKey = `matchingGameBestScore_${currentUser}`;
 

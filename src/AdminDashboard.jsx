@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import {
     collection, getDocs, doc, setDoc, updateDoc, deleteDoc,
-    orderBy, query, getCountFromServer
+    orderBy, query, onSnapshot
 } from 'firebase/firestore';
-import { getApp } from 'firebase/app';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -308,36 +306,88 @@ function Users({ users, loading, onRefresh }) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function PendingRequests() {
-    const [requests, setRequests] = useState([]);
+    const [requests, setRequests]     = useState([]);
     const [loadingList, setLoadingList] = useState(true);
-    const [processingId, setProcessingId] = useState(null); // request currently being approved/rejected
+    const [processingId, setProcessingId] = useState(null);
     const [expiryDays, setExpiryDays] = useState(7);
+    // After approving, show the generated token + mailto for that request
+    const [approvedResult, setApprovedResult] = useState(null); // { requestId, token, link, email, name }
+    const [copied, setCopied] = useState('');
 
-    useEffect(() => { fetchRequests(); }, []);
-
-    const fetchRequests = async () => {
-        setLoadingList(true);
-        try {
-            const q = query(collection(db, 'teacherRequests'), orderBy('requestedAt', 'desc'));
-            const snap = await getDocs(q);
+    // ── Real-time listener — updates the list the instant a teacher submits ──
+    useEffect(() => {
+        const q = query(collection(db, 'teacherRequests'), orderBy('requestedAt', 'desc'));
+        const unsub = onSnapshot(q, (snap) => {
             setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (err) { console.error(err); }
-        setLoadingList(false);
+            setLoadingList(false);
+        }, (err) => {
+            console.error('PendingRequests listener error:', err);
+            setLoadingList(false);
+        });
+        return () => unsub();
+    }, []);
+
+    const copyText = (text, label) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(label);
+            setTimeout(() => setCopied(''), 2000);
+        });
     };
 
-    // Calls the approveTeacherRequest Cloud Function — it generates the
-    // token AND sends the email itself in one atomic server-side step, so
-    // there's no separate "now go click send" action left for the admin.
+    // ── Approve: generate token in Firestore, update request status ───────────
+    // No Cloud Function needed — everything happens client-side.
+    // When EmailJS is ready, add the send call right after the Firestore writes.
     const handleApprove = async (request) => {
-        const confirmed = window.confirm(`Approve ${request.fullName} (${request.email})? A token will be generated and emailed to them automatically.`);
+        const confirmed = window.confirm(
+            `Approve ${request.fullName} (${request.email})?\n\nA token will be generated. You'll see a copy button and mailto link to send it to them.`
+        );
         if (!confirmed) return;
 
         setProcessingId(request.id);
         try {
-            const functions = getFunctions(getApp());
-            const approveTeacherRequest = httpsCallable(functions, 'approveTeacherRequest');
-            await approveTeacherRequest({ requestId: request.id, expiryDays });
-            await fetchRequests();
+            const token = generateToken();
+            const link  = `${window.location.origin}/register?token=${token}`;
+            const expiresAt = new Date(Date.now() + expiryDays * 86400000).toISOString();
+
+            // 1. Write the token to teacherInvites so Login.jsx can validate it
+            await setDoc(doc(db, 'teacherInvites', token), {
+                used: false,
+                createdAt: new Date().toISOString(),
+                expiresAt,
+                createdBy: 'admin',
+                forEmail: request.email,
+                forName: request.fullName,
+            });
+
+            // 2. Mark the request as approved
+            await updateDoc(doc(db, 'teacherRequests', request.id), {
+                status: 'approved',
+                reviewedAt: new Date().toISOString(),
+                reviewedBy: 'admin',
+                tokenGenerated: token,
+            });
+
+            // ── TODO: EmailJS ─────────────────────────────────────────────────
+            // Once your Gmail + EmailJS is set up, add this block here:
+            //
+            // import emailjs from '@emailjs/browser';
+            // await emailjs.send(
+            //     'YOUR_SERVICE_ID',
+            //     'YOUR_APPROVAL_TEMPLATE_ID',   // teacher approval template
+            //     {
+            //         to_name:     request.fullName,
+            //         to_email:    request.email,
+            //         token:       token,
+            //         invite_link: link,
+            //         expiry_days: expiryDays,
+            //     },
+            //     'YOUR_PUBLIC_KEY'
+            // );
+            // ─────────────────────────────────────────────────────────────────
+
+            // Show the copy UI for this approval
+            setApprovedResult({ requestId: request.id, token, link, email: request.email, name: request.fullName, expiryDays });
+
         } catch (err) {
             console.error('Failed to approve request:', err);
             alert(`Error approving request: ${err.message || 'Please try again.'}`);
@@ -356,7 +406,6 @@ function PendingRequests() {
                 reviewedAt: new Date().toISOString(),
                 reviewedBy: 'admin',
             });
-            await fetchRequests();
         } catch (err) {
             console.error('Failed to reject request:', err);
             alert('Error rejecting request. Check Firestore permissions.');
@@ -364,19 +413,97 @@ function PendingRequests() {
         setProcessingId(null);
     };
 
-    const pendingRequests = requests.filter(r => r.status === 'pending');
+    const pendingRequests  = requests.filter(r => r.status === 'pending');
     const reviewedRequests = requests.filter(r => r.status !== 'pending');
+
+    // Pre-build mailto for the approved result
+    const buildMailto = (result) => {
+        if (!result) return '';
+        const expiryDate = new Date(Date.now() + result.expiryDays * 86400000)
+            .toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+        const body = [
+            `Hi ${result.name},`,
+            '',
+            'Your teacher access request for AtomARix has been approved!',
+            '',
+            `Your invite token: ${result.token}`,
+            `Or use this direct link: ${result.link}`,
+            '',
+            `This token expires on: ${expiryDate}`,
+            '',
+            'Go to the AtomARix registration page, select Teacher, and enter your token to create your account.',
+            '',
+            'Welcome aboard!'
+        ].join('\n');
+        return `mailto:${result.email}?subject=${encodeURIComponent('Your AtomARix Teacher Invite Token')}&body=${encodeURIComponent(body)}`;
+    };
 
     return (
         <>
             <div style={S.pageTitle}>Pending Requests</div>
-            <div style={S.pageSub}>Review teachers requesting access — approving sends them a token by email automatically</div>
+            <div style={S.pageSub}>Review teachers requesting access — approving generates a token you can copy or email directly</div>
 
-            <div style={S.card}>
-                <div style={S.cardHead}>
-                    <div>
-                        <div style={S.cardTitle}>New token expires after</div>
+            {/* ── Post-approval token panel ── */}
+            {approvedResult && (
+                <div style={{ ...S.card, border: `1px solid ${C.purpleBorder}`, background: C.purpleLight, marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                        <div>
+                            <div style={{ fontSize: '15px', fontWeight: '700', color: C.dark }}>
+                                ✅ Approved — {approvedResult.name}
+                            </div>
+                            <div style={{ fontSize: '13px', color: C.muted, marginTop: '3px' }}>
+                                Send this token to <strong>{approvedResult.email}</strong>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setApprovedResult(null)}
+                            style={{ background: 'none', border: 'none', fontSize: '18px', color: C.muted, cursor: 'pointer', lineHeight: 1 }}
+                        >×</button>
                     </div>
+
+                    {/* Token display */}
+                    <div style={{ background: C.white, border: `1px solid ${C.purpleBorder}`, borderRadius: '10px', padding: '14px 18px', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: C.purple, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Token</div>
+                        <div style={{ fontSize: '22px', fontWeight: '800', fontFamily: 'monospace', color: C.dark, letterSpacing: '0.08em' }}>{approvedResult.token}</div>
+                    </div>
+
+                    {/* Invite link */}
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: C.purple, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Invite Link</div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div style={S.linkBox}>{approvedResult.link}</div>
+                            <button style={S.btnOutline} onClick={() => copyText(approvedResult.link, 'link')}>
+                                {copied === 'link' ? '✓ Copied!' : 'Copy Link'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Copy token + mailto */}
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <button
+                            style={{ ...S.btnOutline, fontSize: '13px' }}
+                            onClick={() => copyText(approvedResult.token, 'token')}
+                        >
+                            {copied === 'token' ? '✓ Token Copied!' : '📋 Copy Token'}
+                        </button>
+                        <a
+                            href={buildMailto(approvedResult)}
+                            style={{ ...S.btn, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                        >
+                            ✉️ Open Email to {approvedResult.name}
+                        </a>
+                    </div>
+                    <div style={{ fontSize: '12px', color: C.muted, marginTop: '8px' }}>
+                        Opens your email app with the token pre-filled — just hit Send.
+                        {' '}Once EmailJS is set up, this will send automatically.
+                    </div>
+                </div>
+            )}
+
+            {/* ── Expiry picker ── */}
+            <div style={{ ...S.card, marginBottom: '20px' }}>
+                <div style={S.cardHead}>
+                    <div style={S.cardTitle}>New token expires after</div>
                 </div>
                 <select style={S.select} value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value))}>
                     <option value={1}>1 day</option>
@@ -390,13 +517,15 @@ function PendingRequests() {
                 </div>
             </div>
 
+            {/* ── Awaiting review ── */}
             <div style={S.card}>
                 <div style={S.cardHead}>
                     <div>
                         <div style={S.cardTitle}>Awaiting Review</div>
-                        <div style={{ fontSize: '13px', color: C.muted }}>{pendingRequests.length} pending</div>
+                        <div style={{ fontSize: '13px', color: C.muted }}>
+                            {pendingRequests.length} pending — updates in real time
+                        </div>
                     </div>
-                    <button onClick={fetchRequests} style={{ ...S.btnOutline, fontSize: '12px' }}>↻ Refresh</button>
                 </div>
 
                 {loadingList ? (
@@ -416,7 +545,7 @@ function PendingRequests() {
                                     <button
                                         onClick={() => handleReject(r)}
                                         disabled={processingId === r.id}
-                                        style={{ padding: '8px 16px', borderRadius: '9px', border: `1px solid #e53e3e`, background: 'white', color: '#e53e3e', fontWeight: '700', fontSize: '13px', cursor: processingId === r.id ? 'not-allowed' : 'pointer', opacity: processingId === r.id ? 0.6 : 1 }}
+                                        style={{ padding: '8px 16px', borderRadius: '9px', border: `1px solid ${C.red}`, background: 'white', color: C.red, fontWeight: '700', fontSize: '13px', cursor: processingId === r.id ? 'not-allowed' : 'pointer', opacity: processingId === r.id ? 0.6 : 1 }}
                                     >
                                         Reject
                                     </button>
@@ -425,7 +554,7 @@ function PendingRequests() {
                                         disabled={processingId === r.id}
                                         style={{ ...S.btn, padding: '8px 16px', fontSize: '13px', cursor: processingId === r.id ? 'not-allowed' : 'pointer', opacity: processingId === r.id ? 0.6 : 1 }}
                                     >
-                                        {processingId === r.id ? 'Approving...' : '✓ Approve & Send'}
+                                        {processingId === r.id ? 'Approving...' : '✓ Approve & Generate Token'}
                                     </button>
                                 </div>
                             </div>
@@ -434,6 +563,7 @@ function PendingRequests() {
                 )}
             </div>
 
+            {/* ── Reviewed history ── */}
             {reviewedRequests.length > 0 && (
                 <div style={S.card}>
                     <div style={S.cardHead}>
@@ -446,6 +576,7 @@ function PendingRequests() {
                                     <th style={S.th}>Name</th>
                                     <th style={S.th}>Email</th>
                                     <th style={S.th}>Status</th>
+                                    <th style={S.th}>Token</th>
                                     <th style={S.th}>Reviewed</th>
                                 </tr>
                             </thead>
@@ -458,6 +589,12 @@ function PendingRequests() {
                                             <span style={S.badge(r.status === 'approved' ? 'active' : 'inactive')}>
                                                 {r.status === 'approved' ? 'Approved' : 'Rejected'}
                                             </span>
+                                        </td>
+                                        <td style={S.td}>
+                                            {r.tokenGenerated
+                                                ? <span style={S.mono}>{r.tokenGenerated}</span>
+                                                : <span style={{ color: C.muted }}>—</span>
+                                            }
                                         </td>
                                         <td style={S.td}>{formatDate(r.reviewedAt)}</td>
                                     </tr>
@@ -733,9 +870,22 @@ export default function AdminDashboard() {
     const [stats, setStats]   = useState({ students: 0, teachers: 0, activeTokens: 0, usedTokens: 0 });
     const [loadingUsers, setLoadingUsers] = useState(true);
     const [loadingStats, setLoadingStats] = useState(true);
+    const [pendingCount, setPendingCount] = useState(0);
 
     useEffect(() => {
         fetchAll();
+
+        // ── Real-time pending request count for sidebar badge ──────────────────
+        // onSnapshot fires immediately on mount and again whenever any
+        // teacherRequests document changes, so the badge updates the instant
+        // a teacher submits — no refresh needed.
+        const q = query(collection(db, 'teacherRequests'), orderBy('requestedAt', 'desc'));
+        const unsub = onSnapshot(q, (snap) => {
+            const count = snap.docs.filter(d => d.data().status === 'pending').length;
+            setPendingCount(count);
+        }, (err) => console.error('pendingCount listener error:', err));
+
+        return () => unsub();
     }, []);
 
     const fetchAll = async () => {
@@ -790,7 +940,12 @@ export default function AdminDashboard() {
                             onClick={() => setPage(item.id)}
                         >
                             <span style={S.navIcon}>{item.icon}</span>
-                            {item.label}
+                            <span style={{ flex: 1 }}>{item.label}</span>
+                            {item.id === 'requests' && pendingCount > 0 && (
+                                <span style={{ background: '#e74c3c', color: '#fff', fontSize: '11px', fontWeight: '800', padding: '2px 7px', borderRadius: '20px', minWidth: '20px', textAlign: 'center' }}>
+                                    {pendingCount}
+                                </span>
+                            )}
                         </div>
                     ))}
                 </nav>

@@ -295,3 +295,24 @@
     .toggle-container { width: 100%; flex-wrap: nowrap; overflow-x: auto; }
     .toggle-container button { flex: 1; justify-content: center; }
 }
+/* ── Dark mode overrides ── */
+[data-theme="dark"] .navbar { background: var(--navbar-bg) !important; box-shadow: var(--navbar-shadow) !important; }
+[data-theme="dark"] .nav-links { background: var(--bottom-nav-bg) !important; border-color: var(--bottom-nav-border) !important; }
+[data-theme="dark"] .dashboard-container,
+[data-theme="dark"] body { background: var(--bg-page); }
+[data-theme="dark"] .room-card { background: var(--bg-card) !important; border-color: var(--border-default) !important; }
+[data-theme="dark"] .room-card h3,
+[data-theme="dark"] .room-card p { color: var(--text-primary) !important; }
+[data-theme="dark"] .room-card span { color: var(--text-muted) !important; }
+[data-theme="dark"] .modal-content { background: var(--modal-bg) !important; border-color: var(--border-default) !important; }
+[data-theme="dark"] .modal-content h2,
+[data-theme="dark"] .modal-content p,
+[data-theme="dark"] .modal-content label { color: var(--text-primary) !important; }
+[data-theme="dark"] .input-group input,
+[data-theme="dark"] .input-group select,
+[data-theme="dark"] .input-group textarea { background: var(--input-bg) !important; border-color: var(--border-input) !important; color: var(--text-primary) !important; }
+[data-theme="dark"] .btn-cancel { background: var(--bg-subtle) !important; color: var(--text-primary) !important; }
+[data-theme="dark"] .dropdown-menu { background: var(--dropdown-bg) !important; border-color: var(--dropdown-border) !important; }
+[data-theme="dark"] .dropdown-item { color: var(--text-primary) !important; }
+[data-theme="dark"] .dropdown-item:hover { background: var(--dropdown-item-hover) !important; }
+[data-theme="dark"] .close-modal { background: var(--bg-subtle) !important; color: var(--text-muted) !important; }

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Achievements.css';
+import { ThemeContext } from './App.jsx';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -20,7 +21,9 @@ const getLevel = (xp) => {
 
 export default function Achievements() {
     const navigate = useNavigate();
+    const { isDark } = useContext(ThemeContext);
     
+    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const [stats, setStats] = useState({
         learned: 0,
         compounds: 0,

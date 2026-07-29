@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './TimeAttack.css';
+import { ThemeContext } from './App.jsx';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -39,7 +40,9 @@ const elements = [
 
 export default function TimeAttack() {
     const navigate = useNavigate();
+    const { isDark } = useContext(ThemeContext);
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
+    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const containerRef = useRef(null);
     const highScoreKey = `timeAttackBestCorrect_${currentUser}`;
     const srsKey = `timeAttackSRS_${currentUser}`;

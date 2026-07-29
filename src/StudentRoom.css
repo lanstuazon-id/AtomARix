@@ -114,3 +114,14 @@
     .class-banner h1 { font-size: 2rem; }
     .content-layout { grid-template-columns: 1fr; }
 }
+/* ── Dark mode overrides ── */
+[data-theme="dark"] .navbar { background: var(--navbar-bg) !important; box-shadow: var(--navbar-shadow) !important; }
+[data-theme="dark"] .nav-links { background: var(--bottom-nav-bg) !important; border-color: var(--bottom-nav-border) !important; }
+[data-theme="dark"] .side-panel .info-box,
+[data-theme="dark"] .post-card { background: var(--bg-card) !important; border-color: var(--border-default) !important; }
+[data-theme="dark"] .post-content h4,
+[data-theme="dark"] .info-box h3 { color: var(--text-primary) !important; }
+[data-theme="dark"] .post-content p,
+[data-theme="dark"] .info-box p { color: var(--text-secondary) !important; }
+[data-theme="dark"] .post-content span { color: var(--text-muted) !important; }
+[data-theme="dark"] .btn-leave-room { border-color: var(--color-danger) !important; color: var(--color-danger) !important; }
