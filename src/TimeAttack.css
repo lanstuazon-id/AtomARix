@@ -22,11 +22,11 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
-    background: white;
+    background: #ffffff;
     padding: 15px 25px;
     border-radius: 16px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-    border: 1px solid #f0f0f0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    border: 1px solid #eeeeee;
 }
 
 .stats-container { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
@@ -53,11 +53,11 @@
 
 
 .game-area {
-    background: white;
+    background: #ffffff;
     padding: 25px;
     border-radius: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-    border: 1px solid #f0f0f0;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+    border: 1px solid #eeeeee;
     text-align: center;
     min-height: 40vh;
     display: flex;
@@ -177,14 +177,4 @@
     }
     .nav-links li.active i { transform: scale(1.15); }
 }
-/* ── Dark mode overrides ── */
-[data-theme="dark"] .navbar { background: var(--navbar-bg) !important; box-shadow: var(--navbar-shadow) !important; }
-[data-theme="dark"] .nav-links { background: var(--bottom-nav-bg) !important; border-color: var(--bottom-nav-border) !important; }
-[data-theme="dark"] body { background: var(--bg-page) !important; }
-[data-theme="dark"] .game-header { background: var(--bg-card) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .stats { color: var(--text-primary) !important; }
-[data-theme="dark"] .game-area { background: var(--bg-card) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .question-box h2 { color: var(--text-primary) !important; }
-[data-theme="dark"] .question-box p { color: var(--text-muted) !important; }
-[data-theme="dark"] .option-btn { background: var(--bg-subtle) !important; border-color: var(--border-medium) !important; color: var(--text-primary) !important; }
-[data-theme="dark"] .btn-restart { background: var(--bg-card) !important; }
+/* ── Dark mode overrides removed ── */

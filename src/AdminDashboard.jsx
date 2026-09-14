@@ -4,6 +4,12 @@ import {
     collection, getDocs, doc, setDoc, updateDoc, deleteDoc,
     orderBy, query, onSnapshot
 } from 'firebase/firestore';
+import emailjs from '@emailjs/browser';
+
+// ── EmailJS credentials ───────────────────────────────────────────────────────
+const EJS_SERVICE           = 'service_vofm2hx';
+const EJS_APPROVAL_TEMPLATE = 'template_aqh4t0b';  
+const EJS_PUBLIC_KEY        = 'D6R6Iv2q_dahXJqDg';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -367,22 +373,28 @@ function PendingRequests() {
                 tokenGenerated: token,
             });
 
-            // ── TODO: EmailJS ─────────────────────────────────────────────────
-            // Once your Gmail + EmailJS is set up, add this block here:
-            //
-            // import emailjs from '@emailjs/browser';
-            // await emailjs.send(
-            //     'YOUR_SERVICE_ID',
-            //     'YOUR_APPROVAL_TEMPLATE_ID',   // teacher approval template
-            //     {
-            //         to_name:     request.fullName,
-            //         to_email:    request.email,
-            //         token:       token,
-            //         invite_link: link,
-            //         expiry_days: expiryDays,
-            //     },
-            //     'YOUR_PUBLIC_KEY'
-            // );
+            // ── EmailJS — send token to teacher ───────────────────────────────
+            try {
+                const params = {
+                    to_name:     request.fullName,
+                    to_email:    request.email,
+                    token:       token,
+                    invite_link: link,
+                    expiry_days: String(expiryDays),
+                };
+                console.log('EmailJS approval params:', params);
+                const result = await emailjs.send(
+                    EJS_SERVICE,
+                    EJS_APPROVAL_TEMPLATE,
+                    params,
+                    EJS_PUBLIC_KEY
+                );
+                console.log('EmailJS approval sent:', result.status, result.text);
+            } catch (ejsErr) {
+                console.error('EmailJS approval failed — status:', ejsErr.status);
+                console.error('EmailJS approval failed — text:', ejsErr.text);
+                console.error('EmailJS approval full error:', JSON.stringify(ejsErr));
+            }
             // ─────────────────────────────────────────────────────────────────
 
             // Show the copy UI for this approval
@@ -539,6 +551,11 @@ function PendingRequests() {
                                 <div>
                                     <div style={{ fontWeight: '700', color: C.dark, fontSize: '14px' }}>{r.fullName}</div>
                                     <div style={{ fontSize: '13px', color: C.muted }}>{r.email}</div>
+                                    {r.school && (
+                                        <div style={{ fontSize: '12px', color: C.muted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <i className="fas fa-school" style={{ fontSize: '11px', color: C.purple }}></i> {r.school}
+                                        </div>
+                                    )}
                                     <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Requested {formatDate(r.requestedAt)}</div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -575,6 +592,7 @@ function PendingRequests() {
                                 <tr>
                                     <th style={S.th}>Name</th>
                                     <th style={S.th}>Email</th>
+                                    <th style={S.th}>School</th>
                                     <th style={S.th}>Status</th>
                                     <th style={S.th}>Token</th>
                                     <th style={S.th}>Reviewed</th>
@@ -585,6 +603,7 @@ function PendingRequests() {
                                     <tr key={r.id}>
                                         <td style={S.td}>{r.fullName}</td>
                                         <td style={S.td}>{r.email}</td>
+                                        <td style={S.td}>{r.school || <span style={{ color: C.muted }}>—</span>}</td>
                                         <td style={S.td}>
                                             <span style={S.badge(r.status === 'approved' ? 'active' : 'inactive')}>
                                                 {r.status === 'approved' ? 'Approved' : 'Rejected'}

@@ -1,4 +1,39 @@
-/* --- Navigation --- */
+/* ── Design tokens — replaces theme.css dependency ─────────────────────────── */
+:root {
+    --bg-page:            #f8f9fa;
+    --bg-card:            #ffffff;
+    --bg-card-hover:      #fdfdff;
+    --bg-subtle:          #f0f2f5;
+    --bg-subtle-2:        #f8f9fa;
+    --text-primary:       #2d3436;
+    --text-secondary:     #555555;
+    --text-muted:         #888888;
+    --text-faint:         #aaaaaa;
+    --text-label:         #7f8fa6;
+    --border-default:     #eeeeee;
+    --border-subtle:      #f0f0f0;
+    --card-shadow:        0 4px 15px rgba(0,0,0,0.03);
+    --navbar-bg:          rgba(255, 255, 255, 0.75);
+    --navbar-shadow:      0 2px 10px rgba(0,0,0,0.05);
+    --nav-link-color:     #666666;
+    --nav-link-hover-bg:  #f0f2f5;
+    --nav-link-active-bg: #f3f0ff;
+    --nav-link-active-color: #6e45e2;
+    --divider:            #f8f9fa;
+    --floating-icon-color:   #6e45e2;
+    --floating-icon-opacity: 0.05;
+    --skeleton-base:      #f0f2f5;
+    --skeleton-shine:     #f8f9fa;
+    --lb-gold-bg:         #fffcf0;
+    --lb-gold-border:     #f1c40f;
+    --lb-silver-bg:       #f8f9fa;
+    --lb-silver-border:   #bdc3c7;
+    --lb-bronze-bg:       #fff5f0;
+    --lb-bronze-border:   #e67e22;
+    --lb-current-bg:      #f8f6ff;
+}
+
+
 .navbar {
     background: var(--navbar-bg);
     padding: 15px 50px;
@@ -254,6 +289,7 @@
 .score-icon-box.time-attack { background: #fff0f0; color: #ff6b6b; }
 .score-icon-box.matching { background: #eaf4ff; color: #4facfe; }
 .score-icon-box.recall { background: #f3f0ff; color: #6e45e2; }
+.score-icon-box.puzzle { background: #fff7e0; color: #f39c12; }
 
 .score-details { flex: 1 1 0%; text-align: left; min-width: 0; }
 
@@ -286,6 +322,10 @@
 .btn-play-game.recall { background: #f3f0ff; color: #6e45e2; }
 @media (hover: hover) {
     .btn-play-game.recall:hover { background: #6e45e2; color: white; transform: scale(1.05); }
+}
+.btn-play-game.puzzle { background: #fff7e0; color: #f39c12; }
+@media (hover: hover) {
+    .btn-play-game.puzzle:hover { background: #f39c12; color: white; transform: scale(1.05); }
 }
 
 /* --- Compounds Modal List --- */
@@ -808,58 +848,3 @@
     0% { background-position: 100% 0; }
     100% { background-position: -100% 0; }
 }
-/* ── Dark mode overrides ── */
-[data-theme="dark"] .navbar {
-    background: var(--navbar-bg) !important;
-    box-shadow: var(--navbar-shadow) !important;
-}
-[data-theme="dark"] .nav-links {
-    background: var(--bottom-nav-bg) !important;
-    border-color: var(--bottom-nav-border) !important;
-}
-[data-theme="dark"] .nav-right .dropdown-menu {
-    background: var(--bg-subtle) !important;
-}
-[data-theme="dark"] .nav-right .dropdown-item {
-    background: var(--bg-card) !important;
-    color: var(--text-primary) !important;
-}
-[data-theme="dark"] .mobile-sheet-header h3 { color: var(--text-primary) !important; }
-[data-theme="dark"] .btn-done { background: var(--bg-subtle) !important; color: var(--accent-blue) !important; }
-[data-theme="dark"] .mobile-user-info { background: var(--bg-card) !important; }
-[data-theme="dark"] .mobile-user-info h4 { color: var(--text-primary) !important; }
-[data-theme="dark"] .mobile-user-info p { color: var(--text-muted) !important; }
-[data-theme="dark"] .modal-content { background: var(--modal-bg) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .modal-container { background: var(--modal-overlay) !important; }
-[data-theme="dark"] .close-modal { background: var(--bg-subtle) !important; color: var(--text-muted) !important; }
-[data-theme="dark"] .user-menu-button { background: var(--bg-subtle) !important; }
-[data-theme="dark"] .profile-modal-header { background: var(--bg-subtle) !important; border-bottom-color: var(--border-default) !important; }
-[data-theme="dark"] .profile-modal-header h2 { color: var(--text-primary) !important; }
-[data-theme="dark"] .profile-modal-header p { color: var(--text-muted) !important; }
-[data-theme="dark"] .input-group input { background: var(--input-bg) !important; border-color: var(--border-input) !important; color: var(--text-primary) !important; }
-[data-theme="dark"] .input-group label { color: var(--text-secondary) !important; }
-[data-theme="dark"] .btn-cancel { background: var(--bg-subtle) !important; color: var(--text-primary) !important; }
-[data-theme="dark"] .class-code-input { background: var(--input-bg) !important; border-color: var(--border-input) !important; color: var(--text-primary) !important; }
-[data-theme="dark"] .leaderboard-card,
-[data-theme="dark"] .classroom-updates-card { background: var(--bg-card) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .leaderboard-header { border-bottom-color: var(--divider) !important; }
-[data-theme="dark"] .updates-header { border-bottom-color: var(--divider) !important; }
-[data-theme="dark"] .leaderboard-item { background: var(--bg-card-hover) !important; border-color: var(--border-default) !important; color: var(--text-primary) !important; }
-[data-theme="dark"] .recent-post-item { background: var(--bg-card-hover) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .recent-post-details h4 { color: var(--text-primary) !important; }
-[data-theme="dark"] .recent-post-details p { color: var(--text-secondary) !important; }
-[data-theme="dark"] .emoji-btn { background: var(--bg-subtle) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .emoji-btn.selected { background: var(--accent-purple-bg) !important; border-color: var(--accent-purple) !important; }
-[data-theme="dark"] .btn-upload-photo { background: var(--bg-subtle) !important; color: var(--text-primary) !important; }
-[data-theme="dark"] .profile-modal-content .close-modal { background: var(--bg-subtle) !important; }
-[data-theme="dark"] .compound-item { background: var(--bg-subtle-2) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .compound-details h4 { color: var(--text-primary) !important; }
-[data-theme="dark"] .compound-details p { color: var(--text-muted) !important; }
-[data-theme="dark"] .progress-stat-card,
-[data-theme="dark"] .score-stat-card { background: var(--bg-card) !important; border-color: var(--border-default) !important; }
-[data-theme="dark"] .stat-details span,
-[data-theme="dark"] .score-details span { color: var(--text-primary) !important; }
-[data-theme="dark"] .circular-progress-inner { background: var(--bg-card) !important; }
-[data-theme="dark"] .dashboard-section-header h2 { color: var(--text-primary) !important; }
-[data-theme="dark"] .dashboard-section-header p { color: var(--text-muted) !important; }
-[data-theme="dark"] [data-tooltip-left]::before { background: var(--bg-card) !important; color: var(--text-primary) !important; border-color: var(--border-default) !important; }

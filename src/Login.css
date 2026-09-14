@@ -4,6 +4,7 @@
     max-width: 100%;
     min-height: 100vh;
     overflow-x: hidden;
+    align-items: flex-start;
 }
 
 .left-panel {
@@ -16,6 +17,10 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .brand { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
@@ -53,10 +58,16 @@
     background: white;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
     padding: 40px;
+    height: 100vh;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
 }
+
+.right-panel > .toggle-container { margin-top: auto; }
+.right-panel > .form-card { margin-bottom: auto; }
 
 .toggle-container {
     background: #f0f2f5;
@@ -245,59 +256,96 @@
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* Mobile Adjustments */
+/* ── Mobile ───────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-    .container { 
-        flex-direction: column; 
+
+    /* Container stacks vertically, gradient covers the whole screen */
+    .container {
+        flex-direction: column;
+        align-items: stretch;
         background: linear-gradient(-45deg, #4facfe, #ee0979, #4facfe, #ee0979);
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
         min-height: 100vh;
         overflow-x: hidden;
+        overflow-y: auto;
     }
-    
-    .left-panel { 
-        padding: 40px 20px 50px 20px; 
+
+    /* Left panel — compact top section, no sticky, no fixed height */
+    .left-panel {
+        flex: none;
+        height: auto;
+        min-height: unset;
+        position: relative;
+        top: auto;
+        overflow-x: visible;
+        overflow-y: hidden;
         background: transparent;
         animation: none;
-        flex: none;
+        padding: 50px 24px 40px 24px;
     }
+
+    /* Hide floating background on mobile */
+    .left-panel .floating-background { display: none; }
+
     .brand { justify-content: center; }
-    .tagline { text-align: center; margin-bottom: 30px; font-size: 1rem; }
-    
-    .feature-list { 
-        display: flex; 
+    .brand h1 { font-size: 2rem; }
+    .logo-icon { font-size: 2.2rem; }
+    .tagline { text-align: center; margin-bottom: 24px; font-size: 0.95rem; }
+
+    /* Feature cards scroll horizontally */
+    .feature-list {
+        display: flex;
         flex-direction: row;
-        gap: 15px;
+        gap: 12px;
         width: 100vw;
-        padding: 0 20px 20px 20px;
-        margin-left: -20px;
+        padding: 0 24px 4px 24px;
+        margin-left: -24px;
+        overflow: visible;
         animation: mobileCarousel 12s infinite alternate ease-in-out;
     }
-    
-    .feature-item { min-width: 85vw; margin-bottom: 0; padding: 15px; align-items: flex-start;}
-    .feature-item h3 { font-size: 1.05rem; margin-bottom: 4px; }
-    .feature-item p { font-size: 0.85rem; }
-    .icon-box { min-width: 45px; height: 45px; font-size: 1.2rem; }
-    
-    .right-panel { 
-        flex: 1; 
-        padding: 40px 25px; 
-        border-radius: 30px 30px 0 0; /* Creates the rounded bottom sheet effect */
-        margin-top: -30px; /* Pulls the sheet up over the gradient */
-        z-index: 10;
-        box-shadow: 0 -10px 20px rgba(0,0,0,0.1);
-        justify-content: flex-start;
-    }
-    
-    .toggle-container { width: 100%; display: flex; }
-    .toggle-btn { flex: 1; text-align: center; padding: 12px 0; }
-    .form-card h2 { font-size: 1.8rem; }
+    .feature-item { min-width: 82vw; margin-bottom: 0; padding: 14px; align-items: flex-start; }
+    .feature-item h3 { font-size: 1rem; margin-bottom: 3px; }
+    .feature-item p { font-size: 0.83rem; }
+    .icon-box { min-width: 42px; height: 42px; font-size: 1.1rem; }
 
-    /* Automated Carousel Animation */
+    /* Right panel — white bottom sheet */
+    .right-panel {
+        flex: 1;
+        height: auto;
+        min-height: 100vh;
+        overflow-y: visible;
+        position: relative;
+        top: auto;
+        padding: 36px 24px 60px 24px;
+        border-radius: 28px 28px 0 0;
+        margin-top: -28px;
+        z-index: 10;
+        box-shadow: 0 -8px 24px rgba(0,0,0,0.12);
+        justify-content: flex-start;
+        align-items: stretch;
+    }
+
+    /* Reset desktop sticky margins */
+    .right-panel > .toggle-container { margin-top: 0; }
+    .right-panel > .form-card { margin-bottom: 0; }
+
+    .toggle-container { width: 100%; display: flex; }
+    .toggle-btn { flex: 1; text-align: center; padding: 11px 0; }
+    .form-card { width: 100%; max-width: 100%; }
+    .form-card h2 { font-size: 1.7rem; }
+    .form-card p { font-size: 0.9rem; }
+
+    /* font-size 16px prevents iOS auto-zoom on input focus */
+    .input-group input,
+    .input-group select { font-size: 16px; }
+
+    .login-submit { font-size: 1rem; padding: 15px; }
+    .auth-modal-content { width: 92%; padding: 30px 22px; }
+
     @keyframes mobileCarousel {
-        0%, 25% { transform: translateX(0); }
-        35%, 60% { transform: translateX(calc(-85vw - 15px)); }
-        70%, 100% { transform: translateX(calc(-170vw - 30px)); }
+        0%,  25% { transform: translateX(0); }
+        35%, 60% { transform: translateX(calc(-82vw - 12px)); }
+        70%,100% { transform: translateX(calc(-164vw - 24px)); }
     }
 }

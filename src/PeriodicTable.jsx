@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import './PeriodicTable.css';
-import { ThemeContext } from './App.jsx';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -273,9 +272,7 @@ const playPuzzleSound = (audio) => {
 
 export default function PeriodicTable() {
     const navigate = useNavigate();
-    const { isDark } = useContext(ThemeContext);
     const location = useLocation();
-    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
     const storageKey = `learnedElements_${currentUser}`;
     const puzzleCategoriesKey = `puzzleCategoriesCompleted_${currentUser}`; // array of category ids completed at least once
@@ -944,7 +941,7 @@ export default function PeriodicTable() {
             <style>
             {`
                 .floating-background { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 0; overflow: hidden; }
-                .floating-item { position: absolute; color: var(--floating-icon-color); opacity: var(--floating-icon-opacity); bottom: -100px; animation: float-up infinite linear; }
+                .floating-item { position: absolute; color: #6e45e2; opacity: 0.04; bottom: -100px; animation: float-up infinite linear; }
                 @keyframes float-up { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(-120vh) rotate(360deg); } }
 
                 @media (min-width: 768px) {

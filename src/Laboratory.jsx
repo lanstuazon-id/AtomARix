@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import './Laboratory.css';
-import { ThemeContext } from './App.jsx';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
 // group: 'nonmetal' | 'metal' | 'noble' | 'metalloid' | 'halogen' | 'alkali' | 'alkaline'
 const baseElements = [
-    { sym: 'H',  num: 1,  name: 'Hydrogen',   group: 'nonmetal'  },
+    { sym: 'H',  num: 1,  name: 'Hydrogen',   group: 'nonmetal'   },
     { sym: 'He', num: 2,  name: 'Helium',      group: 'noble'     },
     { sym: 'Li', num: 3,  name: 'Lithium',     group: 'alkali'    },
     { sym: 'C',  num: 6,  name: 'Carbon',      group: 'nonmetal'  },
@@ -82,6 +82,13 @@ export const recipes = {
 };
 
 export const getModelFilename = (name) => {
+    // Explicit overrides for compounds whose names don't map cleanly
+    // to a simple filename (roman numerals, special characters, etc.)
+    const overrides = {
+        'Iron(III) Oxide (Rust)': 'iron_oxide',
+        'Iron(III) Oxide':        'iron_oxide',
+    };
+    if (overrides[name]) return overrides[name];
     return name.split(' (')[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 };
 
@@ -189,9 +196,7 @@ const playLabSound = (audio) => {
 
 export default function Laboratory() {
     const navigate = useNavigate();
-    const { isDark } = useContext(ThemeContext);
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
-    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const discoveredCompoundsKey = `discoveredCompounds_${currentUser}`;
 
     // State
@@ -497,6 +502,11 @@ export default function Laboratory() {
     };
 
     const getModelFilename = (name) => {
+        const overrides = {
+            'Iron(III) Oxide (Rust)': 'iron_oxide',
+            'Iron(III) Oxide':        'iron_oxide',
+        };
+        if (overrides[name]) return overrides[name];
         return name.split(' (')[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     };
 
@@ -786,6 +796,7 @@ export default function Laboratory() {
     ];
 
     return (
+        <>
         <div style={{ background: '#f8faff', minHeight: '100vh', position: 'relative' }}>
             {/* Floating Chemistry Background */}
             <div className="floating-background">
@@ -949,28 +960,6 @@ export default function Laboratory() {
             </nav>
 
             <main className="dashboard-container" style={{ position: 'relative', zIndex: 1 }}>
-
-                {/* ── XP Toast ── */}
-                {xpToast && (
-                    <div style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 9999, background: 'linear-gradient(135deg, #6e45e2, #4facfe)', color: '#fff', padding: '12px 20px', borderRadius: '14px', fontWeight: '700', fontSize: '1rem', boxShadow: '0 8px 24px rgba(110,69,226,0.4)', animation: 'popIn 0.3s ease', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '1.3rem' }}>⭐</span>
-                        +{xpToast.amount} XP — {xpToast.label}
-                    </div>
-                )}
-
-                {/* ── Badge Toast ── */}
-                {badgeToast && (
-                    <div style={{ position: 'fixed', top: '140px', right: '20px', zIndex: 9999, background: '#fff', border: '2px solid #6e45e2', padding: '14px 20px', borderRadius: '16px', fontWeight: '700', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', animation: 'popIn 0.3s ease', maxWidth: '280px' }}>
-                        <div style={{ fontSize: '0.7rem', color: '#6e45e2', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>🏅 Badge Unlocked!</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '1.8rem' }}>{badgeToast.icon}</span>
-                            <div>
-                                <div style={{ color: '#1a1a2e', fontSize: '0.95rem' }}>{badgeToast.title}</div>
-                                <div style={{ color: '#888', fontSize: '0.75rem', fontWeight: '400' }}>{badgeToast.desc}</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* ── Hint modal ── */}
                 {showHint && (
@@ -1468,5 +1457,31 @@ export default function Laboratory() {
                 </div>
             )}
         </div>
+
+        {/* ── XP Toast — rendered via portal directly into document.body
+              so it's never clipped or blurred by any modal stacking context ── */}
+        {xpToast && ReactDOM.createPortal(
+            <div style={{ position: 'fixed', top: '80px', right: '20px', zIndex: 999999, background: 'linear-gradient(135deg, #6e45e2, #4facfe)', color: '#fff', padding: '12px 20px', borderRadius: '14px', fontWeight: '700', fontSize: '1rem', boxShadow: '0 8px 24px rgba(110,69,226,0.4)', animation: 'popIn 0.3s ease', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1.3rem' }}>⭐</span>
+                +{xpToast.amount} XP — {xpToast.label}
+            </div>,
+            document.body
+        )}
+
+        {/* ── Badge Toast — same portal approach ── */}
+        {badgeToast && ReactDOM.createPortal(
+            <div style={{ position: 'fixed', top: '140px', right: '20px', zIndex: 999999, background: '#fff', border: '2px solid #6e45e2', padding: '14px 20px', borderRadius: '16px', fontWeight: '700', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', animation: 'popIn 0.3s ease', maxWidth: '280px' }}>
+                <div style={{ fontSize: '0.7rem', color: '#6e45e2', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>🏅 Badge Unlocked!</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.8rem' }}>{badgeToast.icon}</span>
+                    <div>
+                        <div style={{ color: '#1a1a2e', fontSize: '0.95rem' }}>{badgeToast.title}</div>
+                        <div style={{ color: '#888', fontSize: '0.75rem', fontWeight: '400' }}>{badgeToast.desc}</div>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
+        </>
     );
 }

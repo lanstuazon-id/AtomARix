@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './StudentRoom.css';
-import { ThemeContext } from './App.jsx';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -30,9 +29,7 @@ const taElements = [
 export default function StudentRoom() {
     const { roomId } = useParams();
     const navigate = useNavigate();
-    const { isDark } = useContext(ThemeContext);
     const location = useLocation();
-    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const userName = sessionStorage.getItem('loggedInUser');
 
     const [room, setRoom] = useState(null);

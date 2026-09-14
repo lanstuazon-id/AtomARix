@@ -4,6 +4,7 @@ import './Login.css';
 import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
+import emailjs from '@emailjs/browser';
 
 export default function Login() {
     const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function Login() {
     const [fullname, setFullname] = useState('');
     const [role, setRole] = useState('student');
     const [teacherCode, setTeacherCode] = useState('');
+    const [teacherSchool, setTeacherSchool] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +33,7 @@ export default function Login() {
     const [showRequestAccess, setShowRequestAccess] = useState(false);
     const [requestFullName, setRequestFullName] = useState('');
     const [requestEmail, setRequestEmail] = useState('');
+    const [requestSchool, setRequestSchool] = useState('');
     const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
     const [requestSubmitted, setRequestSubmitted] = useState(false);
 
@@ -44,6 +47,8 @@ export default function Login() {
         setConfirmPassword('');
         setPasswordError('');
         setTeacherCode('');
+        setTeacherSchool('');
+        setRequestSchool('');
         setShowPassword(false);
         setShowConfirmPassword(false);
     };
@@ -59,15 +64,10 @@ export default function Login() {
             setRole('teacher');
         } else {
             const savedUser = localStorage.getItem('rememberedUser');
-            const savedRole = localStorage.getItem('rememberedRole');
             if (savedUser) {
-                if (savedRole === 'teacher') {
-                    setFullname(savedUser);
-                    setRole('teacher');
-                } else {
-                    setUsername(savedUser);
-                    setRole('student');
-                }
+                setUsername(savedUser);
+                const savedRole = localStorage.getItem('rememberedRole');
+                if (savedRole) setRole(savedRole);
                 setRememberMe(true);
             }
         }
@@ -111,8 +111,8 @@ export default function Login() {
     // to this address — nothing further is needed here once submitted.
     const submitAccessRequest = async (e) => {
         e.preventDefault();
-        if (!requestFullName.trim() || !requestEmail.trim()) {
-            setModal({ show: true, title: 'Missing Information', message: 'Please enter your full name and email address.', type: 'error' });
+        if (!requestFullName.trim() || !requestEmail.trim() || !requestSchool.trim()) {
+            setModal({ show: true, title: 'Missing Information', message: 'Please fill in all fields before submitting.', type: 'error' });
             return;
         }
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -125,7 +125,9 @@ export default function Login() {
         try {
             await addDoc(collection(db, 'teacherRequests'), {
                 fullName: requestFullName.trim(),
-                email: requestEmail.trim().toLowerCase(),
+                username: username.trim(),
+                school:   requestSchool.trim(),
+                email:    requestEmail.trim().toLowerCase(),
                 status: 'pending',
                 requestedAt: new Date().toISOString(),
                 reviewedAt: null,
@@ -133,20 +135,26 @@ export default function Login() {
                 tokenGenerated: null,
             });
 
-            // ── TODO: EmailJS admin notification ──────────────────────────────
-            // Once your Atomarix Gmail + EmailJS is active, add this block:
-            //
-            // import emailjs from '@emailjs/browser';
-            // await emailjs.send(
-            //     'YOUR_SERVICE_ID',
-            //     'YOUR_ADMIN_NOTIFY_TEMPLATE_ID',   // admin notification template
-            //     {
-            //         from_name:  requestFullName.trim(),
-            //         from_email: requestEmail.trim(),
-            //         admin_url:  `${window.location.origin}/admin/tokens`,
-            //     },
-            //     'YOUR_PUBLIC_KEY'
-            // );
+            // ── EmailJS — notify admin of new teacher request ─────────────────
+            try {
+                const ejsResult = await emailjs.send(
+                    'service_vofm2hx',
+                    'template_qbpqaca',
+                    {
+                        from_name:   requestFullName.trim(),
+                        from_email:  requestEmail.trim(),
+                        from_school: requestSchool.trim(),
+                        admin_url:   `${window.location.origin}/admin/tokens`,
+                    },
+                    'D6R6Iv2q_dahXJqDg'
+                );
+                console.log('EmailJS sent:', ejsResult.status, ejsResult.text);
+            } catch (ejsErr) {
+                // Email failed but request is already saved — admin can still
+                // see it on the dashboard. Log the full error for debugging.
+                console.error('EmailJS admin notify failed:', ejsErr);
+                console.error('EmailJS error details:', JSON.stringify(ejsErr));
+            }
             // ─────────────────────────────────────────────────────────────────
 
             setRequestSubmitted(true);
@@ -161,7 +169,10 @@ export default function Login() {
     const handleFormSubmit = async (e) => {
         e.preventDefault();
 
-        const actualUsername = (role === 'teacher' ? fullname : username).trim();
+        // For both students and teachers, the username field is now the login identifier.
+        // Teachers who registered before this change used their fullname as the username —
+        // they log in by typing their fullname in the username field, same as before.
+        const actualUsername = username.trim();
         // Create a dummy email for Firebase Auth since it requires an email format
         const authEmail = `${actualUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
 
@@ -224,6 +235,10 @@ export default function Login() {
 
             // Validate invite token for teacher registrations
             if (role === 'teacher') {
+                if (!username.trim()) {
+                    setModal({ show: true, title: 'Registration Failed', message: 'Please enter a username for your teacher account.', type: 'error' });
+                    return;
+                }
                 if (!teacherCode.trim()) {
                     setModal({ show: true, title: 'Registration Failed', message: 'Please enter your invite token. Ask your admin for one.', type: 'error' });
                     return;
@@ -245,9 +260,10 @@ export default function Login() {
 
                 const userRef = doc(db, "users", actualUsername);
                 await setDoc(userRef, {
-                    fullname: fullname,
+                    fullname: fullname.trim() || actualUsername,
                     username: actualUsername,
                     role: role,
+                    ...(role === 'teacher' && teacherSchool && { school: teacherSchool.trim() }),
                     createdAt: new Date().toISOString()
                 }, { merge: true });
 
@@ -422,24 +438,20 @@ export default function Login() {
         if (isLoginView) {
             return (
                 <>
-                    {roleSelectorJSX}
-                    {role === 'student' ? (
-                        <div className="input-group">
-                            <label htmlFor="username">Username</label>
-                            <div className="input-icon-wrapper">
-                                <input type="text" id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. atomarix123" required />
-                                {username && <i className="fas fa-times-circle clear-icon" onClick={() => setUsername('')} title="Clear"></i>}
-                            </div>
+                    <div className="input-group">
+                        <label htmlFor="username">Username</label>
+                        <div className="input-icon-wrapper">
+                            <input
+                                type="text"
+                                id="username"
+                                value={username}
+                                onChange={e => setUsername(e.target.value)}
+                                placeholder="Enter your username"
+                                required
+                            />
+                            {username && <i className="fas fa-times-circle clear-icon" onClick={() => setUsername('')} title="Clear"></i>}
                         </div>
-                    ) : (
-                        <div className="input-group">
-                            <label htmlFor="fullname">Full Name</label>
-                            <div className="input-icon-wrapper">
-                                <input type="text" id="fullname" value={fullname} onChange={e => setFullname(e.target.value)} placeholder="e.g. Atomarix User" required />
-                                {fullname && <i className="fas fa-times-circle clear-icon" onClick={() => setFullname('')} title="Clear"></i>}
-                            </div>
-                        </div>
-                    )}
+                    </div>
                     <div className="input-group">
                         <label htmlFor="password">Password</label>
                         <div className="password-wrapper">
@@ -447,9 +459,11 @@ export default function Login() {
                             <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} password-toggle-icon`} onClick={() => setShowPassword(!showPassword)}></i>
                         </div>
                     </div>
-                    <div className="remember-me">
-                        <input type="checkbox" id="rememberMe" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
-                        <label htmlFor="rememberMe" style={{ display: 'inline', margin: 0, fontWeight: 500, color: '#666' }}>Remember Me</label>
+                    <div className="remember-me" style={{ justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input type="checkbox" id="rememberMe" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
+                            <label htmlFor="rememberMe" style={{ display: 'inline', margin: 0, fontWeight: 500, color: '#666' }}>Remember Me</label>
+                        </div>
                     </div>
                 </>
             );
@@ -458,53 +472,119 @@ export default function Login() {
         // ── Registration fields ───────────────────────────────────────────────
         return (
             <>
-                <div className="input-group">
-                    <label htmlFor="fullname">Full Name</label>
-                    <div className="input-icon-wrapper">
-                        <input type="text" id="fullname" value={fullname} onChange={e => setFullname(e.target.value)} placeholder="e.g. Atomarix User" required />
-                        {fullname && <i className="fas fa-times-circle clear-icon" onClick={() => setFullname('')} title="Clear"></i>}
-                    </div>
-                </div>
+                {/* Role dropdown — always first */}
                 {roleSelectorJSX}
 
-                {/* Invite token field — shown only for teacher registration */}
+                {/* Student registration: full name + username */}
+                {role === 'student' && (
+                    <>
+                        <div className="input-group">
+                            <label htmlFor="fullname">Full Name</label>
+                            <div className="input-icon-wrapper">
+                                <input type="text" id="fullname" value={fullname} onChange={e => setFullname(e.target.value)} placeholder="e.g. Juan Dela Cruz" required />
+                                {fullname && <i className="fas fa-times-circle clear-icon" onClick={() => setFullname('')} title="Clear"></i>}
+                            </div>
+                        </div>
+                        <div className="input-group">
+                            <label htmlFor="username">Username</label>
+                            <div className="input-icon-wrapper">
+                                <input type="text" id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. juandelacruz123" required />
+                                {username && <i className="fas fa-times-circle clear-icon" onClick={() => setUsername('')} title="Clear"></i>}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* Teacher registration: full name + username */}
+                {role === 'teacher' && (
+                    <>
+                        <div className="input-group">
+                            <label htmlFor="fullname">Full Name</label>
+                            <div className="input-icon-wrapper">
+                                <input type="text" id="fullname" value={fullname} onChange={e => setFullname(e.target.value)} placeholder="e.g. Juan Dela Cruz" required />
+                                {fullname && <i className="fas fa-times-circle clear-icon" onClick={() => setFullname('')} title="Clear"></i>}
+                            </div>
+                        </div>
+                        <div className="input-group">
+                            <label htmlFor="username">Username</label>
+                            <div className="input-icon-wrapper">
+                                <input type="text" id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. juandelacruz123" required />
+                                {username && <i className="fas fa-times-circle clear-icon" onClick={() => setUsername('')} title="Clear"></i>}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* Invite token + school — shown only for teacher registration */}
                 {role === 'teacher' && !showRequestAccess && (
-                    <div className="input-group">
-                        <label htmlFor="teacherCode">
-                            Invite Token
-                            {tokenFromUrl && (
-                                <span style={{ marginLeft: '8px', fontSize: '12px', color: '#10ac84', fontWeight: 500 }}>
-                                    <i className="fas fa-check-circle" style={{ marginRight: '4px' }}></i>Token applied from invite link
-                                </span>
-                            )}
-                        </label>
-                        <div className="input-icon-wrapper">
-                            <input
-                                type="text"
-                                id="teacherCode"
-                                value={teacherCode}
-                                onChange={e => setTeacherCode(e.target.value)}
-                                placeholder="e.g. TK-A3F9X2"
-                                readOnly={tokenFromUrl}
-                                style={tokenFromUrl ? { backgroundColor: '#f0fff8', color: '#10ac84', cursor: 'default' } : {}}
-                                required
-                            />
-                            {!tokenFromUrl && teacherCode && (
-                                <i className="fas fa-times-circle clear-icon" onClick={() => setTeacherCode('')} title="Clear"></i>
+                    <>
+                        <div className="input-group">
+                            <label htmlFor="teacherSchool">School / Institution</label>
+                            <div className="input-icon-wrapper">
+                                <input
+                                    type="text"
+                                    id="teacherSchool"
+                                    value={teacherSchool}
+                                    onChange={e => setTeacherSchool(e.target.value)}
+                                    placeholder="e.g. Calasiao National High School"
+                                    required
+                                />
+                                {teacherSchool && <i className="fas fa-times-circle clear-icon" onClick={() => setTeacherSchool('')} title="Clear"></i>}
+                            </div>
+                        </div>
+                        <div className="input-group">
+                            <label htmlFor="teacherCode">
+                                Invite Token
+                                {tokenFromUrl && (
+                                    <span style={{ marginLeft: '8px', fontSize: '12px', color: '#10ac84', fontWeight: 500 }}>
+                                        <i className="fas fa-check-circle" style={{ marginRight: '4px' }}></i>Token applied from invite link
+                                    </span>
+                                )}
+                            </label>
+                            <div className="input-icon-wrapper">
+                                <input
+                                    type="text"
+                                    id="teacherCode"
+                                    value={teacherCode}
+                                    onChange={e => setTeacherCode(e.target.value)}
+                                    placeholder="e.g. TK-A3F9X2"
+                                    readOnly={tokenFromUrl}
+                                    style={tokenFromUrl ? { backgroundColor: '#f0fff8', color: '#10ac84', cursor: 'default' } : {}}
+                                    required
+                                />
+                                {!tokenFromUrl && teacherCode && (
+                                    <i className="fas fa-times-circle clear-icon" onClick={() => setTeacherCode('')} title="Clear"></i>
+                                )}
+                            </div>
+                            {!tokenFromUrl && (
+                                <small style={{ color: '#999', marginTop: '4px', display: 'block' }}>
+                                    Ask your admin for an invite token or link, or{' '}
+                                    <span
+                                        onClick={() => {
+                                            if (!fullname.trim()) {
+                                                setModal({ show: true, title: 'Fill in your details first', message: 'Please enter your Full Name before requesting a token.', type: 'error' });
+                                                return;
+                                            }
+                                            if (!username.trim()) {
+                                                setModal({ show: true, title: 'Fill in your details first', message: 'Please enter your Username before requesting a token.', type: 'error' });
+                                                return;
+                                            }
+                                            if (!teacherSchool.trim()) {
+                                                setModal({ show: true, title: 'Fill in your details first', message: 'Please enter your School / Institution before requesting a token.', type: 'error' });
+                                                return;
+                                            }
+                                            setRequestFullName(fullname.trim());
+                                            setRequestSchool(teacherSchool.trim());
+                                            setShowRequestAccess(true);
+                                        }}
+                                        style={{ color: '#4facfe', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                                    >
+                                        request one here
+                                    </span>.
+                                </small>
                             )}
                         </div>
-                        {!tokenFromUrl && (
-                            <small style={{ color: '#999', marginTop: '4px', display: 'block' }}>
-                                Ask your admin for an invite token or link, or{' '}
-                                <span
-                                    onClick={() => setShowRequestAccess(true)}
-                                    style={{ color: '#4facfe', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                                >
-                                    request one here
-                                </span>.
-                            </small>
-                        )}
-                    </div>
+                    </>
                 )}
 
                 {/* Request-access form — for a teacher with no token yet. Submits a
@@ -514,41 +594,70 @@ export default function Login() {
                     <div className="input-group" style={{ background: '#f8f9fa', padding: '20px', borderRadius: '12px', border: '1px solid #e1e1e1' }}>
                         {requestSubmitted ? (
                             <div style={{ textAlign: 'center', padding: '10px 0' }}>
-                                <i className="fas fa-paper-plane" style={{ fontSize: '2rem', color: '#10ac84', marginBottom: '12px', display: 'block' }}></i>
-                                <p style={{ color: '#2d3436', fontWeight: 600, marginBottom: '6px' }}>Request submitted!</p>
-                                <p style={{ color: '#666', fontSize: '0.88rem', margin: 0 }}>
-                                    Once an admin approves your request, you'll receive an invite token by email at <strong>{requestEmail}</strong>.
+                                <i className="fas fa-check-circle" style={{ fontSize: '2.5rem', color: '#1dd1a1', marginBottom: '12px', display: 'block' }}></i>
+                                <p style={{ color: '#2d3436', fontWeight: 700, marginBottom: '8px', fontSize: '1rem' }}>Request submitted!</p>
+                                <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '6px' }}>
+                                    Your request has been sent to the admin. Once approved, you'll receive an invite token at:
                                 </p>
-                                <span
-                                    onClick={() => { setShowRequestAccess(false); setRequestSubmitted(false); setRequestFullName(''); setRequestEmail(''); }}
-                                    style={{ display: 'inline-block', marginTop: '14px', color: '#4facfe', fontWeight: 600, cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline' }}
+                                <p style={{ color: '#4facfe', fontWeight: 600, fontSize: '0.88rem', marginBottom: '14px' }}>{requestEmail}</p>
+                                <p style={{ color: '#888', fontSize: '0.8rem', marginBottom: '16px' }}>
+                                    Come back here and enter your token in the <strong>Invite Token</strong> field to complete your registration.
+                                    Don't forget to check your <strong>spam or junk folder</strong> if you don't see it in your inbox.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowRequestAccess(false); setRequestSubmitted(false); setRequestFullName(''); setRequestEmail(''); setRequestSchool(''); }}
+                                    style={{ padding: '10px 24px', borderRadius: '50px', border: 'none', background: '#6e45e2', color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
                                 >
-                                    Back to login
-                                </span>
+                                    Back to Registration
+                                </button>
                             </div>
                         ) : (
                             <>
-                                <p style={{ color: '#2d3436', fontWeight: 600, marginBottom: '12px', fontSize: '0.95rem' }}>
+                                <p style={{ color: '#2d3436', fontWeight: 600, marginBottom: '6px', fontSize: '0.95rem' }}>
                                     <i className="fas fa-user-clock" style={{ marginRight: '6px', color: '#4facfe' }}></i>
                                     Request Teacher Access
                                 </p>
-                                <input
-                                    type="text"
-                                    value={requestFullName}
-                                    onChange={e => setRequestFullName(e.target.value)}
-                                    placeholder="Full name"
-                                    style={{ marginBottom: '10px' }}
-                                />
-                                <input
-                                    type="email"
-                                    value={requestEmail}
-                                    onChange={e => setRequestEmail(e.target.value)}
-                                    placeholder="Email address"
-                                />
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                                <p style={{ fontSize: '0.82rem', color: '#888', marginBottom: '14px' }}>
+                                    Your name and school are pre-filled. Just add your email so the admin can send your token.
+                                </p>
+
+                                {/* Full Name — read-only pre-filled */}
+                                <div style={{ marginBottom: '10px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 600, color: '#555', fontSize: '0.85rem' }}>Full Name</label>
+                                    <div style={{ padding: '11px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', fontSize: '0.95rem', color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <i className="fas fa-check-circle" style={{ color: '#1dd1a1', flexShrink: 0 }}></i>
+                                        {requestFullName}
+                                    </div>
+                                </div>
+
+                                {/* School — read-only pre-filled */}
+                                <div style={{ marginBottom: '10px' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 600, color: '#555', fontSize: '0.85rem' }}>School / Institution</label>
+                                    <div style={{ padding: '11px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', fontSize: '0.95rem', color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <i className="fas fa-check-circle" style={{ color: '#1dd1a1', flexShrink: 0 }}></i>
+                                        {requestSchool}
+                                    </div>
+                                </div>
+
+                                {/* Email — editable */}
+                                <div style={{ marginBottom: '0' }}>
+                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 600, color: '#555', fontSize: '0.85rem' }}>Email Address <span style={{ color: '#e74c3c' }}>*</span></label>
+                                    <input
+                                        type="email"
+                                        value={requestEmail}
+                                        onChange={e => setRequestEmail(e.target.value)}
+                                        placeholder="your@email.com"
+                                        style={{ width: '100%', padding: '11px 14px', border: '1px solid #e1e1e1', borderRadius: '10px', fontSize: '0.95rem', background: '#f8f9fa', outline: 'none', boxSizing: 'border-box' }}
+                                        required
+                                    />
+                                    <small style={{ color: '#999', marginTop: '4px', display: 'block' }}>Your token will be sent here once approved.</small>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                                     <button
                                         type="button"
-                                        onClick={() => setShowRequestAccess(false)}
+                                        onClick={() => { setShowRequestAccess(false); setRequestEmail(''); }}
                                         style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid #e1e1e1', background: 'white', color: '#666', fontWeight: 600, cursor: 'pointer' }}
                                     >
                                         Cancel
@@ -564,16 +673,6 @@ export default function Login() {
                                 </div>
                             </>
                         )}
-                    </div>
-                )}
-
-                {role === 'student' && (
-                    <div className="input-group">
-                        <label htmlFor="username">Username</label>
-                        <div className="input-icon-wrapper">
-                            <input type="text" id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. atomarix123" required />
-                            {username && <i className="fas fa-times-circle clear-icon" onClick={() => setUsername('')} title="Clear"></i>}
-                        </div>
                     </div>
                 )}
 
@@ -615,56 +714,57 @@ export default function Login() {
 
     return (
         <div className="container" style={{ position: 'relative' }}>
-            {/* Floating Chemistry Background */}
-            <div className="floating-background">
-                {floatingItems.map(item => (
-                    <div
-                        key={item.id}
-                        className="floating-item"
-                        style={{
-                            left: item.left,
-                            animationDuration: item.animDuration,
-                            animationDelay: item.delay,
-                            fontSize: item.size,
-                            fontWeight: item.fontWeight || 'normal'
-                        }}
-                    >
-                        {item.icon ? <i className={item.icon}></i> : item.text}
-                    </div>
-                ))}
-            </div>
-            <style>
-                {`
-                    .floating-background {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100vw;
-                        height: 100vh;
-                        pointer-events: none;
-                        z-index: 0;
-                        overflow: hidden;
-                    }
-                    .floating-item {
-                        position: absolute;
-                        color: var(--floating-icon-color);
-                        opacity: var(--floating-icon-opacity);
-                        bottom: -100px;
-                        animation: float-up infinite linear;
-                    }
-                    @keyframes float-up {
-                        0% { transform: translateY(0) rotate(0deg); }
-                        100% { transform: translateY(-120vh) rotate(360deg); }
-                    }
-                `}
-            </style>
-            <div className="left-panel" style={{ position: 'relative', zIndex: 1 }}>
+            <div className="left-panel">
+                {/* Floating Chemistry Background — scoped to left panel only */}
+                <div className="floating-background">
+                    {floatingItems.map(item => (
+                        <div
+                            key={item.id}
+                            className="floating-item"
+                            style={{
+                                left: item.left,
+                                animationDuration: item.animDuration,
+                                animationDelay: item.delay,
+                                fontSize: item.size,
+                                fontWeight: item.fontWeight || 'normal'
+                            }}
+                        >
+                            {item.icon ? <i className={item.icon}></i> : item.text}
+                        </div>
+                    ))}
+                </div>
+                <style>
+                    {`
+                        .floating-background {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            pointer-events: none;
+                            z-index: 0;
+                            overflow: hidden;
+                        }
+                        .floating-item {
+                            position: absolute;
+                            color: rgba(255,255,255,0.15);
+                            bottom: -100px;
+                            animation: float-up infinite linear;
+                        }
+                        @keyframes float-up {
+                            0% { transform: translateY(0) rotate(0deg); }
+                            100% { transform: translateY(-120%) rotate(360deg); }
+                        }
+                    `}
+                </style>
+                <div style={{ position: 'relative', zIndex: 1 }}>
                 <div className="brand"><i className="fas fa-atom logo-icon"></i><h1>AtomARix</h1></div>
                 <p className="tagline">Master the Periodic Table through Interactive Learning</p>
                 <div className="feature-list">
                     <div className="feature-item"><div className="icon-box"><i className="fas fa-flask"></i></div><div><h3>Interactive Elements</h3><p>Explore 118 elements with detailed information</p></div></div>
                     <div className="feature-item"><div className="icon-box"><i className="fas fa-bolt"></i></div><div><h3>Engaging Quizzes</h3><p>Test your knowledge with fun challenges</p></div></div>
                     <div className="feature-item"><div className="icon-box"><i className="fas fa-trophy"></i></div><div><h3>Achievements & Rewards</h3><p>Earn badges and compete on leaderboards</p></div></div>
+                </div>
                 </div>
             </div>
             <div className="right-panel" style={{ position: 'relative', zIndex: 1 }}>

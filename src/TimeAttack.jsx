@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './TimeAttack.css';
-import { ThemeContext } from './App.jsx';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -40,9 +39,7 @@ const elements = [
 
 export default function TimeAttack() {
     const navigate = useNavigate();
-    const { isDark } = useContext(ThemeContext);
     const currentUser = sessionStorage.getItem('loggedInUser') || 'Scientist';
-    useEffect(() => { document.body.style.background = isDark ? 'var(--bg-page)' : ''; }, [isDark]);
     const containerRef = useRef(null);
     const highScoreKey = `timeAttackBestCorrect_${currentUser}`;
     const srsKey = `timeAttackSRS_${currentUser}`;
@@ -312,7 +309,7 @@ export default function TimeAttack() {
     ];
 
     return (
-        <div ref={containerRef} style={{ position: 'relative', background: '#f8faff', minHeight: '100vh' }}>
+        <div ref={containerRef} style={{ position: 'relative', background: '#ffffff', minHeight: '100vh' }}>
             {/* Floating Chemistry Background */}
             <div className="floating-background">
                 {floatingItems.map(item => (
@@ -345,8 +342,8 @@ export default function TimeAttack() {
                     }
                     .floating-item {
                         position: absolute;
-                        color: var(--floating-icon-color);
-                        opacity: var(--floating-icon-opacity);
+                        color: #6e45e2;
+                        opacity: 0.04;
                         bottom: -100px;
                         animation: float-up infinite linear;
                     }

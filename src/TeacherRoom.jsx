@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './TeacherRoom.css';
-import { ThemeContext } from './App.jsx';
 import { doc, updateDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { getApp } from 'firebase/app';
@@ -20,7 +19,6 @@ const roomColorPresets = [
 export default function TeacherRoom() {
     const { roomId } = useParams();
     const navigate = useNavigate();
-    const { isDark } = useContext(ThemeContext);
 
     const [room, setRoom] = useState(null);
     const [activeTab, setActiveTab] = useState('feed');
@@ -418,7 +416,7 @@ Example format:
         const parts = text.split(/(\*\*.*?\*\*|https?:\/\/[^\s]+)/g);
         return parts.map((part, i) => {
             if (part.startsWith('**') && part.endsWith('**') && part.length >= 4)
-                return <strong key={i} style={{ color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{part.slice(2, -2)}</strong>;
+                return <strong key={i} style={{ color: '#888' }}>{part.slice(2, -2)}</strong>;
             if (/^https?:\/\//.test(part))
                 return <a key={i} href={part} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: '#4facfe', textDecoration: 'none', fontWeight: '600' }} onMouseEnter={e => e.target.style.textDecoration='underline'} onMouseLeave={e => e.target.style.textDecoration='none'}>{part}</a>;
             return <span key={i}>{part}</span>;
@@ -461,13 +459,13 @@ Example format:
                                     </div>
                                 </div>
                                 <span>Posted by {post.author} • {new Date(post.timestamp).toLocaleString()}</span>
-                                <p style={{ marginTop: '12px', color: isDark ? 'var(--text-primary)' : '#2d3436', lineHeight: '1.6', whiteSpace: 'pre-wrap', fontSize: '1.05rem', fontWeight: '500' }}>{renderTextWithFormatting(post.text)}</p>
+                                <p style={{ marginTop: '12px', color: '#2d3436', lineHeight: '1.6', whiteSpace: 'pre-wrap', fontSize: '1.05rem', fontWeight: '500' }}>{renderTextWithFormatting(post.text)}</p>
                                 {post.attachment && (
-                                    <div style={{ marginTop: '15px', padding: '10px 15px', background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setPreviewAttachment(post.attachment)}>
+                                    <div style={{ marginTop: '15px', padding: '10px 15px', background: 'white', border: '1px solid #eee', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setPreviewAttachment(post.attachment)}>
                                         <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', flexShrink: 0 }}><i className={`fas ${post.attachment.type.startsWith('image/') ? 'fa-image' : post.attachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`}></i></div>
                                         <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                                            <span style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', fontWeight: '600', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '300px' }}>{post.attachment.name}</span>
-                                            <span style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.8rem', textTransform: 'uppercase' }}>{post.attachment.type.startsWith('image/') ? 'Image' : post.attachment.type.includes('pdf') ? 'PDF Document' : 'Word Document'}</span>
+                                            <span style={{ color: '#2d3436', fontWeight: '600', fontSize: '0.95rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '300px' }}>{post.attachment.name}</span>
+                                            <span style={{ color: '#2d3436', fontSize: '0.8rem', textTransform: 'uppercase' }}>{post.attachment.type.startsWith('image/') ? 'Image' : post.attachment.type.includes('pdf') ? 'PDF Document' : 'Word Document'}</span>
                                         </div>
                                     </div>
                                 )}
@@ -614,12 +612,12 @@ Example format:
             });
         };
 
-        const card = { background: isDark ? 'var(--bg-card)' : 'white', border: `1px solid ${isDark ? 'var(--border-default)' : '#eee'}`, borderRadius: '16px', padding: '22px 24px', boxShadow: isDark ? '0 4px 15px rgba(0,0,0,0.2)' : '0 4px 15px rgba(0,0,0,0.03)' };
+        const card = { background: 'white', border: '1px solid #eee', borderRadius: '16px', padding: '22px 24px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' };
 
         if (students.length === 0) return (
             <div style={{ ...card, textAlign: 'center', padding: '60px 20px' }}>
                 <i className="fas fa-users" style={{ fontSize: '3rem', color: '#ddd', marginBottom: '16px', display: 'block' }}></i>
-                <h3 style={{ color: isDark ? 'var(--text-faint)' : '#aaa', fontWeight: '600' }}>No students have joined yet</h3>
+                <h3 style={{ color: '#2d3436', fontWeight: '600' }}>No students have joined yet</h3>
                 <p style={{ color: '#bbb', marginTop: '8px' }}>Item analysis will appear once students join and submit activities.</p>
             </div>
         );
@@ -631,11 +629,11 @@ Example format:
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
 
                     {/* Class Average */}
-                    <div onClick={() => setAnalysisModal({ type: 'avg' })} style={{ background: isDark ? 'var(--bg-card)' : 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                    <div onClick={() => setAnalysisModal({ type: 'avg' })} style={{ background: 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#6e45e2'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(110,69,226,0.12)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'; }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Class Average</span>
+                            <span style={{ fontSize: '0.75rem', color: '#2d3436', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Class Average</span>
                             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f3f0ff', color: '#6e45e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}><i className="fas fa-chart-line"></i></div>
                         </div>
                         <div style={{ fontSize: '2rem', fontWeight: '800', color: classAvg !== null ? (classAvg >= 70 ? '#1dd1a1' : classAvg >= 50 ? '#f39c12' : '#e74c3c') : '#ccc', lineHeight: 1 }}>
@@ -646,7 +644,7 @@ Example format:
                                 <div style={{ height: '6px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' }}>
                                     <div style={{ height: '100%', width: `${classAvg}%`, background: classAvg >= 70 ? '#1dd1a1' : classAvg >= 50 ? '#f39c12' : '#e74c3c', borderRadius: '99px', transition: 'width 0.6s ease' }}></div>
                                 </div>
-                                <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#888' }}>
                                     {classAvg >= 70 ? '✓ Class is performing well' : classAvg >= 50 ? '⚠ Needs some improvement' : '✗ Class needs attention'}
                                 </span>
                             </div>
@@ -655,22 +653,22 @@ Example format:
                     </div>
 
                     {/* Participation */}
-                    <div onClick={() => setAnalysisModal({ type: 'participation' })} style={{ background: isDark ? 'var(--bg-card)' : 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                    <div onClick={() => setAnalysisModal({ type: 'participation' })} style={{ background: 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#4facfe'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(79,172,254,0.12)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'; }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Participation</span>
+                            <span style={{ fontSize: '0.75rem', color: '#2d3436', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Participation</span>
                             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#eaf4ff', color: '#4facfe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}><i className="fas fa-users"></i></div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', lineHeight: 1 }}>
-                            <span style={{ fontSize: '2rem', fontWeight: '800', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{studentData.filter(s => s.submitted > 0).length}</span>
-                            <span style={{ fontSize: '1rem', color: isDark ? 'var(--text-faint)' : '#aaa', fontWeight: '600', marginBottom: '4px' }}>/ {students.length}</span>
+                            <span style={{ fontSize: '2rem', fontWeight: '800', color: '#888' }}>{studentData.filter(s => s.submitted > 0).length}</span>
+                            <span style={{ fontSize: '1rem', color: '#2d3436', fontWeight: '600', marginBottom: '4px' }}>/ {students.length}</span>
                         </div>
                         <div>
                             <div style={{ height: '6px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' }}>
                                 <div style={{ height: '100%', width: students.length > 0 ? `${Math.round((studentData.filter(s => s.submitted > 0).length / students.length) * 100)}%` : '0%', background: '#4facfe', borderRadius: '99px', transition: 'width 0.6s ease' }}></div>
                             </div>
-                            <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>students submitted at least one activity</span>
+                            <span style={{ fontSize: '0.75rem', color: '#888' }}>students submitted at least one activity</span>
                         </div>
                         <span style={{ fontSize: '0.72rem', color: '#4facfe', fontWeight: '600', marginTop: '2px' }}>Tap to see who submitted →</span>
                     </div>
@@ -685,7 +683,7 @@ Example format:
                         </div>
                         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', lineHeight: 1 }}>
                             <span style={{ fontSize: '2rem', fontWeight: '800', color: atRisk > 0 ? '#e74c3c' : '#1dd1a1' }}>{atRisk}</span>
-                            <span style={{ fontSize: '0.85rem', color: isDark ? 'var(--text-faint)' : '#aaa', fontWeight: '600', marginBottom: '4px' }}>student{atRisk !== 1 ? 's' : ''}</span>
+                            <span style={{ fontSize: '0.85rem', color: '#2d3436', fontWeight: '600', marginBottom: '4px' }}>student{atRisk !== 1 ? 's' : ''}</span>
                         </div>
                         <span style={{ fontSize: '0.75rem', color: atRisk > 0 ? '#e74c3c' : '#1dd1a1' }}>
                             {atRisk > 0 ? 'averaging below 50% — needs intervention' : '✓ No students at risk'}
@@ -694,11 +692,11 @@ Example format:
                     </div>
 
                     {/* Score Range */}
-                    <div onClick={() => setAnalysisModal({ type: 'range' })} style={{ background: isDark ? 'var(--bg-card)' : 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                    <div onClick={() => setAnalysisModal({ type: 'range' })} style={{ background: 'white', border: '1px solid #eee', borderRadius: '14px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#f39c12'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(243,156,18,0.12)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.03)'; }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score Range</span>
+                            <span style={{ fontSize: '0.75rem', color: '#2d3436', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score Range</span>
                             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fff7e0', color: '#f39c12', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}><i className="fas fa-arrows-alt-v"></i></div>
                         </div>
                         {(() => {
@@ -712,7 +710,7 @@ Example format:
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                 <i className="fas fa-arrow-up" style={{ fontSize: '0.7rem', color: '#1dd1a1' }}></i>
-                                                <span style={{ fontSize: '0.82rem', color: isDark ? 'var(--text-secondary)' : '#555', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{highest.student.fullname || highest.student.username}</span>
+                                                <span style={{ fontSize: '0.82rem', color: '#2d3436', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{highest.student.fullname || highest.student.username}</span>
                                             </div>
                                             <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1dd1a1' }}>{highest.avg}%</span>
                                         </div>
@@ -720,13 +718,13 @@ Example format:
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <i className="fas fa-arrow-down" style={{ fontSize: '0.7rem', color: '#e74c3c' }}></i>
-                                                    <span style={{ fontSize: '0.82rem', color: isDark ? 'var(--text-secondary)' : '#555', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{lowest.student.fullname || lowest.student.username}</span>
+                                                    <span style={{ fontSize: '0.82rem', color: '#2d3436', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{lowest.student.fullname || lowest.student.username}</span>
                                                 </div>
                                                 <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#e74c3c' }}>{lowest.avg}%</span>
                                             </div>
                                         )}
                                     </div>
-                                    <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>
+                                    <span style={{ fontSize: '0.75rem', color: '#888' }}>
                                         {lowest && lowest.student.id !== highest.student.id ? `${highest.avg - lowest.avg}pt gap between top and bottom` : 'Only one student has submitted'}
                                     </span>
                                 </>
@@ -770,7 +768,7 @@ Example format:
                     return (
                         <div className="modal-container show" onClick={() => setAnalysisModal(null)}>
                             <div className="modal-content" onClick={e => e.stopPropagation()}
-                                style={{ maxWidth: '520px', maxHeight: '82vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', borderRadius: '18px', background: isDark ? 'var(--bg-card)' : 'white', border: isDark ? '1px solid var(--border-default)' : 'none' }}>
+                                style={{ maxWidth: '520px', maxHeight: '82vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', borderRadius: '18px', background: 'white', border: 'none' }}>
 
                                 {/* header */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '18px 22px', borderBottom: '1px solid #f0f2f5', flexShrink: 0 }}>
@@ -778,10 +776,10 @@ Example format:
                                         <i className={`fas ${cfg.icon}`}></i>
                                     </div>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: '800', color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '1rem' }}>{cfg.title}</div>
-                                        <div style={{ fontSize: '0.78rem', color: isDark ? 'var(--text-muted)' : '#888', marginTop: '1px' }}>{cfg.subtitle}</div>
+                                        <div style={{ fontWeight: '800', color: '#2d3436', fontSize: '1rem' }}>{cfg.title}</div>
+                                        <div style={{ fontSize: '0.78rem', color: '#2d3436', marginTop: '1px' }}>{cfg.subtitle}</div>
                                     </div>
-                                    <button onClick={() => setAnalysisModal(null)} style={{ background: 'none', border: 'none', fontSize: '1.4rem', color: isDark ? 'var(--text-faint)' : '#aaa', cursor: 'pointer', lineHeight: 1, padding: '4px' }}>&times;</button>
+                                    <button onClick={() => setAnalysisModal(null)} style={{ background: 'none', border: 'none', fontSize: '1.4rem', color: '#2d3436', cursor: 'pointer', lineHeight: 1, padding: '4px' }}>&times;</button>
                                 </div>
 
                                 {/* body */}
@@ -793,27 +791,27 @@ Example format:
                                             {/* big avg + bar */}
                                             <div style={{ textAlign: 'center', padding: '16px', background: scoreBg(classAvg ?? 0), borderRadius: '12px', marginBottom: '4px' }}>
                                                 <div style={{ fontSize: '3rem', fontWeight: '800', color: scoreColor(classAvg ?? 0), lineHeight: 1 }}>{classAvg !== null ? `${classAvg}%` : '—'}</div>
-                                                <div style={{ fontSize: '0.82rem', color: isDark ? 'var(--text-muted)' : '#888', marginTop: '6px' }}>{classAvg >= 70 ? '✓ Class is performing well' : classAvg >= 50 ? '⚠ Needs some improvement' : '✗ Class needs attention'}</div>
+                                                <div style={{ fontSize: '0.82rem', color: '#2d3436', marginTop: '6px' }}>{classAvg >= 70 ? '✓ Class is performing well' : classAvg >= 50 ? '⚠ Needs some improvement' : '✗ Class needs attention'}</div>
                                                 <div style={{ height: '8px', background: 'rgba(0,0,0,0.08)', borderRadius: '99px', overflow: 'hidden', marginTop: '12px' }}>
                                                     <div style={{ height: '100%', width: `${classAvg ?? 0}%`, background: scoreColor(classAvg ?? 0), borderRadius: '99px' }}></div>
                                                 </div>
                                             </div>
                                             {/* per-activity averages */}
-                                            <p style={{ fontSize: '0.78rem', color: isDark ? 'var(--text-muted)' : '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Per-activity averages</p>
+                                            <p style={{ fontSize: '0.78rem', color: '#2d3436', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Per-activity averages</p>
                                             {allCw.map(cw => {
                                                 const subs = cw.submissions || [];
                                                 const pcts = subs.map(s => s.total > 0 ? Math.round((s.score / s.total) * 100) : 0);
                                                 const avg2 = pcts.length > 0 ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
                                                 return (
-                                                    <div key={cw.id} style={{ padding: '11px 14px', background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', borderRadius: '10px', border: '1px solid #eee' }}>
+                                                    <div key={cw.id} style={{ padding: '11px 14px', background: 'white', borderRadius: '10px', border: '1px solid #eee' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
-                                                            <span style={{ fontWeight: '700', fontSize: '0.88rem', color: isDark ? 'var(--text-primary)' : '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>{cw.title}</span>
+                                                            <span style={{ fontWeight: '700', fontSize: '0.88rem', color: '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>{cw.title}</span>
                                                             <span style={{ fontWeight: '800', fontSize: '0.95rem', color: avg2 !== null ? scoreColor(avg2) : '#ccc', flexShrink: 0, marginLeft: '10px' }}>{avg2 !== null ? `${avg2}%` : '—'}</span>
                                                         </div>
                                                         <div style={{ height: '6px', background: '#e9ecef', borderRadius: '99px', overflow: 'hidden' }}>
                                                             <div style={{ height: '100%', width: `${avg2 ?? 0}%`, background: avg2 !== null ? scoreColor(avg2) : '#ddd', borderRadius: '99px' }}></div>
                                                         </div>
-                                                        <div style={{ fontSize: '0.72rem', color: isDark ? 'var(--text-faint)' : '#aaa', marginTop: '5px' }}>{subs.length} submission{subs.length !== 1 ? 's' : ''}</div>
+                                                        <div style={{ fontSize: '0.72rem', color: '#2d3436', marginTop: '5px' }}>{subs.length} submission{subs.length !== 1 ? 's' : ''}</div>
                                                     </div>
                                                 );
                                             })}
@@ -832,8 +830,8 @@ Example format:
                                                     <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 13px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px' }}>
                                                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
                                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: isDark ? 'var(--text-primary)' : '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                                                            <div style={{ fontSize: '0.72rem', color: isDark ? 'var(--text-muted)' : '#888' }}>{submitted} / {allCw.length} activit{allCw.length !== 1 ? 'ies' : 'y'} submitted</div>
+                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                                                            <div style={{ fontSize: '0.72rem', color: '#888' }}>{submitted} / {allCw.length} activit{allCw.length !== 1 ? 'ies' : 'y'} submitted</div>
                                                         </div>
                                                         {avg !== null && <span style={{ fontSize: '0.85rem', fontWeight: '800', color: scoreColor(avg) }}>{avg}%</span>}
                                                         <i className="fas fa-check-circle" style={{ color: '#4facfe', fontSize: '1rem', flexShrink: 0 }}></i>
@@ -850,7 +848,7 @@ Example format:
                                                             <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 13px', background: '#fff8f8', border: '1px solid #fecaca', borderRadius: '10px' }}>
                                                                 <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff0f0', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
                                                                 <div style={{ flex: 1 }}>
-                                                                    <div style={{ fontWeight: '700', fontSize: '0.9rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{name}</div>
+                                                                    <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#888' }}>{name}</div>
                                                                     <div style={{ fontSize: '0.72rem', color: '#e74c3c' }}>No submissions yet</div>
                                                                 </div>
                                                                 <i className="fas fa-times-circle" style={{ color: '#e74c3c', fontSize: '1rem', flexShrink: 0 }}></i>
@@ -868,8 +866,8 @@ Example format:
                                             {studentData.filter(s => s.avg !== null && s.avg < 50).length === 0 ? (
                                                 <div style={{ textAlign: 'center', padding: '30px' }}>
                                                     <i className="fas fa-check-circle" style={{ fontSize: '3rem', color: '#1dd1a1', marginBottom: '12px', display: 'block' }}></i>
-                                                    <p style={{ fontWeight: '700', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>No at-risk students!</p>
-                                                    <p style={{ fontSize: '0.82rem', color: isDark ? 'var(--text-muted)' : '#888', marginTop: '6px' }}>All students who have submitted are averaging 50% or above.</p>
+                                                    <p style={{ fontWeight: '700', color: '#888' }}>No at-risk students!</p>
+                                                    <p style={{ fontSize: '0.82rem', color: '#2d3436', marginTop: '6px' }}>All students who have submitted are averaging 50% or above.</p>
                                                 </div>
                                             ) : studentData.filter(s => s.avg !== null && s.avg < 50).map(({ student, avg, submitted, weakTopics }) => {
                                                 const name = student.fullname || student.username;
@@ -878,8 +876,8 @@ Example format:
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: weakTopics.length > 0 ? '10px' : 0 }}>
                                                             <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#fff0f0', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
                                                             <div style={{ flex: 1 }}>
-                                                                <div style={{ fontWeight: '700', color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '0.95rem' }}>{name}</div>
-                                                                <div style={{ fontSize: '0.72rem', color: isDark ? 'var(--text-muted)' : '#888' }}>{submitted} / {allCw.length} activities submitted</div>
+                                                                <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.95rem' }}>{name}</div>
+                                                                <div style={{ fontSize: '0.72rem', color: '#888' }}>{submitted} / {allCw.length} activities submitted</div>
                                                             </div>
                                                             <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#e74c3c' }}>{avg}%</span>
                                                         </div>
@@ -892,7 +890,7 @@ Example format:
                                                                         <span style={{ lineHeight: '1.4' }}>{w.question}</span>
                                                                     </div>
                                                                 ))}
-                                                                {weakTopics.length > 3 && <p style={{ fontSize: '0.72rem', color: isDark ? 'var(--text-faint)' : '#aaa', marginTop: '2px' }}>+{weakTopics.length - 3} more missed questions</p>}
+                                                                {weakTopics.length > 3 && <p style={{ fontSize: '0.72rem', color: '#2d3436', marginTop: '2px' }}>+{weakTopics.length - 3} more missed questions</p>}
                                                             </div>
                                                         )}
                                                     </div>
@@ -913,15 +911,15 @@ Example format:
                                                 return (
                                                     <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px', background: isTop ? '#f0fdf4' : isLast ? '#fff8f8' : '#f8f9fa', border: `1px solid ${isTop ? '#bbf7d0' : isLast ? '#fecaca' : '#eee'}`, borderRadius: '11px' }}>
                                                         {/* rank */}
-                                                        <div style={{ width: '26px', textAlign: 'center', fontSize: i < 3 ? '1.1rem' : '0.85rem', color: isDark ? 'var(--text-faint)' : '#aaa', fontWeight: '700', flexShrink: 0 }}>
+                                                        <div style={{ width: '26px', textAlign: 'center', fontSize: i < 3 ? '1.1rem' : '0.85rem', color: '#2d3436', fontWeight: '700', flexShrink: 0 }}>
                                                             {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                                                         </div>
                                                         {/* avatar */}
                                                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</div>
                                                         {/* name */}
                                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: isDark ? 'var(--text-primary)' : '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                                                            <div style={{ fontSize: '0.72rem', color: isDark ? 'var(--text-faint)' : '#aaa' }}>{submitted} activit{submitted !== 1 ? 'ies' : 'y'} submitted</div>
+                                                            <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#2d3436', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                                                            <div style={{ fontSize: '0.72rem', color: '#888' }}>{submitted} activit{submitted !== 1 ? 'ies' : 'y'} submitted</div>
                                                         </div>
                                                         {/* avg pill + bar */}
                                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
@@ -936,15 +934,15 @@ Example format:
                                             {/* students who haven't submitted */}
                                             {studentData.filter(s => s.avg === null).length > 0 && (
                                                 <>
-                                                    <p style={{ fontSize: '0.78rem', color: isDark ? 'var(--text-faint)' : '#aaa', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>No submissions</p>
+                                                    <p style={{ fontSize: '0.78rem', color: '#2d3436', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>No submissions</p>
                                                     {studentData.filter(s => s.avg === null).map(({ student }) => {
                                                         const name = student.fullname || student.username;
                                                         return (
-                                                            <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', border: '1px solid #eee', borderRadius: '11px', opacity: 0.6 }}>
+                                                            <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'white', border: '1px solid #eee', borderRadius: '11px', opacity: 0.6 }}>
                                                                 <div style={{ width: '26px', textAlign: 'center', fontSize: '0.85rem', color: '#ccc' }}>—</div>
                                                                 <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f0f2f5', color: '#ccc', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: '700', fontSize: '0.85rem' }}>{name.charAt(0).toUpperCase()}</div>
                                                                 <div style={{ flex: 1 }}>
-                                                                    <div style={{ fontWeight: '700', fontSize: '0.9rem', color: isDark ? 'var(--text-faint)' : '#aaa' }}>{name}</div>
+                                                                    <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#888' }}>{name}</div>
                                                                     <div style={{ fontSize: '0.72rem', color: '#ccc' }}>No submissions yet</div>
                                                                 </div>
                                                                 <span style={{ fontSize: '0.85rem', color: '#ccc', fontWeight: '700' }}>—</span>
@@ -966,25 +964,25 @@ Example format:
                 <div style={card}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                         <i className="fas fa-table" style={{ color: '#6e45e2', fontSize: '1rem' }}></i>
-                        <h3 style={{ margin: 0, color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '1.05rem', fontWeight: '800' }}>Student performance table</h3>
+                        <h3 style={{ margin: 0, color: '#2d3436', fontSize: '1.05rem', fontWeight: '800' }}>Student performance table</h3>
                     </div>
-                    <p style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.83rem', margin: '0 0 20px 0' }}>Every student's score per activity, sorted best to worst.</p>
+                    <p style={{ color: '#2d3436', fontSize: '0.83rem', margin: '0 0 20px 0' }}>Every student's score per activity, sorted best to worst.</p>
                     {allCw.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '30px', color: isDark ? 'var(--text-faint)' : '#aaa' }}><i className="fas fa-tasks" style={{ fontSize: '2rem', marginBottom: '10px', display: 'block' }}></i>No activities posted yet.</div>
+                        <div style={{ textAlign: 'center', padding: '30px', color: '#888' }}><i className="fas fa-tasks" style={{ fontSize: '2rem', marginBottom: '10px', display: 'block' }}></i>No activities posted yet.</div>
                     ) : (
                         <div style={{ overflowX: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '500px' }}>
                                 <thead>
                                     <tr style={{ borderBottom: '2px solid #f0f2f5' }}>
-                                        <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '0.8rem', color: isDark ? 'var(--text-muted)' : '#888', fontWeight: '700', textTransform: 'uppercase', width: '180px' }}>Student</th>
+                                        <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '0.8rem', color: '#2d3436', fontWeight: '700', textTransform: 'uppercase', width: '180px' }}>Student</th>
                                         {allCw.map(cw => (
-                                            <th key={cw.id} style={{ textAlign: 'center', padding: '10px 8px', fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888', fontWeight: '700', maxWidth: '90px' }}>
+                                            <th key={cw.id} style={{ textAlign: 'center', padding: '10px 8px', fontSize: '0.75rem', color: '#2d3436', fontWeight: '700', maxWidth: '90px' }}>
                                                 <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85px' }} title={cw.title}>{cw.title.length > 12 ? cw.title.slice(0, 11) + '…' : cw.title}</div>
                                                 <div style={{ fontSize: '0.65rem', color: cw.assessmentType === 'time_attack' ? '#f39c12' : '#e74c3c', fontWeight: '600', marginTop: '2px' }}>{cw.assessmentType === 'time_attack' ? 'Time Attack' : 'Quiz'}</div>
                                             </th>
                                         ))}
                                         <th style={{ textAlign: 'center', padding: '10px 12px', fontSize: '0.8rem', color: '#6e45e2', fontWeight: '700', textTransform: 'uppercase' }}>Avg</th>
-                                        <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '0.8rem', color: isDark ? 'var(--text-muted)' : '#888', fontWeight: '700', textTransform: 'uppercase' }}>Weak areas</th>
+                                        <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '0.8rem', color: '#2d3436', fontWeight: '700', textTransform: 'uppercase' }}>Weak areas</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1002,7 +1000,7 @@ Example format:
                                                             {!student.avatarUrl && name.charAt(0).toUpperCase()}
                                                         </div>
                                                         <div>
-                                                            <div style={{ fontWeight: '700', color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>{name}</div>
+                                                            <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>{name}</div>
                                                             {isAtRisk && <div style={{ fontSize: '0.65rem', color: '#e74c3c', fontWeight: '700' }}>⚠ At risk</div>}
                                                         </div>
                                                     </div>
@@ -1032,7 +1030,7 @@ Example format:
                                                                     {w.question.length > 28 ? w.question.slice(0, 27) + '…' : w.question}
                                                                 </span>
                                                             ))}
-                                                            {weakTopics.length > 2 && <span style={{ fontSize: '0.7rem', background: '#f0f2f5', color: isDark ? 'var(--text-muted)' : '#888', padding: '3px 8px', borderRadius: '20px', fontWeight: '600' }}>+{weakTopics.length - 2} more</span>}
+                                                            {weakTopics.length > 2 && <span style={{ fontSize: '0.7rem', background: '#f0f2f5', color: '#2d3436', padding: '3px 8px', borderRadius: '20px', fontWeight: '600' }}>+{weakTopics.length - 2} more</span>}
                                                         </div>
                                                     ) : avg !== null
                                                         ? <span style={{ fontSize: '0.78rem', color: '#1dd1a1', fontWeight: '700' }}>✓ No weak areas</span>
@@ -1051,12 +1049,12 @@ Example format:
                 <div style={card}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                         <i className="fas fa-user-graduate" style={{ color: '#4facfe', fontSize: '1rem' }}></i>
-                        <h3 style={{ margin: 0, color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '1.05rem', fontWeight: '800' }}>Student weak-topic breakdown</h3>
+                        <h3 style={{ margin: 0, color: '#2d3436', fontSize: '1.05rem', fontWeight: '800' }}>Student weak-topic breakdown</h3>
                     </div>
-                    <p style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.83rem', margin: '0 0 20px 0' }}>Tap any student to expand the full list of questions they got wrong.</p>
+                    <p style={{ color: '#2d3436', fontSize: '0.83rem', margin: '0 0 20px 0' }}>Tap any student to expand the full list of questions they got wrong.</p>
 
                     {studentData.filter(s => s.weakTopics.length > 0).length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '30px', color: isDark ? 'var(--text-faint)' : '#aaa' }}>
+                        <div style={{ textAlign: 'center', padding: '30px', color: '#888' }}>
                             <i className="fas fa-check-circle" style={{ fontSize: '2.5rem', marginBottom: '10px', display: 'block', color: '#1dd1a1' }}></i>
                             <p style={{ fontWeight: '600' }}>No weak areas found — all students answered every question correctly!</p>
                         </div>
@@ -1105,13 +1103,13 @@ Example format:
 
                                         {/* ── collapsible body ── */}
                                         {isOpen && (
-                                            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', background: isDark ? 'var(--bg-card)' : '#fff', animation: 'fadeIn 0.2s ease' }}>
+                                            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'white', animation: 'fadeIn 0.2s ease' }}>
                                                 {weakTopics.map((w, wi) => (
                                                     <div key={wi} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 13px', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '9px' }}>
                                                         <i className="fas fa-times-circle" style={{ color: '#e74c3c', marginTop: '2px', flexShrink: 0, fontSize: '0.9rem' }}></i>
                                                         <div style={{ minWidth: 0 }}>
-                                                            <div style={{ fontSize: '0.87rem', color: isDark ? 'var(--text-primary)' : '#2d3436', fontWeight: '600', lineHeight: '1.5' }}>{w.question}</div>
-                                                            <div style={{ fontSize: '0.73rem', color: isDark ? 'var(--text-muted)' : '#888', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <div style={{ fontSize: '0.87rem', color: '#2d3436', fontWeight: '600', lineHeight: '1.5' }}>{w.question}</div>
+                                                            <div style={{ fontSize: '0.73rem', color: '#2d3436', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                                 <i className="fas fa-book" style={{ fontSize: '0.65rem' }}></i> {w.activity}
                                                             </div>
                                                         </div>
@@ -1143,7 +1141,7 @@ Example format:
 
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontWeight: '800', color: isMostMissedOpen ? '#c0392b' : '#2d3436', fontSize: '1.02rem', transition: 'color 0.2s' }}>Most-missed questions</div>
-                                <div style={{ fontSize: '0.78rem', color: isDark ? 'var(--text-muted)' : '#888', marginTop: '2px' }}>{hardestQuestions.length} question{hardestQuestions.length !== 1 ? 's' : ''} flagged across all quizzes</div>
+                                <div style={{ fontSize: '0.78rem', color: '#2d3436', marginTop: '2px' }}>{hardestQuestions.length} question{hardestQuestions.length !== 1 ? 's' : ''} flagged across all quizzes</div>
                             </div>
 
                             <span style={{ fontSize: '0.75rem', color: '#e74c3c', background: '#fff0f0', border: '1px solid #fecaca', padding: '3px 10px', borderRadius: '20px', fontWeight: '700', flexShrink: 0 }}>
@@ -1157,21 +1155,21 @@ Example format:
 
                         {/* collapsible body */}
                         {isMostMissedOpen && (
-                            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px', background: isDark ? 'var(--bg-card)' : '#fff', animation: 'fadeIn 0.2s ease' }}>
-                                <p style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.83rem', margin: '0 0 6px 0' }}>Questions with the highest wrong-answer rate — prioritise these in your next lesson.</p>
+                            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px', background: 'white', animation: 'fadeIn 0.2s ease' }}>
+                                <p style={{ color: '#2d3436', fontSize: '0.83rem', margin: '0 0 6px 0' }}>Questions with the highest wrong-answer rate — prioritise these in your next lesson.</p>
                                 {hardestQuestions.map((q, i) => (
                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', background: q.missRate >= 70 ? '#fff5f5' : q.missRate >= 50 ? '#fffdf0' : '#f8f9fa', border: `1px solid ${q.missRate >= 70 ? '#fecaca' : q.missRate >= 50 ? '#fde68a' : '#eee'}`, borderRadius: '12px' }}>
                                         <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: scoreColor(100 - q.missRate), color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem', flexShrink: 0 }}>{i + 1}</div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: '700', color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '0.9rem', marginBottom: '3px' }}>{q.question}</div>
-                                            <div style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>From: {q.activity} · {q.wrong}/{q.total} students missed it</div>
+                                            <div style={{ fontWeight: '700', color: '#2d3436', fontSize: '0.9rem', marginBottom: '3px' }}>{q.question}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#888' }}>From: {q.activity} · {q.wrong}/{q.total} students missed it</div>
                                         </div>
                                         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', minWidth: '80px' }}>
                                             <span style={{ fontSize: '0.88rem', fontWeight: '800', color: scoreColor(100 - q.missRate) }}>{q.missRate}% missed</span>
                                             <div style={{ width: '80px', height: '6px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden' }}>
                                                 <div style={{ height: '100%', width: `${q.missRate}%`, background: scoreColor(100 - q.missRate), borderRadius: '99px' }}></div>
                                             </div>
-                                            <span style={{ fontSize: '0.68rem', color: isDark ? 'var(--text-faint)' : '#aaa', fontWeight: '600', textTransform: 'uppercase' }}>{diffLabel(100 - q.missRate)} topic</span>
+                                            <span style={{ fontSize: '0.68rem', color: '#2d3436', fontWeight: '600', textTransform: 'uppercase' }}>{diffLabel(100 - q.missRate)} topic</span>
                                         </div>
                                     </div>
                                 ))}
@@ -1194,28 +1192,28 @@ Example format:
                         <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: teacherAvatar ? 'transparent' : '#f3f0ff', color: '#6e45e2', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', backgroundImage: teacherAvatar ? `url('${teacherAvatar}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                             {!teacherAvatar && <i className="fas fa-user-shield"></i>}
                         </div>
-                        <span style={{ fontWeight: 600, fontSize: '1.1rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{room?.teacherFullName || room?.teacher}</span>
+                        <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#888' }}>{room?.teacherFullName || room?.teacher}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '30px', marginBottom: '20px', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px', flexWrap: 'wrap', gap: '15px' }}>
                         <h3 style={{ margin: 0, color: '#4facfe' }}>Students ({students.length})</h3>
                         {students.length > 0 && (
                             <div style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
-                                <i className="fas fa-search" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: isDark ? 'var(--text-faint)' : '#aaa' }}></i>
+                                <i className="fas fa-search" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#888' }}></i>
                                 <input type="text" placeholder="Search students..." value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} style={{ width: '100%', padding: '8px 12px 8px 35px', borderRadius: '20px', border: '1px solid #ddd', outline: 'none', boxSizing: 'border-box', fontSize: '0.95rem' }} />
                             </div>
                         )}
                     </div>
-                    {students.length === 0 ? (<p style={{ color: isDark ? 'var(--text-muted)' : '#888', textAlign: 'center', padding: '20px 0' }}>Student list will appear here once they join the class.</p>)
-                    : filteredStudents.length === 0 ? (<p style={{ color: isDark ? 'var(--text-muted)' : '#888', textAlign: 'center', padding: '20px 0' }}>No students found matching your search.</p>)
+                    {students.length === 0 ? (<p style={{ color: '#2d3436', textAlign: 'center', padding: '20px 0' }}>Student list will appear here once they join the class.</p>)
+                    : filteredStudents.length === 0 ? (<p style={{ color: '#2d3436', textAlign: 'center', padding: '20px 0' }}>No students found matching your search.</p>)
                     : (
                         <div style={{ display: 'grid', gap: '15px' }}>
                             {filteredStudents.map(student => (
-                                <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px', background: isDark ? 'var(--bg-card-hover)' : '#fdfdfd', border: '1px solid #eee', borderRadius: '12px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = '#d7ccff'} onMouseLeave={e => e.currentTarget.style.borderColor = '#eee'}>
+                                <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 15px', background: 'white', border: '1px solid #eee', borderRadius: '12px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = '#d7ccff'} onMouseLeave={e => e.currentTarget.style.borderColor = '#eee'}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                         <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: student.avatarUrl ? 'transparent' : '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem', backgroundImage: student.avatarUrl ? `url('${student.avatarUrl}')` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                                             {!student.avatarUrl && <i className="fas fa-user"></i>}
                                         </div>
-                                        <span style={{ fontWeight: 600, fontSize: '1.05rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{student.fullname || student.username}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '1.05rem', color: '#888' }}>{student.fullname || student.username}</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <button onClick={(e) => { e.preventDefault(); openAnalyticsModal(student); }} style={{ background: '#f3f0ff', border: 'none', color: '#6e45e2', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 'bold', transition: 'all 0.2s' }} title="View Analytics" onMouseEnter={e => { e.currentTarget.style.background = '#6e45e2'; e.currentTarget.style.color = '#fff'; }} onMouseLeave={e => { e.currentTarget.style.background = '#f3f0ff'; e.currentTarget.style.color = '#6e45e2'; }}>
@@ -1242,7 +1240,7 @@ Example format:
             </nav>
             <main className="room-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
                 <i className="fas fa-circle-notch fa-spin" style={{ fontSize: '3rem', color: '#6e45e2', marginBottom: '20px' }}></i>
-                <h2 style={{ color: isDark ? 'var(--text-primary)' : '#2d3436' }}>Entering Classroom...</h2>
+                <h2 style={{ color: '#888' }}>Entering Classroom...</h2>
                 <p style={{ color: '#666' }}>Fetching data from the cloud</p>
             </main>
         </div>
@@ -1363,18 +1361,18 @@ Example format:
 
                 <div className="modern-feed-container">
                     {activeTab === 'activities' && (
-                        <div className="classwork-summary-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isDark ? 'var(--bg-card)' : 'white', padding: '20px 25px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', border: '1px solid #eee', marginBottom: '10px', flexWrap: 'wrap', gap: '20px' }}>
+                        <div className="classwork-summary-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '20px 25px', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', border: '1px solid #eee', marginBottom: '10px', flexWrap: 'wrap', gap: '20px' }}>
                             <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#fcf3f2', color: '#e74c3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-tasks"></i></div>
-                                    <div><p style={{ margin: 0, color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Generated Quizzes</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{classwork.filter(cw => cw.assessmentType === 'custom').length}</p></div>
+                                    <div><p style={{ margin: 0, color: '#2d3436', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Generated Quizzes</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#888' }}>{classwork.filter(cw => cw.assessmentType === 'custom').length}</p></div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <div style={{ width: '45px', height: '45px', borderRadius: '10px', background: '#fffdf7', color: '#f39c12', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2rem' }}><i className="fas fa-stopwatch"></i></div>
-                                    <div><p style={{ margin: 0, color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Time Attacks</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{classwork.filter(cw => cw.assessmentType === 'time_attack').length}</p></div>
+                                    <div><p style={{ margin: 0, color: '#2d3436', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Time Attacks</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#888' }}>{classwork.filter(cw => cw.assessmentType === 'time_attack').length}</p></div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', borderLeft: '2px solid #f0f2f5', paddingLeft: '30px' }}>
-                                    <div><p style={{ margin: 0, color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Total Activities</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#6e45e2' }}>{classwork.length}</p></div>
+                                    <div><p style={{ margin: 0, color: '#2d3436', fontSize: '0.85rem', fontWeight: '600', textTransform: 'uppercase' }}>Total Activities</p><p style={{ margin: 0, fontSize: '1.3rem', fontWeight: 'bold', color: '#6e45e2' }}>{classwork.length}</p></div>
                                 </div>
                             </div>
                             <button className="btn-primary" onClick={() => setIsCwModalOpen(true)} style={{ borderRadius: '12px' }}><i className="fas fa-plus"></i> Create</button>
@@ -1409,7 +1407,7 @@ Example format:
                                     <textarea value={postContent} onChange={e => setPostContent(e.target.value)} rows="4" placeholder="Share something with your class..." className="modern-textarea" autoFocus></textarea>
                                 </div>
                                 {attachment && (
-                                    <div style={{ marginLeft: '60px', padding: '10px 15px', background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', border: '1px solid #e1e1e1', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: 'calc(100% - 60px)', boxSizing: 'border-box' }}>
+                                    <div style={{ marginLeft: '60px', padding: '10px 15px', background: 'white', border: '1px solid #e1e1e1', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: 'calc(100% - 60px)', boxSizing: 'border-box' }}>
                                         <span style={{ fontSize: '0.9rem', color: '#333', display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><i className={`fas ${attachment.type.startsWith('image/') ? 'fa-image' : attachment.type === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-word'}`} style={{ color: '#6e45e2', fontSize: '1.2rem' }}></i>{attachment.name}</span>
                                         <button type="button" onClick={() => setAttachment(null)} style={{ background: 'transparent', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1.1rem' }}><i className="fas fa-times"></i></button>
                                     </div>
@@ -1445,25 +1443,25 @@ Example format:
                                     {/* Left Column: Metadata and Selection */}
                                     <div className="cw-modal-left" style={{ overflowY: 'auto', minHeight: 0 }}>
                                         <div style={{ marginBottom: '10px' }}>
-                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: isDark ? 'var(--text-muted)' : '#888', textTransform: 'uppercase' }}>1. Basic Information</label>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: '#2d3436', textTransform: 'uppercase' }}>1. Basic Information</label>
                                             <div className="input-group" style={{ marginBottom: '12px' }}><input type="text" value={cwTitle} onChange={e => setCwTitle(e.target.value)} placeholder="Assessment Title (e.g., Chapter 1 Quiz)" required /></div>
                                             <div className="input-group"><textarea value={cwDesc} onChange={e => setCwDesc(e.target.value)} rows="3" placeholder="Instructions (Optional)"></textarea></div>
                                         </div>
 
                                         <div>
-                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: isDark ? 'var(--text-muted)' : '#888', textTransform: 'uppercase' }}>2. Assessment Type</label>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: '#2d3436', textTransform: 'uppercase' }}>2. Assessment Type</label>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                                 <div onClick={() => { setAssessmentType('time_attack'); setCwTitle(''); setCwDesc(''); setAttachment(null); resetAiState(); }} style={{ padding: '15px', border: assessmentType === 'time_attack' ? '2px solid #f39c12' : '1px solid #eee', borderRadius: '12px', cursor: 'pointer', background: assessmentType === 'time_attack' ? '#fffdf7' : '#fff', transition: 'all 0.2s' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
                                                         <i className="fas fa-stopwatch" style={{ fontSize: '1.2rem', color: '#f39c12' }}></i>
-                                                        <h3 style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', margin: 0, fontSize: '1rem' }}>Time Attack</h3>
+                                                        <h3 style={{ color: '#2d3436', margin: 0, fontSize: '1rem' }}>Time Attack</h3>
                                                     </div>
                                                     <p style={{ color: '#666', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' }}>Fast-paced chemistry quiz game.</p>
                                                 </div>
                                                 <div onClick={() => { setAssessmentType('custom'); setCwTitle(''); setCwDesc(''); }} style={{ padding: '15px', border: assessmentType === 'custom' ? '2px solid #6e45e2' : '1px solid #eee', borderRadius: '12px', cursor: 'pointer', background: assessmentType === 'custom' ? '#f8f5ff' : '#fff', transition: 'all 0.2s' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
                                                         <i className="fas fa-robot" style={{ fontSize: '1.2rem', color: '#6e45e2' }}></i>
-                                                        <h3 style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', margin: 0, fontSize: '1rem' }}>Generate Quiz</h3>
+                                                        <h3 style={{ color: '#2d3436', margin: 0, fontSize: '1rem' }}>Generate Quiz</h3>
                                                     </div>
                                                     <p style={{ color: '#666', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' }}>AI questions from your material.</p>
                                                 </div>
@@ -1471,14 +1469,14 @@ Example format:
                                         </div>
 
                                         <div style={{ marginTop: '18px' }}>
-                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: isDark ? 'var(--text-muted)' : '#888', textTransform: 'uppercase' }}>3. Schedule & Limits <span style={{ fontWeight: '400', color: '#bbb', fontSize: '0.8rem' }}>(optional)</span></label>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '700', fontSize: '0.85rem', color: '#2d3436', textTransform: 'uppercase' }}>3. Schedule & Limits <span style={{ fontWeight: '400', color: '#bbb', fontSize: '0.8rem' }}>(optional)</span></label>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                                 {assessmentType === 'custom' && (
-                                                <div style={{ background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', borderRadius: '10px', padding: '12px 14px', border: '1px solid #eee' }}>
+                                                <div style={{ background: 'white', borderRadius: '10px', padding: '12px 14px', border: '1px solid #eee' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                                         <i className="fas fa-hourglass-half" style={{ color: '#6e45e2', fontSize: '0.9rem' }}></i>
-                                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>Time Limit</span>
-                                                        <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-faint)' : '#aaa' }}>— how long students have to finish</span>
+                                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#888' }}>Time Limit</span>
+                                                        <span style={{ fontSize: '0.75rem', color: '#888' }}>— how long students have to finish</span>
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         <input
@@ -1492,16 +1490,16 @@ Example format:
                                                             onFocus={e => e.target.style.borderColor = '#6e45e2'}
                                                             onBlur={e => e.target.style.borderColor = '#ddd'}
                                                         />
-                                                        <span style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.85rem' }}>minutes</span>
+                                                        <span style={{ color: '#2d3436', fontSize: '0.85rem' }}>minutes</span>
                                                         {cwTimeLimit && <button type="button" onClick={() => setCwTimeLimit('')} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}><i className="fas fa-times"></i> clear</button>}
                                                     </div>
                                                 </div>
                                                 )}
-                                                <div style={{ background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', borderRadius: '10px', padding: '12px 14px', border: '1px solid #eee' }}>
+                                                <div style={{ background: 'white', borderRadius: '10px', padding: '12px 14px', border: '1px solid #eee' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                                         <i className="fas fa-calendar-alt" style={{ color: '#e74c3c', fontSize: '0.9rem' }}></i>
-                                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>Deadline</span>
-                                                        <span style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-faint)' : '#aaa' }}>— last day/time to submit</span>
+                                                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#888' }}>Deadline</span>
+                                                        <span style={{ fontSize: '0.75rem', color: '#888' }}>— last day/time to submit</span>
                                                     </div>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                         <input
@@ -1524,7 +1522,7 @@ Example format:
                                     <div className="cw-modal-right" style={{ overflowY: 'auto', minHeight: 0 }}>
                             {assessmentType === 'custom' && (
                                             <div style={{ marginTop: '0' }}>
-                                    <h3 style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}><i className="fas fa-robot" style={{ color: '#6e45e2' }}></i>Quiz Generator</h3>
+                                    <h3 style={{ color: '#2d3436', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}><i className="fas fa-robot" style={{ color: '#6e45e2' }}></i>Quiz Generator</h3>
 
                                     {!aiGenerated && (
                                         <div className="ai-upload-zone">
@@ -1532,9 +1530,9 @@ Example format:
                                                 <>
                                                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                                                         <i className="fas fa-magic" style={{ fontSize: '1.8rem', color: '#6e45e2' }}></i>
-                                                        <span style={{ fontWeight: '700', fontSize: '1.05rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>Upload a PDF or paste your lesson</span>
+                                                        <span style={{ fontWeight: '700', fontSize: '1.05rem', color: '#888' }}>Upload a PDF or paste your lesson</span>
                                                     </div>
-                                                    <p style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.85rem', marginBottom: '20px', marginTop: 0 }}>The AI will instantly generate multiple-choice questions from your material.</p>
+                                                    <p style={{ color: '#2d3436', fontSize: '0.85rem', marginBottom: '20px', marginTop: 0 }}>The AI will instantly generate multiple-choice questions from your material.</p>
 
                                                     <input type="file" accept="application/pdf" id="ai-pdf-input" style={{ display: 'none' }} onChange={(e) => { const file = e.target.files[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { alert('PDF too large! Max 10MB.'); return; } setAiPdfFile(file); e.target.value = ''; }} />
                                                     <label htmlFor="ai-pdf-input" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 22px', background: '#f3f0ff', color: '#6e45e2', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', marginBottom: '12px', fontSize: '0.95rem', border: '1px solid #d7ccff', transition: 'all 0.2s' }}>
@@ -1551,14 +1549,14 @@ Example format:
 
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '10px 0 14px 0' }}>
                                                         <div style={{ flex: 1, height: '1px', background: '#e1e1e1' }}></div>
-                                                        <span style={{ color: isDark ? 'var(--text-faint)' : '#aaa', fontSize: '0.85rem', fontWeight: '600' }}>or paste text</span>
+                                                        <span style={{ color: '#2d3436', fontSize: '0.85rem', fontWeight: '600' }}>or paste text</span>
                                                         <div style={{ flex: 1, height: '1px', background: '#e1e1e1' }}></div>
                                                     </div>
 
-                                                    <textarea value={aiLessonText} onChange={e => setAiLessonText(e.target.value)} placeholder="Paste your lesson, module, or notes here..." rows="5" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #d7ccff', resize: 'vertical', fontSize: '0.95rem', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', marginBottom: '16px', background: isDark ? 'var(--bg-card)' : '#fff', transition: 'border-color 0.2s' }} onFocus={e => e.target.style.borderColor = '#6e45e2'} onBlur={e => e.target.style.borderColor = '#d7ccff'} />
+                                                    <textarea value={aiLessonText} onChange={e => setAiLessonText(e.target.value)} placeholder="Paste your lesson, module, or notes here..." rows="5" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #d7ccff', resize: 'vertical', fontSize: '0.95rem', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', marginBottom: '16px', background: 'white', transition: 'border-color 0.2s' }} onFocus={e => e.target.style.borderColor = '#6e45e2'} onBlur={e => e.target.style.borderColor = '#d7ccff'} />
 
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', justifyContent: 'center' }}>
-                                                        <label style={{ color: isDark ? 'var(--text-secondary)' : '#555', fontWeight: '600', fontSize: '0.9rem' }}>Number of questions:</label>
+                                                        <label style={{ color: '#2d3436', fontWeight: '600', fontSize: '0.9rem' }}>Number of questions:</label>
                                                         <div style={{ display: 'flex', gap: '6px' }}>
                                                             {[3, 5, 8, 10, 15].map(n => (
                                                                 <button key={n} type="button" onClick={() => setAiQuestionCount(n)} style={{ width: '38px', height: '38px', border: aiQuestionCount === n ? '2px solid #6e45e2' : '1px solid #ddd', borderRadius: '8px', background: aiQuestionCount === n ? '#f3f0ff' : '#fff', color: aiQuestionCount === n ? '#6e45e2' : '#555', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>{n}</button>
@@ -1575,11 +1573,11 @@ Example format:
                                             ) : (
                                                 <div style={{ textAlign: 'center', padding: '20px' }}>
                                                     <i className="fas fa-magic fa-spin" style={{ fontSize: '3.5rem', color: '#6e45e2', marginBottom: '20px', display: 'block' }}></i>
-                                                    <h3 style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', marginBottom: '10px' }}>Generating your chemistry quiz...</h3>
-                                                    <p style={{ color: isDark ? 'var(--text-muted)' : '#888', maxWidth: '400px', margin: '0 auto 30px' }}>Our AI is analyzing your material and crafting {aiQuestionCount} unique questions just for your class.</p>
+                                                    <h3 style={{ color: '#2d3436', marginBottom: '10px' }}>Generating your chemistry quiz...</h3>
+                                                    <p style={{ color: '#2d3436', maxWidth: '400px', margin: '0 auto 30px' }}>Our AI is analyzing your material and crafting {aiQuestionCount} unique questions just for your class.</p>
                                                     <div style={{ textAlign: 'left' }}>
                                                         {[...Array(3)].map((_, i) => (
-                                                            <div key={i} style={{ padding: '15px', borderRadius: '12px', border: '1px solid #e1e1e1', marginBottom: '10px', background: isDark ? 'var(--bg-card)' : '#fff' }}>
+                                                            <div key={i} style={{ padding: '15px', borderRadius: '12px', border: '1px solid #e1e1e1', marginBottom: '10px', background: '#fff' }}>
                                                                 <div className="ai-generating-pulse" style={{ width: '80%' }}></div>
                                                                 <div className="ai-generating-pulse" style={{ width: '60%' }}></div>
                                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
@@ -1599,11 +1597,11 @@ Example format:
                                         <>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px' }}>
                                                 <span style={{ fontWeight: '700', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem' }}><i className="fas fa-check-circle"></i> {quizQuestions.length} questions generated successfully!</span>
-                                                <button type="button" onClick={resetAiState} style={{ background: isDark ? 'var(--bg-card)' : '#fff', border: '1px solid #d1fae5', color: '#16a34a', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}><i className="fas fa-redo"></i> Regenerate</button>
+                                                <button type="button" onClick={resetAiState} style={{ background: 'white', border: '1px solid #d1fae5', color: '#16a34a', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}><i className="fas fa-redo"></i> Regenerate</button>
                                             </div>
                                             {quizQuestions.map((q, qIndex) => (
                                                 <div key={q.id || qIndex} className="ai-question-card">
-                                                    <p style={{ fontWeight: '700', color: isDark ? 'var(--text-primary)' : '#2d3436', margin: '0 0 14px 0', fontSize: '1rem', lineHeight: '1.5' }}>
+                                                    <p style={{ fontWeight: '700', color: '#2d3436', margin: '0 0 14px 0', fontSize: '1rem', lineHeight: '1.5' }}>
                                                         <span style={{ display: 'inline-block', width: '26px', height: '26px', background: '#f3f0ff', color: '#6e45e2', borderRadius: '6px', textAlign: 'center', lineHeight: '26px', fontSize: '0.85rem', fontWeight: '800', marginRight: '10px' }}>{qIndex + 1}</span>
                                                         {q.question}
                                                     </p>
@@ -1622,7 +1620,7 @@ Example format:
                                 </div>
                             )}
                                         {assessmentType === 'time_attack' && (
-                                            <div style={{ textAlign: 'center', paddingTop: '60px', color: isDark ? 'var(--text-muted)' : '#888' }}>
+                                            <div style={{ textAlign: 'center', paddingTop: '60px', color: '#888' }}>
                                                 <i className="fas fa-stopwatch" style={{ fontSize: '4rem', opacity: 0.2, marginBottom: '20px' }}></i>
                                                 <p style={{ fontSize: '1.1rem' }}>Students will participate in the built-in Time Attack challenge.</p>
                                                 <p style={{ fontSize: '0.9rem' }}>No further configuration required.</p>
@@ -1661,7 +1659,7 @@ Example format:
                                     <textarea value={editPostContent} onChange={e => setEditPostContent(e.target.value)} rows="4" placeholder="Share something with your class..." className="modern-textarea" autoFocus></textarea>
                                 </div>
                                 {selectedPost.attachment && (
-                                    <div style={{ marginLeft: '60px', padding: '10px 15px', background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', border: '1px solid #e1e1e1', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: 'calc(100% - 60px)', boxSizing: 'border-box' }}>
+                                    <div style={{ marginLeft: '60px', padding: '10px 15px', background: 'white', border: '1px solid #e1e1e1', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: 'calc(100% - 60px)', boxSizing: 'border-box' }}>
                                         <span style={{ fontSize: '0.9rem', color: '#333', display: 'flex', alignItems: 'center', gap: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><i className={`fas ${selectedPost.attachment.type.startsWith('image/') ? 'fa-image' : selectedPost.attachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`} style={{ color: '#6e45e2', fontSize: '1.2rem' }}></i>{selectedPost.attachment.name}</span>
                                     </div>
                                 )}
@@ -1716,31 +1714,31 @@ Example format:
                 <div className="modal-container show" onClick={() => setIsReportModalOpen(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '2px solid #f0f2f5', paddingBottom: '15px' }}>
-                            <h2 style={{ margin: 0, color: isDark ? 'var(--text-primary)' : '#2d3436' }}><i className="fas fa-chart-bar" style={{ color: '#4facfe', marginRight: '10px' }}></i> Submissions</h2>
+                            <h2 style={{ margin: 0, color: '#888' }}><i className="fas fa-chart-bar" style={{ color: '#4facfe', marginRight: '10px' }}></i> Submissions</h2>
                             <button className="close-modal" onClick={() => setIsReportModalOpen(false)} style={{ position: 'static' }}>&times;</button>
                         </div>
                         <p style={{ color: '#666', marginBottom: '20px', fontWeight: '600', fontSize: '1.1rem' }}>{selectedReportCw.title}</p>
                         {!selectedReportCw.submissions || selectedReportCw.submissions.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '40px 20px', color: isDark ? 'var(--text-muted)' : '#888' }}>
+                            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#888' }}>
                                 <i className="fas fa-inbox" style={{ fontSize: '3rem', color: '#e1e1e1', marginBottom: '15px' }}></i>
                                 <p>No students have submitted this activity yet.</p>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                 {selectedReportCw.submissions.sort((a,b) => b.score - a.score).map((sub, idx) => (
-                                    <div key={idx} style={{ background: isDark ? 'var(--bg-card-hover)' : '#fdfdfd', border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden' }}>
+                                    <div key={idx} style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden' }}>
                                         <div onClick={() => setExpandedStudentId(expandedStudentId === sub.studentId ? null : sub.studentId)} style={{ padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: expandedStudentId === sub.studentId ? '#f8faff' : 'transparent', transition: 'background 0.2s' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#eaf4ff', color: '#4facfe', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '1.2rem' }}>{sub.studentName.charAt(0).toUpperCase()}</div>
                                                 <div>
-                                                    <span style={{ fontWeight: '600', color: isDark ? 'var(--text-primary)' : '#2d3436', display: 'block', fontSize: '1.05rem' }}>{sub.studentName}</span>
-                                                    <span style={{ fontSize: '0.85rem', color: isDark ? 'var(--text-muted)' : '#888' }}>Submitted: {new Date(sub.timestamp).toLocaleString()}</span>
+                                                    <span style={{ fontWeight: '600', color: '#2d3436', display: 'block', fontSize: '1.05rem' }}>{sub.studentName}</span>
+                                                    <span style={{ fontSize: '0.85rem', color: '#888' }}>Submitted: {new Date(sub.timestamp).toLocaleString()}</span>
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: sub.score >= sub.total / 2 ? '#1dd1a1' : '#e74c3c' }}>{sub.score}/{sub.total}</span>
-                                                    <span style={{ fontSize: '0.8rem', color: isDark ? 'var(--text-muted)' : '#888', display: 'block', textTransform: 'uppercase', fontWeight: '600' }}>
+                                                    <span style={{ fontSize: '0.8rem', color: '#2d3436', display: 'block', textTransform: 'uppercase', fontWeight: '600' }}>
                                                         {selectedReportCw.assessmentType === 'time_attack' ? 'Correct / Answered' : 'Score'}
                                                     </span>
                                                 </div>
@@ -1750,8 +1748,8 @@ Example format:
                                             </div>
                                         </div>
                                         {expandedStudentId === sub.studentId && selectedReportCw.assessmentType === 'custom' && (
-                                            <div style={{ padding: '20px', borderTop: '1px solid #eee', background: isDark ? 'var(--bg-card)' : '#fff' }}>
-                                                <h4 style={{ margin: '0 0 15px 0', color: isDark ? 'var(--text-secondary)' : '#555' }}>Detailed Breakdown</h4>
+                                            <div style={{ padding: '20px', borderTop: '1px solid #eee', background: '#fff' }}>
+                                                <h4 style={{ margin: '0 0 15px 0', color: '#888' }}>Detailed Breakdown</h4>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                                     {selectedReportCw.questions.map((q, qIdx) => {
                                                         const studentAnsIdx = sub.answers ? sub.answers[qIdx] : null;
@@ -1770,17 +1768,17 @@ Example format:
                                             </div>
                                         )}
                                         {expandedStudentId === sub.studentId && selectedReportCw.assessmentType === 'time_attack' && (
-                                            <div style={{ padding: '20px', borderTop: '1px solid #eee', background: isDark ? 'var(--bg-card)' : '#fff' }}>
+                                            <div style={{ padding: '20px', borderTop: '1px solid #eee', background: '#fff' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                                    <h4 style={{ margin: 0, color: isDark ? 'var(--text-secondary)' : '#555' }}>Performance Summary</h4>
-                                                    <span style={{ fontSize: '0.78rem', color: isDark ? 'var(--text-muted)' : '#888', background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                    <h4 style={{ margin: 0, color: '#888' }}>Performance Summary</h4>
+                                                    <span style={{ fontSize: '0.78rem', color: '#2d3436', background: 'white', padding: '4px 10px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                         <i className="fas fa-lock"></i> Final attempt — one try only
                                                     </span>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '20px' }}>
                                                     <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', textAlign: 'center' }}><i className="fas fa-check-circle" style={{ fontSize: '2rem', color: '#16a34a', marginBottom: '10px' }}></i><h3 style={{ margin: 0, color: '#16a34a', fontSize: '1.5rem' }}>{sub.score}</h3><p style={{ margin: 0, color: '#15803d', fontWeight: '600' }}>Correct Answers</p></div>
                                                     <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: '#fff0f0', border: '1px solid #fecaca', textAlign: 'center' }}><i className="fas fa-times-circle" style={{ fontSize: '2rem', color: '#ef4444', marginBottom: '10px' }}></i><h3 style={{ margin: 0, color: '#ef4444', fontSize: '1.5rem' }}>{sub.wrong || 0}</h3><p style={{ margin: 0, color: '#b91c1c', fontWeight: '600' }}>Wrong Answers</p></div>
-                                                    <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', border: '1px solid #eee', textAlign: 'center' }}><i className="fas fa-list-ol" style={{ fontSize: '2rem', color: '#6e45e2', marginBottom: '10px' }}></i><h3 style={{ margin: 0, color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '1.5rem' }}>{sub.total}</h3><p style={{ margin: 0, color: isDark ? 'var(--text-secondary)' : '#555', fontWeight: '600' }}>Total Answered</p></div>
+                                                    <div style={{ flex: 1, padding: '15px', borderRadius: '12px', background: 'white', border: '1px solid #eee', textAlign: 'center' }}><i className="fas fa-list-ol" style={{ fontSize: '2rem', color: '#6e45e2', marginBottom: '10px' }}></i><h3 style={{ margin: 0, color: '#2d3436', fontSize: '1.5rem' }}>{sub.total}</h3><p style={{ margin: 0, color: '#2d3436', fontWeight: '600' }}>Total Answered</p></div>
                                                 </div>
                                             </div>
                                         )}
@@ -1831,8 +1829,8 @@ Example format:
                                     {!analyticsStudent.avatarUrl && <i className="fas fa-user"></i>}
                                 </div>
                                 <div>
-                                    <h2 style={{ margin: 0, color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{studentName}</h2>
-                                    <p style={{ margin: 0, color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.9rem' }}>Student Analytics — {room?.section}</p>
+                                    <h2 style={{ margin: 0, color: '#888' }}>{studentName}</h2>
+                                    <p style={{ margin: 0, color: '#2d3436', fontSize: '0.9rem' }}>Student Analytics — {room?.section}</p>
                                 </div>
                             </div>
 
@@ -1842,10 +1840,10 @@ Example format:
                             </h3>
 
                             {history.length === 0 ? (
-                                <p style={{ color: isDark ? 'var(--text-muted)' : '#888', textAlign: 'center', padding: '20px 0' }}>This student hasn't submitted any activities in this room yet.</p>
+                                <p style={{ color: '#2d3436', textAlign: 'center', padding: '20px 0' }}>This student hasn't submitted any activities in this room yet.</p>
                             ) : (
                                 <>
-                                    <p style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.85rem', marginTop: 0, marginBottom: '8px' }}>Score trend over time (%)</p>
+                                    <p style={{ color: '#2d3436', fontSize: '0.85rem', marginTop: 0, marginBottom: '8px' }}>Score trend over time (%)</p>
                                     <div style={{ width: '100%', minWidth: '300px', height: 220, marginBottom: '10px' }}>
                                         <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={220} initialDimension={{ width: 520, height: 220 }}>
                                             <LineChart data={lineChartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
@@ -1862,7 +1860,7 @@ Example format:
                                         </ResponsiveContainer>
                                     </div>
 
-                                    <p style={{ color: isDark ? 'var(--text-muted)' : '#888', fontSize: '0.85rem', marginBottom: '8px' }}>Score per activity{history.length > 8 ? ' (most recent 8)' : ''}</p>
+                                    <p style={{ color: '#2d3436', fontSize: '0.85rem', marginBottom: '8px' }}>Score per activity{history.length > 8 ? ' (most recent 8)' : ''}</p>
                                     <div style={{ width: '100%', minWidth: '300px', height: 200, marginBottom: '20px' }}>
                                         <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200} initialDimension={{ width: 520, height: 200 }}>
                                             <BarChart data={barChartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
@@ -1892,8 +1890,8 @@ Example format:
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '22px' }}>
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', marginBottom: '5px' }}>
-                                        <span style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', fontWeight: '600' }}><i className="fas fa-atom" style={{ color: '#f1c40f' }}></i> Elements Learned</span>
-                                        <span style={{ color: isDark ? 'var(--text-muted)' : '#888' }}>{learnedCount}/118</span>
+                                        <span style={{ color: '#2d3436', fontWeight: '600' }}><i className="fas fa-atom" style={{ color: '#f1c40f' }}></i> Elements Learned</span>
+                                        <span style={{ color: '#888' }}>{learnedCount}/118</span>
                                     </div>
                                     <div style={{ height: '10px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden' }}>
                                         <div style={{ height: '100%', width: `${elementsPct}%`, background: 'linear-gradient(90deg, #f1c40f, #f39c12)', borderRadius: '99px' }}></div>
@@ -1901,8 +1899,8 @@ Example format:
                                 </div>
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', marginBottom: '5px' }}>
-                                        <span style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', fontWeight: '600' }}><i className="fas fa-vial" style={{ color: '#1dd1a1' }}></i> Compounds Found</span>
-                                        <span style={{ color: isDark ? 'var(--text-muted)' : '#888' }}>{compoundsCount}/37</span>
+                                        <span style={{ color: '#2d3436', fontWeight: '600' }}><i className="fas fa-vial" style={{ color: '#1dd1a1' }}></i> Compounds Found</span>
+                                        <span style={{ color: '#888' }}>{compoundsCount}/37</span>
                                     </div>
                                     <div style={{ height: '10px', background: '#f0f2f5', borderRadius: '99px', overflow: 'hidden' }}>
                                         <div style={{ height: '100%', width: `${compoundsPct}%`, background: 'linear-gradient(90deg, #1dd1a1, #10ac84)', borderRadius: '99px' }}></div>
@@ -1917,23 +1915,23 @@ Example format:
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
                                 <div style={{ background: '#fff0f0', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
                                     <i className="fas fa-stopwatch" style={{ color: '#ff6b6b', fontSize: '1.3rem', marginBottom: '6px' }}></i>
-                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{analyticsStudent.timeAttackBestCorrect ?? 0}</div>
-                                    <div style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>Time Attack pts</div>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#888' }}>{analyticsStudent.timeAttackBestCorrect ?? 0}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Time Attack pts</div>
                                 </div>
                                 <div style={{ background: '#eaf4ff', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
                                     <i className="fas fa-puzzle-piece" style={{ color: '#4facfe', fontSize: '1.3rem', marginBottom: '6px' }}></i>
-                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{analyticsStudent.matchingGameBestScore > 0 ? analyticsStudent.matchingGameBestScore : '—'}</div>
-                                    <div style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>Matching moves</div>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#888' }}>{analyticsStudent.matchingGameBestScore > 0 ? analyticsStudent.matchingGameBestScore : '—'}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Matching moves</div>
                                 </div>
                                 <div style={{ background: '#f3f0ff', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
                                     <i className="fas fa-brain" style={{ color: '#6e45e2', fontSize: '1.3rem', marginBottom: '6px' }}></i>
-                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{analyticsStudent.compoundRecallBestScore ?? 0}/8</div>
-                                    <div style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>Compound Recall</div>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#888' }}>{analyticsStudent.compoundRecallBestScore ?? 0}/8</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Compound Recall</div>
                                 </div>
-                                <div style={{ background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-                                    <i className="fas fa-th" style={{ color: isDark ? 'var(--text-primary)' : '#2d3436', fontSize: '1.3rem', marginBottom: '6px' }}></i>
-                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>{analyticsStudent.puzzlesCompleted ?? 0}</div>
-                                    <div style={{ fontSize: '0.75rem', color: isDark ? 'var(--text-muted)' : '#888' }}>Puzzles done</div>
+                                <div style={{ background: 'white', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+                                    <i className="fas fa-th" style={{ color: '#2d3436', fontSize: '1.3rem', marginBottom: '6px' }}></i>
+                                    <div style={{ fontWeight: '800', fontSize: '1.3rem', color: '#888' }}>{analyticsStudent.puzzlesCompleted ?? 0}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Puzzles done</div>
                                 </div>
                             </div>
                         </div>
@@ -1964,7 +1962,7 @@ Example format:
                             <h3 style={{ margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><i className={`fas ${previewAttachment.type.startsWith('image/') ? 'fa-image' : previewAttachment.type.includes('pdf') ? 'fa-file-pdf' : 'fa-file-word'}`} style={{ color: '#4facfe' }}></i>{previewAttachment.name}</h3>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                 <button onClick={() => window.open(previewAttachment.url, '_blank')} style={{ background: '#4facfe', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}><i className="fas fa-external-link-alt"></i> Open</button>
-                                <button onClick={() => setPreviewAttachment(null)} style={{ background: 'transparent', border: 'none', color: isDark ? 'var(--text-faint)' : '#aaa', fontSize: '1.8rem', cursor: 'pointer', lineHeight: 1, padding: '0 5px' }}>&times;</button>
+                                <button onClick={() => setPreviewAttachment(null)} style={{ background: 'transparent', border: 'none', color: '#2d3436', fontSize: '1.8rem', cursor: 'pointer', lineHeight: 1, padding: '0 5px' }}>&times;</button>
                             </div>
                         </div>
                         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0f0f0f', position: 'relative' }}>
@@ -1980,7 +1978,7 @@ Example format:
                                     </div>
                                 </object>
                             ) : (
-                                <iframe src={previewAttachment.url} title={previewAttachment.name} width="100%" height="100%" style={{ border: 'none', opacity: isPreviewLoading ? 0 : 1, transition: 'opacity 0.3s', position: 'relative', zIndex: 2, background: isDark ? 'var(--bg-card)' : 'white' }} onLoad={() => setIsPreviewLoading(false)}></iframe>
+                                <iframe src={previewAttachment.url} title={previewAttachment.name} width="100%" height="100%" style={{ border: 'none', opacity: isPreviewLoading ? 0 : 1, transition: 'opacity 0.3s', position: 'relative', zIndex: 2, background: '#fff' }} onLoad={() => setIsPreviewLoading(false)}></iframe>
                             )}
                         </div>
                     </div>
@@ -1991,7 +1989,7 @@ Example format:
             {isLinkModalOpen && (
                 <div className="modal-container show" style={{ zIndex: 1100 }} onClick={() => setIsLinkModalOpen(false)}>
                     <div className="modal-content" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
-                        <h2 style={{ marginBottom: '15px', color: isDark ? 'var(--text-primary)' : '#2d3436' }}><i className="fas fa-link" style={{ color: '#4facfe', marginRight: '10px' }}></i>Add Link</h2>
+                        <h2 style={{ marginBottom: '15px', color: '#888' }}><i className="fas fa-link" style={{ color: '#4facfe', marginRight: '10px' }}></i>Add Link</h2>
                         <div className="input-group"><label>URL Address</label><input type="url" placeholder="https://example.com" value={linkInput} onChange={e => setLinkInput(e.target.value)} autoFocus /></div>
                         <div className="modal-actions">
                             <button type="button" className="btn-cancel" onClick={() => setIsLinkModalOpen(false)}>Cancel</button>
@@ -2023,13 +2021,13 @@ Example format:
                         <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'linear-gradient(135deg, #fff0f0, #fecaca)', display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', boxShadow: '0 4px 15px rgba(231,76,60,0.15)' }}>
                             <i className="fas fa-flask" style={{ fontSize: '2rem', color: '#e74c3c' }}></i>
                         </div>
-                        <h2 style={{ marginBottom: '10px', color: isDark ? 'var(--text-primary)' : '#2d3436' }}>Not Chemistry-Related</h2>
+                        <h2 style={{ marginBottom: '10px', color: '#888' }}>Not Chemistry-Related</h2>
                         <p style={{ color: '#666', marginBottom: '25px', lineHeight: '1.6', fontSize: '0.95rem' }}>
                             {aiError || 'The uploaded material does not appear to be related to chemistry. Please upload a chemistry lesson or module only.'}
                         </p>
-                        <div style={{ background: isDark ? 'var(--bg-subtle-2)' : '#f8f9fa', borderRadius: '12px', padding: '12px 16px', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: 'white', borderRadius: '12px', padding: '12px 16px', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <i className="fas fa-info-circle" style={{ color: '#6e45e2', fontSize: '1rem', flexShrink: 0 }}></i>
-                            <span style={{ color: isDark ? 'var(--text-secondary)' : '#555', fontSize: '0.85rem', textAlign: 'left' }}>Accepted topics: elements, compounds, reactions, periodic table, atoms, molecules, acids & bases, lab procedures, and more.</span>
+                            <span style={{ color: '#2d3436', fontSize: '0.85rem', textAlign: 'left' }}>Accepted topics: elements, compounds, reactions, periodic table, atoms, molecules, acids & bases, lab procedures, and more.</span>
                         </div>
                         <div className="modal-actions" style={{ justifyContent: 'center' }}>
                             <button type="button" className="btn-confirm" style={{ background: 'linear-gradient(135deg, #6e45e2, #8e44ad)', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setIsAiErrorModalOpen(false); setAiError(''); setAiPdfFile(null); setAiLessonText(''); }}>
