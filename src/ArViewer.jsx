@@ -62,7 +62,6 @@ export default function ArViewer() {
                     {!modelFailed ? (
                         <model-viewer
                             src={modelSrc}
-                            ios-src={modelIosSrc}
                             alt={`3D model of ${title}`}
                             auto-rotate
                             rotation-per-second="45deg"
@@ -70,9 +69,7 @@ export default function ArViewer() {
                             ar
                             autoplay
                             scale="0.4 0.4 0.4"
-                            ar-scale="auto"
-                            min-camera-orbit="auto auto 0.5m"
-                            max-camera-orbit="auto auto 2m"
+                            ar-scale="fixed"
                             ar-modes="webxr scene-viewer quick-look"
                             style={{ width: '100%', height: '100%' }}
                             onError={() => setModelFailed(true)}

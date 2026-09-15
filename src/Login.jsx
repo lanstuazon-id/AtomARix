@@ -6,6 +6,28 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, Go
 import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
 
+//Schools list 
+const SCHOOLS = [
+    'Bataan National High School',
+    'Bataan Peninsula State University',
+    'City of Balanga National High School',
+    'Balanga City National Science High School',
+    'Bagac National High School',
+    'Orani National High School',
+    'Pilar National High School',
+    'Pablo Roman National High School',
+    'Orion National High School',
+    'Dinalupihan National High School',
+    'Mariveles National High School',
+    'Abucay National High School',
+    'Tomas del Rosario College',
+    'Bonifacio Camacho National High School',
+    'Mabatang National High School',
+    'Asia Pacific College of Advanced Studies',
+    'Eastwoods College of Science & Technology',
+    'Eastwoods Academy of Science & Technology'
+];
+
 export default function Login() {
     const navigate = useNavigate();
 
@@ -18,6 +40,7 @@ export default function Login() {
     const [role, setRole] = useState('student');
     const [teacherCode, setTeacherCode] = useState('');
     const [teacherSchool, setTeacherSchool] = useState('');
+    const [schoolDropdownOpen, setSchoolDropdownOpen] = useState(false);
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -25,11 +48,9 @@ export default function Login() {
     const [rememberMe, setRememberMe] = useState(false);
     const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
-    // Token state — tracks whether the token came from a URL invite link
+    
     const [tokenFromUrl, setTokenFromUrl] = useState(false);
 
-    // Request-access flow — lets a teacher without a token ask the admin to
-    // review and approve them, instead of requiring a pre-existing token.
     const [showRequestAccess, setShowRequestAccess] = useState(false);
     const [requestFullName, setRequestFullName] = useState('');
     const [requestEmail, setRequestEmail] = useState('');
@@ -73,7 +94,7 @@ export default function Login() {
         }
     }, []);
 
-    // ─── Token validator ───────────────────────────────────────────────────────
+    // Token validator 
     const validateInviteToken = async (token) => {
         const tokenRef = doc(db, 'teacherInvites', token.trim());
         const tokenSnap = await getDoc(tokenRef);
@@ -95,7 +116,7 @@ export default function Login() {
         return { valid: true };
     };
 
-    // ─── Mark token as used after successful registration ─────────────────────
+    // Mark token as used after successful registration 
     const markTokenUsed = async (token, usedByUsername) => {
         const tokenRef = doc(db, 'teacherInvites', token.trim());
         await setDoc(tokenRef, {
@@ -105,10 +126,6 @@ export default function Login() {
         }, { merge: true });
     };
 
-    // ─── Teacher access request (no token yet) ─────────────────────────────────
-    // Writes a pending request the admin reviews in AdminDashboard.jsx. On
-    // approval, a Cloud Function generates a token and emails it directly
-    // to this address — nothing further is needed here once submitted.
     const submitAccessRequest = async (e) => {
         e.preventDefault();
         if (!requestFullName.trim() || !requestEmail.trim() || !requestSchool.trim()) {
@@ -135,7 +152,7 @@ export default function Login() {
                 tokenGenerated: null,
             });
 
-            // ── EmailJS — notify admin of new teacher request ─────────────────
+            // notify admin of new teacher request
             try {
                 const ejsResult = await emailjs.send(
                     'service_vofm2hx',
@@ -150,12 +167,9 @@ export default function Login() {
                 );
                 console.log('EmailJS sent:', ejsResult.status, ejsResult.text);
             } catch (ejsErr) {
-                // Email failed but request is already saved — admin can still
-                // see it on the dashboard. Log the full error for debugging.
                 console.error('EmailJS admin notify failed:', ejsErr);
                 console.error('EmailJS error details:', JSON.stringify(ejsErr));
             }
-            // ─────────────────────────────────────────────────────────────────
 
             setRequestSubmitted(true);
         } catch (err) {
@@ -165,15 +179,11 @@ export default function Login() {
         setIsSubmittingRequest(false);
     };
 
-    // ─── Form submit ──────────────────────────────────────────────────────────
+    // Form submit 
     const handleFormSubmit = async (e) => {
         e.preventDefault();
 
-        // For both students and teachers, the username field is now the login identifier.
-        // Teachers who registered before this change used their fullname as the username —
-        // they log in by typing their fullname in the username field, same as before.
         const actualUsername = username.trim();
-        // Create a dummy email for Firebase Auth since it requires an email format
         const authEmail = `${actualUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
 
         if (isLoginView) {
@@ -221,7 +231,7 @@ export default function Login() {
                 setModal({ show: true, title: 'Login Failed', message: errorMessage, type: 'error' });
             }
         } else {
-            // ── Registration ──────────────────────────────────────────────────
+            // Registration 
             setPasswordError('');
 
             if (password.length < 8) {
@@ -518,19 +528,63 @@ export default function Login() {
                 {/* Invite token + school — shown only for teacher registration */}
                 {role === 'teacher' && !showRequestAccess && (
                     <>
-                        <div className="input-group">
+                        <div className="input-group" style={{ position: 'relative' }}>
                             <label htmlFor="teacherSchool">School / Institution</label>
                             <div className="input-icon-wrapper">
                                 <input
                                     type="text"
                                     id="teacherSchool"
                                     value={teacherSchool}
-                                    onChange={e => setTeacherSchool(e.target.value)}
-                                    placeholder="e.g. Calasiao National High School"
+                                    onChange={e => {
+                                        setTeacherSchool(e.target.value);
+                                        setSchoolDropdownOpen(e.target.value.trim().length > 0);
+                                    }}
+                                    onFocus={() => teacherSchool.trim().length > 0 && setSchoolDropdownOpen(true)}
+                                    onBlur={() => setTimeout(() => setSchoolDropdownOpen(false), 150)}
+                                    placeholder="e.g. Bataan National High School"
+                                    autoComplete="off"
                                     required
                                 />
-                                {teacherSchool && <i className="fas fa-times-circle clear-icon" onClick={() => setTeacherSchool('')} title="Clear"></i>}
+                                {teacherSchool && <i className="fas fa-times-circle clear-icon" onClick={() => { setTeacherSchool(''); setSchoolDropdownOpen(false); }} title="Clear"></i>}
                             </div>
+
+                            {/* ── Suggestion dropdown ── */}
+                            {schoolDropdownOpen && (() => {
+                                const filtered = SCHOOLS.filter(s =>
+                                    s.toLowerCase().includes(teacherSchool.toLowerCase().trim())
+                                );
+                                if (filtered.length === 0) return null;
+                                return (
+                                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e1e1e1', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.10)', zIndex: 50, overflow: 'hidden', maxHeight: '200px', overflowY: 'auto', marginTop: '4px' }}>
+                                        {filtered.map((school, i) => (
+                                            <div
+                                                key={i}
+                                                onMouseDown={() => {
+                                                    setTeacherSchool(school);
+                                                    setSchoolDropdownOpen(false);
+                                                }}
+                                                style={{ padding: '11px 16px', cursor: 'pointer', fontSize: '0.9rem', color: '#2d3436', borderBottom: i < filtered.length - 1 ? '1px solid #f0f2f5' : 'none', transition: 'background 0.15s', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                                onMouseEnter={e => e.currentTarget.style.background = '#f3f0ff'}
+                                                onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                            >
+                                                <i className="fas fa-school" style={{ color: '#6e45e2', fontSize: '0.8rem', flexShrink: 0 }}></i>
+                                                {/* Highlight the matched portion */}
+                                                {(() => {
+                                                    const idx = school.toLowerCase().indexOf(teacherSchool.toLowerCase().trim());
+                                                    if (idx === -1) return school;
+                                                    return (
+                                                        <>
+                                                            {school.slice(0, idx)}
+                                                            <strong style={{ color: '#6e45e2' }}>{school.slice(idx, idx + teacherSchool.trim().length)}</strong>
+                                                            {school.slice(idx + teacherSchool.trim().length)}
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
                         </div>
                         <div className="input-group">
                             <label htmlFor="teacherCode">
