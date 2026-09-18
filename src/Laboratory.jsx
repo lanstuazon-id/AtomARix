@@ -48,7 +48,7 @@ export const recipes = {
     "C,H,H,H,H": { name: "Methane", formula: "CH₄", icon: "🔥", desc: "The main constituent of natural gas.", color: "#ffeaa7" },
     "H,H,O,O": { name: "Hydrogen Peroxide", formula: "H₂O₂", icon: "🫧", desc: "Used as a mild antiseptic and bleaching agent.", color: "#81ecec" },
     "C,O": { name: "Carbon Monoxide", formula: "CO", icon: "☠️", desc: "A toxic, colorless, odorless gas.", color: "#b2bec3", requiresHeat: true },
-    "Fe,Fe,O,O,O": { name: "Iron(III) Oxide (Rust)", formula: "Fe₂O₃", icon: "🟫", desc: "Formed when iron oxidizes.", color: "#d35400", requiresHeat: true },
+    "Fe,Fe,O,O,O": { name: "Iron Oxide (Rust)", formula: "Fe₂O₃", icon: "🟫", desc: "Formed when iron oxidizes.", color: "#d35400", requiresHeat: true },
     "N,N,O": { name: "Nitrous Oxide", formula: "N₂O", icon: "😂", desc: "Also known as laughing gas.", color: "#a29bfe" },
     "H,H,S": { name: "Hydrogen Sulfide", formula: "H₂S", icon: "🥚", desc: "A gas with the foul odor of rotten eggs.", color: "#feca57" },
     "H,H,H,N": { name: "Ammonia", formula: "NH₃", icon: "🧽", desc: "Used in fertilizers and cleaning products.", color: "#55efc4" },
@@ -56,14 +56,14 @@ export const recipes = {
     "C,Ca,O,O,O": { name: "Calcium Carbonate", formula: "CaCO₃", icon: "🪨", desc: "Found in rocks, shells, and pearls.", color: "#ecf0f1" },
     "Cl,K": { name: "Potassium Chloride", formula: "KCl", icon: "🧂", desc: "Used as a fertilizer and salt substitute.", color: "#f5f6fa" },
     "Ag,N,O,O,O": { name: "Silver Nitrate", formula: "AgNO₃", icon: "🪙", desc: "An important compound in photography and medicine.", color: "#c8d6e5" },
-    "Cu,O,O,O,O,S": { name: "Copper(II) Sulfate", formula: "CuSO₄", icon: "🔵", desc: "Used as a fungicide and in electroplating.", color: "#0984e3" },
+    "Cu,O,O,O,O,S": { name: "Copper Sulfate", formula: "CuSO₄", icon: "🔵", desc: "Used as a fungicide and in electroplating.", color: "#0984e3" },
     "O,O,O": { name: "Ozone", formula: "O₃", icon: "🛡️", desc: "Protects the Earth from harmful UV radiation.", color: "#00cec9" },
     "F,H": { name: "Hydrogen Fluoride", formula: "HF", icon: "⚠️", desc: "A highly dangerous and corrosive gas.", color: "#fab1a0" },
     "Cl,Li": { name: "Lithium Chloride", formula: "LiCl", icon: "🔋", desc: "Used in the production of lithium metal.", color: "#ffeaa7" },
     "Mg,O": { name: "Magnesium Oxide", formula: "MgO", icon: "💊", desc: "Used to relieve heartburn and indigestion.", color: "#f1f2f6", requiresHeat: true },
     "H,Na,O": { name: "Sodium Hydroxide", formula: "NaOH", icon: "🧼", desc: "Also known as lye, used in soap making.", color: "#dfe6e9" },
     "H,K,O": { name: "Potassium Hydroxide", formula: "KOH", icon: "🔋", desc: "Used in alkaline batteries and soft soaps.", color: "#c8d6e5" },
-    "Fe,S": { name: "Iron(II) Sulfide", formula: "FeS", icon: "🪨", desc: "A black solid commonly found in nature.", color: "#2d3436", requiresHeat: true },
+    "Fe,S": { name: "Iron Sulfide", formula: "FeS", icon: "🪨", desc: "A black solid commonly found in nature.", color: "#2d3436", requiresHeat: true },
     "N,O,O": { name: "Nitrogen Dioxide", formula: "NO₂", icon: "🏭", desc: "A reddish-brown toxic gas and air pollutant.", color: "#e17055" },
     "H,N,O,O,O": { name: "Nitric Acid", formula: "HNO₃", icon: "💥", desc: "A highly corrosive acid used in explosives.", color: "#ff7675" },
     "Ca,O": { name: "Calcium Oxide", formula: "CaO", icon: "🧱", desc: "Known as quicklime, used in making cement.", color: "#ecf0f1" },
@@ -85,8 +85,8 @@ export const getModelFilename = (name) => {
     // Explicit overrides for compounds whose names don't map cleanly
     // to a simple filename (roman numerals, special characters, etc.)
     const overrides = {
-        'Iron(III) Oxide (Rust)': 'iron_oxide',
-        'Iron(III) Oxide':        'iron_oxide',
+        'Iron Oxide (Rust)': 'iron_oxide',
+        'Iron Oxide':        'iron_oxide',
     };
     if (overrides[name]) return overrides[name];
     return name.split(' (')[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');

@@ -8,7 +8,7 @@ import emailjs from '@emailjs/browser';
 
 // ── EmailJS credentials ───────────────────────────────────────────────────────
 const EJS_SERVICE           = 'service_vofm2hx';
-const EJS_APPROVAL_TEMPLATE = 'template_aqh4t0b';  
+const EJS_APPROVAL_TEMPLATE = 'template_aqh4t0b';  // teacher approval
 const EJS_PUBLIC_KEY        = 'D6R6Iv2q_dahXJqDg';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -361,8 +361,10 @@ function PendingRequests() {
                 createdAt: new Date().toISOString(),
                 expiresAt,
                 createdBy: 'admin',
-                forEmail: request.email,
-                forName: request.fullName,
+                forEmail:    request.email,
+                forName:     request.fullName,
+                forUsername: request.username || '',
+                forSchool:   request.school   || '',
             });
 
             // 2. Mark the request as approved

@@ -43,6 +43,8 @@ export default function Login() {
     const [schoolDropdownOpen, setSchoolDropdownOpen] = useState(false);
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [passwordTouched, setPasswordTouched] = useState(false);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
@@ -67,6 +69,8 @@ export default function Login() {
         setFullname('');
         setConfirmPassword('');
         setPasswordError('');
+        setPasswordTouched(false);
+        setSubmitAttempted(false);
         setTeacherCode('');
         setTeacherSchool('');
         setRequestSchool('');
@@ -233,13 +237,35 @@ export default function Login() {
         } else {
             // Registration 
             setPasswordError('');
+            setSubmitAttempted(true);
+            const ALLOWED_CHARS = /^[A-Za-z0-9!@#$%^&*\-_.]+$/;
 
             if (password.length < 8) {
-                setPasswordError("Password must be at least 8 characters long.");
+                setPasswordError('Password must be at least 8 characters long.');
+                return;
+            }
+            if (password.length > 128) {
+                setPasswordError('Password must not exceed 128 characters.');
+                return;
+            }
+            if (!/[A-Z]/.test(password)) {
+                setPasswordError('Password must include at least one uppercase letter (A–Z).');
+                return;
+            }
+            if (!/[a-z]/.test(password)) {
+                setPasswordError('Password must include at least one lowercase letter (a–z).');
+                return;
+            }
+            if (!/\d/.test(password)) {
+                setPasswordError('Password must include at least one number (0–9).');
+                return;
+            }
+            if (!ALLOWED_CHARS.test(password)) {
+                setPasswordError('Password contains invalid characters. Only letters, numbers, and ! @ # $ % ^ & * - _ . are allowed.');
                 return;
             }
             if (password !== confirmPassword) {
-                setPasswordError("Passwords do not match. Please try again.");
+                setPasswordError('Passwords do not match. Please try again.');
                 return;
             }
 
@@ -435,15 +461,22 @@ export default function Login() {
         );
 
         // Password strength for registration
+        // Rules: min 8 chars, max 128, requires uppercase, lowercase,
+        // number, allowed special chars only (!@#$%^&*), no spaces
+        const ALLOWED_SPECIAL = /^[A-Za-z0-9!@#$%^&*\-_.]+$/;
         let strengthScore = 0;
+        let strengthLabel = '';
         if (password) {
-            if (password.length > 5) strengthScore += 1;
-            if (password.length > 7) strengthScore += 1;
-            if (/\d/.test(password)) strengthScore += 1;
-            if (/[A-Z]/.test(password) || /[^A-Za-z0-9]/.test(password)) strengthScore += 1;
+            if (password.length >= 8)  strengthScore += 1;
+            if (password.length >= 12) strengthScore += 1;
+            if (/[A-Z]/.test(password)) strengthScore += 1;
+            if (/[a-z]/.test(password)) strengthScore += 1;
+            if (/\d/.test(password))    strengthScore += 1;
+            if (/[!@#$%^&*\-_.]/.test(password)) strengthScore += 1;
         }
-        const strengthWidth = password ? `${Math.max(15, (strengthScore / 4) * 100)}%` : '0%';
-        const strengthColor = strengthScore <= 1 ? '#ff4b2b' : strengthScore === 2 ? '#feca57' : strengthScore === 3 ? '#1dd1a1' : '#10ac84';
+        const strengthWidth = password ? `${Math.max(10, (strengthScore / 6) * 100)}%` : '0%';
+        const strengthColor = strengthScore <= 2 ? '#ff4b2b' : strengthScore <= 3 ? '#feca57' : strengthScore <= 4 ? '#1dd1a1' : '#10ac84';
+        const strengthLabel2 = strengthScore <= 2 ? 'Weak' : strengthScore <= 3 ? 'Fair' : strengthScore <= 4 ? 'Good' : 'Strong';
 
         if (isLoginView) {
             return (
@@ -733,19 +766,73 @@ export default function Login() {
                 <div className="input-group">
                     <label htmlFor="password">Create Password</label>
                     <div className="password-wrapper">
-                        <input type={showPassword ? "text" : "password"} id="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+                        <input
+                            type={showPassword ? "text" : "password"}
+                            id="password"
+                            value={password}
+                            onChange={e => { setPassword(e.target.value); setPasswordTouched(true); }}
+                            onBlur={() => setPasswordTouched(true)}
+                            placeholder="Create Password"
+                            required
+                        />
                         <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} password-toggle-icon`} onClick={() => setShowPassword(!showPassword)}></i>
                     </div>
+
+                    {/* Strength meter */}
                     {password && (
-                        <div className="strength-meter"><div className="strength-meter-bar" style={{ width: strengthWidth, backgroundColor: strengthColor }}></div></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            <div className="strength-meter" style={{ flex: 1, marginTop: 0 }}>
+                                <div className="strength-meter-bar" style={{ width: strengthWidth, backgroundColor: strengthColor }}></div>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: strengthColor, minWidth: '38px' }}>{strengthLabel2}</span>
+                        </div>
                     )}
+
+                    {/* 3-state requirements checklist */}
+                    <div style={{ marginTop: '10px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '10px', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#555', marginBottom: '2px' }}>Password requirements:</span>
+                        {[
+                            { ok: password.length >= 8,                   label: 'At least 8 characters'        },
+                            { ok: /\d/.test(password),                    label: 'At least 1 number'            },
+                            { ok: /[a-z]/.test(password),                 label: 'At least 1 lowercase letter'  },
+                            { ok: /[A-Z]/.test(password),                 label: 'At least 1 uppercase letter'  },
+                            { ok: /[!@#$%^&*\-_.]/.test(password),       label: 'At least 1 special character' },
+                        ].map((req, i) => {
+                            // ── 3 states ──────────────────────────────────────────────────
+                            // unmet  (not touched yet)  → gray bullet
+                            // success (requirement met) → green checkmark
+                            // fail   (touched/submitted but not met) → red X
+                            const touched = passwordTouched || submitAttempted;
+                            const isSuccess = req.ok;
+                            const isFail    = touched && !req.ok;
+                            const isUnmet   = !touched && !req.ok;
+
+                            const color = isSuccess ? '#10ac84' : isFail ? '#e74c3c' : '#bbb';
+                            const icon  = isSuccess ? 'fa-check-circle' : isFail ? 'fa-times-circle' : 'fa-circle';
+
+                            return (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.75rem', color }}>
+                                    <i className={`fas ${icon}`} style={{ fontSize: '0.72rem' }}></i>
+                                    {req.label}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
+
                 <div className="input-group">
                     <label htmlFor="confirmPassword">Confirm Password</label>
                     <div className="password-wrapper">
-                        <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" required />
+                        <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required />
                         <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} password-toggle-icon`} onClick={() => setShowConfirmPassword(!showConfirmPassword)}></i>
                     </div>
+                    {/* Match indicator */}
+                    {confirmPassword && (
+                        <div style={{ fontSize: '0.75rem', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px', color: password === confirmPassword ? '#10ac84' : '#e74c3c' }}>
+                            <i className={`fas ${password === confirmPassword ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
+                            {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                        </div>
+                    )}
                     <small className="error-message">{passwordError}</small>
                 </div>
             </>
