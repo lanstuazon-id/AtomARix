@@ -92,6 +92,11 @@ export default function TeacherRoom() {
     const [aiError, setAiError] = useState('');
     const [aiGenerated, setAiGenerated] = useState(false);
     const [isAiErrorModalOpen, setIsAiErrorModalOpen] = useState(false);
+    // Per-type question counts
+    const [countMC, setCountMC]     = useState(3);
+    const [countTF, setCountTF]     = useState(2);
+    const [countID, setCountID]     = useState(2);
+    const [countFB, setCountFB]     = useState(2);
 
     const addQuestion = () => {
         setQuizQuestions(prev => [...prev, { id: Date.now().toString() + Math.random(), question: '', options: ['', '', '', ''], correctOption: 0 }]);
@@ -130,6 +135,12 @@ export default function TeacherRoom() {
 
     // ── AI Quiz Generator ──
     const handleGenerateAiQuiz = async () => {
+        const totalCount = countMC + countTF + countID + countFB;
+        if (totalCount === 0) {
+            setAiError('Please set at least 1 question for any type.');
+            setIsAiErrorModalOpen(true);
+            return;
+        }
         setIsAiGenerating(true);
         setAiError('');
 
@@ -140,7 +151,7 @@ export default function TeacherRoom() {
 
             let lessonContent = aiLessonText.trim();
 
-            // Step 1
+            // Step 1 — Extract PDF text if uploaded
             if (aiPdfFile) {
                 const base64Data = await new Promise((res, rej) => {
                     const r = new FileReader();
@@ -148,7 +159,6 @@ export default function TeacherRoom() {
                     r.onerror = () => rej(new Error('Failed to read PDF file.'));
                     r.readAsDataURL(aiPdfFile);
                 });
-
                 const extractResult = await generateQuiz({
                     payload: {
                         model: 'claude-sonnet-4-6',
@@ -162,14 +172,13 @@ export default function TeacherRoom() {
                         }]
                     }
                 });
-
                 lessonContent = extractResult.data?.content?.map(b => b.text || '').join('') || '';
                 if (!lessonContent) throw new Error('Could not extract text from PDF. Try pasting the text instead.');
             }
 
             if (!lessonContent) throw new Error('No content to generate from. Upload a PDF or paste your lesson text.');
 
-            // Step 2
+            // Step 2 — Validate chemistry content
             const validateResult = await generateQuiz({
                 payload: {
                     model: 'claude-sonnet-4-6',
@@ -185,33 +194,46 @@ ${lessonContent}`
                     }]
                 }
             });
-
             const validationAnswer = validateResult.data?.content?.map(b => b.text || '').join('').trim().toUpperCase();
             if (!validationAnswer.includes('YES')) {
                 throw new Error('The uploaded material does not appear to be related to chemistry. Please upload a chemistry lesson or module only.');
             }
 
-            // Step 3
-            const prompt = `You are a professional quiz generator for a Grade 7-8 chemistry classroom. Based on the lesson content below, generate exactly ${aiQuestionCount} multiple-choice questions.
+            // Step 3 — Build type-specific instructions
+            const typeInstructions = [];
+            if (countMC > 0) typeInstructions.push(`- ${countMC} Multiple Choice questions: each has a "question" string, "options" array of exactly 4 strings, "correctOption" integer (0-3), and "type": "mc"`);
+            if (countTF > 0) typeInstructions.push(`- ${countTF} True or False questions: each has a "question" string, "options": ["True", "False"], "correctOption" integer (0 for True, 1 for False), and "type": "tf"`);
+            if (countID > 0) typeInstructions.push(`- ${countID} Identification questions: each has a "question" string (e.g. "What element has the symbol Au?"), "answer" string (the correct word/phrase, e.g. "Gold"), and "type": "identification". No options array.`);
+            if (countFB > 0) typeInstructions.push(`- ${countFB} Fill in the Blank questions: each has a "question" string with a blank shown as ___ (e.g. "The atomic number of Carbon is ___."), "answer" string (the word or value that fills the blank, e.g. "6"), and "type": "fillblank". No options array.`);
+
+            const prompt = `You are a professional quiz generator for a Grade 7-8 chemistry classroom. Based on the lesson content below, generate a mixed quiz with exactly ${totalCount} questions total.
 
 LESSON CONTENT:
 ${lessonContent}
 
+QUESTION TYPES TO GENERATE:
+${typeInstructions.join('\n')}
+
 STRICT OUTPUT RULES:
-- Respond with ONLY a valid JSON array. No markdown, no backticks, no preamble, no extra text whatsoever.
-- Each item must have exactly these fields: "question" (string), "options" (array of exactly 4 strings), "correctOption" (integer 0-3)
+- Respond with ONLY a valid JSON array. No markdown, no backticks, no preamble, no extra text.
+- Each item must have the exact fields described above for its type.
 - Questions must be appropriate for Grade 7-8 students (ages 12-14).
-- Use simple, clear language that is easy to understand.
-- Avoid overly technical jargon unless it is part of the lesson.
-- Vary difficulty from easy to moderate — avoid very hard questions.
-- All 4 options must be plausible and relevant.
+- Use simple, clear language.
+- Vary difficulty from easy to moderate.
+- Mix the question types throughout — do not group all of one type together.
 
 Example format:
-[{"question":"What is the chemical formula for water?","options":["H2O2","H2O","HO","H3O"],"correctOption":1}]`;
+[
+  {"type":"mc","question":"What is the symbol for Gold?","options":["Ag","Au","Fe","Cu"],"correctOption":1},
+  {"type":"tf","question":"Protons have a negative charge.","options":["True","False"],"correctOption":1},
+  {"type":"identification","question":"What element has the atomic number 1?","answer":"Hydrogen"},
+  {"type":"fillblank","question":"Water is made of hydrogen and ___.","answer":"oxygen"}
+]`;
+
             const quizResult = await generateQuiz({
                 payload: {
                     model: 'claude-sonnet-4-6',
-                    max_tokens: 1000,
+                    max_tokens: 4000,
                     messages: [{ role: 'user', content: prompt }]
                 }
             });
@@ -224,9 +246,11 @@ Example format:
 
             setQuizQuestions(parsed.map((q, i) => ({
                 id: Date.now().toString() + i,
+                type: q.type || 'mc',
                 question: q.question,
-                options: q.options,
-                correctOption: q.correctOption
+                options: q.options || (q.type === 'tf' ? ['True', 'False'] : []),
+                correctOption: q.correctOption ?? 0,
+                answer: q.answer || '',
             })));
             setAiGenerated(true);
 
@@ -1303,6 +1327,9 @@ Example format:
                 .ai-generate-btn:disabled{background:#ccc;cursor:not-allowed;box-shadow:none}
                 .ai-question-card{background:#fdfdfd;padding:18px;border-radius:12px;border:1px solid #e1e1e1;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.03);transition:border-color .2s}
                 .ai-question-card:hover{border-color:#d7ccff}
+                input[type=number]::-webkit-inner-spin-button,
+                input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+                input[type=number] { -moz-appearance: textfield; }
                 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
                 .ai-generating-pulse{background:linear-gradient(90deg,#f0f2f5 25%,#e8eaf0 50%,#f0f2f5 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;height:20px;margin-bottom:8px}
 
@@ -1555,17 +1582,51 @@ Example format:
 
                                                     <textarea value={aiLessonText} onChange={e => setAiLessonText(e.target.value)} placeholder="Paste your lesson, module, or notes here..." rows="5" style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #d7ccff', resize: 'vertical', fontSize: '0.95rem', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit', marginBottom: '16px', background: 'white', transition: 'border-color 0.2s' }} onFocus={e => e.target.style.borderColor = '#6e45e2'} onBlur={e => e.target.style.borderColor = '#d7ccff'} />
 
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', justifyContent: 'center' }}>
-                                                        <label style={{ color: '#2d3436', fontWeight: '600', fontSize: '0.9rem' }}>Number of questions:</label>
-                                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                                            {[3, 5, 8, 10, 15].map(n => (
-                                                                <button key={n} type="button" onClick={() => setAiQuestionCount(n)} style={{ width: '38px', height: '38px', border: aiQuestionCount === n ? '2px solid #6e45e2' : '1px solid #ddd', borderRadius: '8px', background: aiQuestionCount === n ? '#f3f0ff' : '#fff', color: aiQuestionCount === n ? '#6e45e2' : '#555', fontWeight: '700', cursor: 'pointer', fontSize: '0.9rem', transition: 'all 0.2s' }}>{n}</button>
-                                                            ))}
+                                                    <div style={{ marginBottom: '20px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                                            <label style={{ color: '#2d3436', fontWeight: '600', fontSize: '0.9rem' }}>Question Types & Count:</label>
+                                                            <span style={{ background: (countMC + countTF + countID + countFB) > 50 ? '#fff0f0' : '#f3f0ff', color: (countMC + countTF + countID + countFB) > 50 ? '#e74c3c' : '#6e45e2', fontWeight: 800, fontSize: '0.85rem', padding: '3px 12px', borderRadius: '20px', border: `1px solid ${(countMC + countTF + countID + countFB) > 50 ? '#fecaca' : '#d7ccff'}` }}>
+                                                                Total: {countMC + countTF + countID + countFB} / 50 (Maximum)
+                                                            </span>
                                                         </div>
+                                                        {(countMC + countTF + countID + countFB) > 50 && (
+                                                            <div style={{ fontSize: '0.75rem', color: '#e74c3c', background: '#fff0f0', padding: '6px 12px', borderRadius: '8px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <i className="fas fa-exclamation-triangle"></i> Maximum 50 questions total. Please reduce the count.
+                                                            </div>
+                                                        )}
+                                                        {[
+                                                            { label: 'Multiple Choice', icon: 'fa-list',      color: '#6e45e2', bg: '#f3f0ff', count: countMC, set: setCountMC },
+                                                            { label: 'True or False',   icon: 'fa-toggle-on', color: '#1dd1a1', bg: '#e3fdf5', count: countTF, set: setCountTF },
+                                                            { label: 'Identification',  icon: 'fa-lightbulb', color: '#f39c12', bg: '#fff7e0', count: countID, set: setCountID },
+                                                            { label: 'Fill in the Blank', icon: 'fa-pen',    color: '#4facfe', bg: '#eaf4ff', count: countFB, set: setCountFB },
+                                                        ].map(type => (
+                                                            <div key={type.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: type.count > 0 ? type.bg : '#f8f9fa', borderRadius: '10px', border: `1.5px solid ${type.count > 0 ? type.color + '55' : '#eee'}`, marginBottom: '8px', transition: 'all 0.2s' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <i className={`fas ${type.icon}`} style={{ color: type.count > 0 ? type.color : '#bbb', fontSize: '0.9rem', width: '16px' }}></i>
+                                                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: type.count > 0 ? '#2d3436' : '#aaa' }}>{type.label}</span>
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <button type="button" onClick={() => type.set(v => Math.max(0, v - 1))} style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontWeight: 800, color: '#555', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>−</button>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        max="50"
+                                                                        value={type.count}
+                                                                        onChange={e => {
+                                                                            const val = Math.min(50, Math.max(0, parseInt(e.target.value) || 0));
+                                                                            const otherTotal = (countMC + countTF + countID + countFB) - type.count;
+                                                                            type.set(Math.min(val, 50 - otherTotal < 0 ? 0 : 50 - otherTotal));
+                                                                        }}
+                                                                        style={{ width: '44px', textAlign: 'center', fontWeight: 800, fontSize: '0.95rem', color: type.count > 0 ? type.color : '#bbb', border: '1px solid #ddd', borderRadius: '6px', padding: '3px 4px', outline: 'none', MozAppearance: 'textfield', WebkitAppearance: 'none', appearance: 'textfield' }}
+                                                                    />
+                                                                    <button type="button" onClick={() => { const otherTotal = (countMC + countTF + countID + countFB) - type.count; if (type.count < 50 && otherTotal + type.count < 50) type.set(v => v + 1); }} style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontWeight: 800, color: '#555', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
                                                     </div>
 
                                                     {!aiGenerated && (
-                                                        <button type="button" className="ai-generate-btn" onClick={handleGenerateAiQuiz} disabled={isAiGenerating || (!aiPdfFile && !aiLessonText.trim())}>
+                                                        <button type="button" className="ai-generate-btn" onClick={handleGenerateAiQuiz} disabled={isAiGenerating || (!aiPdfFile && !aiLessonText.trim()) || (countMC + countTF + countID + countFB) === 0 || (countMC + countTF + countID + countFB) > 50}>
                                                             <i className="fas fa-magic"></i> Generate Quiz with AI
                                                         </button>
                                                     )}
@@ -1574,7 +1635,7 @@ Example format:
                                                 <div style={{ textAlign: 'center', padding: '20px' }}>
                                                     <i className="fas fa-magic fa-spin" style={{ fontSize: '3.5rem', color: '#6e45e2', marginBottom: '20px', display: 'block' }}></i>
                                                     <h3 style={{ color: '#2d3436', marginBottom: '10px' }}>Generating your chemistry quiz...</h3>
-                                                    <p style={{ color: '#2d3436', maxWidth: '400px', margin: '0 auto 30px' }}>Our AI is analyzing your material and crafting {aiQuestionCount} unique questions just for your class.</p>
+                                                    <p style={{ color: '#2d3436', maxWidth: '400px', margin: '0 auto 30px' }}>Our AI is analyzing your material and crafting {countMC + countTF + countID + countFB} mixed questions just for your class.</p>
                                                     <div style={{ textAlign: 'left' }}>
                                                         {[...Array(3)].map((_, i) => (
                                                             <div key={i} style={{ padding: '15px', borderRadius: '12px', border: '1px solid #e1e1e1', marginBottom: '10px', background: '#fff' }}>
@@ -1600,19 +1661,75 @@ Example format:
                                                 <button type="button" onClick={resetAiState} style={{ background: 'white', border: '1px solid #d1fae5', color: '#16a34a', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#dcfce7'} onMouseLeave={e => e.currentTarget.style.background = '#fff'}><i className="fas fa-redo"></i> Regenerate</button>
                                             </div>
                                             {quizQuestions.map((q, qIndex) => (
-                                                <div key={q.id || qIndex} className="ai-question-card">
-                                                    <p style={{ fontWeight: '700', color: '#2d3436', margin: '0 0 14px 0', fontSize: '1rem', lineHeight: '1.5' }}>
-                                                        <span style={{ display: 'inline-block', width: '26px', height: '26px', background: '#f3f0ff', color: '#6e45e2', borderRadius: '6px', textAlign: 'center', lineHeight: '26px', fontSize: '0.85rem', fontWeight: '800', marginRight: '10px' }}>{qIndex + 1}</span>
-                                                        {q.question}
-                                                    </p>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                                        {q.options.map((opt, oIndex) => (
-                                                            <div key={oIndex} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 13px', borderRadius: '9px', background: q.correctOption === oIndex ? '#f0fdf4' : '#f8f9fa', border: q.correctOption === oIndex ? '2px solid #1dd1a1' : '1px solid #e1e1e1', fontSize: '0.9rem' }}>
-                                                                {q.correctOption === oIndex ? <i className="fas fa-check-circle" style={{ color: '#1dd1a1', flexShrink: 0 }}></i> : <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '1.5px solid #ccc', flexShrink: 0, display: 'inline-block' }}></span>}
-                                                                <span style={{ color: q.correctOption === oIndex ? '#15803d' : '#555', fontWeight: q.correctOption === oIndex ? '600' : '400' }}>{opt}</span>
-                                                            </div>
-                                                        ))}
+                                                <div key={q.id || qIndex} className="ai-question-card" style={{ marginBottom: '14px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '26px', height: '26px', background: '#f3f0ff', color: '#6e45e2', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '800', flexShrink: 0, marginTop: '8px' }}>{qIndex + 1}</span>
+                                                        <div style={{ flex: 1 }}>
+                                                            {(() => {
+                                                                const typeMap = { mc: { label: 'Multiple Choice', color: '#6e45e2', bg: '#f3f0ff' }, tf: { label: 'True or False', color: '#1dd1a1', bg: '#e3fdf5' }, identification: { label: 'Identification', color: '#f39c12', bg: '#fff7e0' }, fillblank: { label: 'Fill in the Blank', color: '#4facfe', bg: '#eaf4ff' } };
+                                                                const t = typeMap[q.type || 'mc'] || typeMap.mc;
+                                                                return <span style={{ fontSize: '10px', fontWeight: 700, color: t.color, background: t.bg, padding: '2px 8px', borderRadius: '20px', border: `1px solid ${t.color}44`, marginBottom: '6px', display: 'inline-block' }}>{t.label}</span>;
+                                                            })()}
+                                                            <textarea value={q.question} onChange={e => handleQuestionChange(qIndex, 'question', e.target.value)} rows={2} placeholder="Question text..."
+                                                                style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #e1e1e1', borderRadius: '9px', fontSize: '0.95rem', fontWeight: '600', color: '#2d3436', background: '#fff', resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: '1.5', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
+                                                                onFocus={e => e.target.style.borderColor = '#6e45e2'} onBlur={e => e.target.style.borderColor = '#e1e1e1'} />
+                                                        </div>
+                                                        {quizQuestions.length > 1 && (
+                                                            <button type="button" onClick={() => removeQuestion(qIndex)} title="Remove" style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '1rem', padding: '6px', borderRadius: '6px', flexShrink: 0, marginTop: '4px', opacity: 0.7 }}
+                                                                onMouseEnter={e => e.currentTarget.style.opacity = '1'} onMouseLeave={e => e.currentTarget.style.opacity = '0.7'}>
+                                                                <i className="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        )}
                                                     </div>
+
+                                                    {/* Multiple Choice */}
+                                                    {(q.type === 'mc' || !q.type) && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {q.options.map((opt, oIndex) => {
+                                                                const isCorrect = q.correctOption === oIndex;
+                                                                return (
+                                                                    <div key={oIndex} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderRadius: '9px', background: isCorrect ? '#f0fdf4' : '#f8f9fa', border: isCorrect ? '2px solid #1dd1a1' : '1px solid #e1e1e1', transition: 'all 0.2s' }}>
+                                                                        <button type="button" onClick={() => handleQuestionChange(qIndex, 'correctOption', oIndex)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
+                                                                            {isCorrect ? <i className="fas fa-check-circle" style={{ color: '#1dd1a1', fontSize: '1.1rem' }}></i> : <span style={{ width: '18px', height: '18px', borderRadius: '50%', border: '1.5px solid #ccc', display: 'inline-block' }}></span>}
+                                                                        </button>
+                                                                        <span style={{ width: '22px', height: '22px', borderRadius: '5px', background: isCorrect ? '#1dd1a1' : '#ddd', color: isCorrect ? '#fff' : '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: '800', flexShrink: 0 }}>{['A','B','C','D'][oIndex]}</span>
+                                                                        <input type="text" value={opt} onChange={e => handleOptionChange(qIndex, oIndex, e.target.value)} placeholder={`Choice ${['A','B','C','D'][oIndex]}...`}
+                                                                            style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '0.9rem', color: isCorrect ? '#15803d' : '#555', fontWeight: isCorrect ? '600' : '400', outline: 'none', fontFamily: 'inherit' }} />
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* True or False */}
+                                                    {q.type === 'tf' && (
+                                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                                            {['True', 'False'].map((opt, oIndex) => {
+                                                                const isCorrect = q.correctOption === oIndex;
+                                                                return (
+                                                                    <button key={oIndex} type="button" onClick={() => handleQuestionChange(qIndex, 'correctOption', oIndex)}
+                                                                        style={{ flex: 1, padding: '10px', borderRadius: '10px', border: isCorrect ? `2px solid ${oIndex === 0 ? '#1dd1a1' : '#e74c3c'}` : '1.5px solid #e1e1e1', background: isCorrect ? (oIndex === 0 ? '#f0fdf4' : '#fff0f0') : '#f8f9fa', fontWeight: 700, fontSize: '0.95rem', color: isCorrect ? (oIndex === 0 ? '#15803d' : '#c0392b') : '#888', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                                                        {isCorrect && <i className="fas fa-check-circle"></i>}
+                                                                        {opt}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Identification / Fill in the Blank */}
+                                                    {(q.type === 'identification' || q.type === 'fillblank') && (
+                                                        <div>
+                                                            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#888', marginBottom: '5px', display: 'block' }}>
+                                                                {q.type === 'fillblank' ? 'Word/value that fills the blank:' : 'Correct answer:'}
+                                                            </label>
+                                                            <input type="text" value={q.answer || ''} onChange={e => handleQuestionChange(qIndex, 'answer', e.target.value)}
+                                                                placeholder={q.type === 'fillblank' ? 'e.g. 6' : 'e.g. Sodium'}
+                                                                style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #e1e1e1', borderRadius: '9px', fontSize: '0.95rem', fontWeight: 600, color: '#2d3436', background: '#f8f9fa', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+                                                                onFocus={e => e.target.style.borderColor = '#6e45e2'} onBlur={e => e.target.style.borderColor = '#e1e1e1'} />
+                                                            <small style={{ color: '#aaa', fontSize: '0.7rem', marginTop: '4px', display: 'block' }}>Case-insensitive match.</small>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </>

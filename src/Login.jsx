@@ -45,6 +45,7 @@ export default function Login() {
     const [passwordError, setPasswordError] = useState('');
     const [passwordTouched, setPasswordTouched] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);
+    const [showPasswordReqs, setShowPasswordReqs] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
@@ -71,6 +72,7 @@ export default function Login() {
         setPasswordError('');
         setPasswordTouched(false);
         setSubmitAttempted(false);
+        setShowPasswordReqs(false);
         setTeacherCode('');
         setTeacherSchool('');
         setRequestSchool('');
@@ -193,29 +195,61 @@ export default function Login() {
         if (isLoginView) {
             setModal({ show: true, title: 'Authenticating...', message: 'Checking credentials...', type: 'loading' });
             try {
-                await signInWithEmailAndPassword(auth, authEmail, password);
+                // ── Admin check — credentials stored in Firestore, never in code ──
+                // Set up: Firebase Console → Firestore → adminConfig → credentials
+                // Add fields: username (string), password (string)
+                // Change them anytime in Firestore without touching the code.
+                try {
+                    const adminSnap = await getDoc(doc(db, 'adminConfig', 'credentials'));
+                    if (adminSnap.exists()) {
+                        const adminData = adminSnap.data();
+                        if (
+                            actualUsername.toLowerCase() === (adminData.username || '').toLowerCase() &&
+                            password === adminData.password
+                        ) {
+                            sessionStorage.setItem('loggedInUser', adminData.username);
+                            sessionStorage.setItem('userRole', 'admin');
+                            sessionStorage.setItem('userFullname', 'Admin');
+                            setModal({ show: false, title: '', message: '', type: '' });
+                            navigate('/admin/tokens');
+                            return;
+                        }
+                    }
+                } catch (adminErr) {
+                    // adminConfig missing or no permission — continue to normal login
+                    console.warn('adminConfig check skipped:', adminErr.code);
+                }
 
+                // ── Step 1: Look up Firestore first to get the exact stored username ──
                 const userRef = doc(db, "users", actualUsername);
                 const userSnap = await getDoc(userRef);
 
                 if (!userSnap.exists()) {
-                    setModal({ show: true, title: 'Login Failed', message: 'User profile not found in database.', type: 'error' });
+                    setModal({ show: true, title: 'Login Failed', message: 'No account found with that username. Please check your username and try again.', type: 'error' });
                     return;
                 }
 
                 const userData = userSnap.data();
 
-                // Block deactivated accounts 
                 if (userData.active === false) {
                     setModal({ show: true, title: 'Access Denied', message: 'Your account has been deactivated. Please contact your admin.', type: 'error' });
                     return;
                 }
-                sessionStorage.setItem('loggedInUser', userData.username);
+
+                // ── Step 2: Build authEmail from the STORED username (exact case) ──
+                // This ensures the Firebase Auth email matches what was used at registration.
+                const storedUsername = userData.username || actualUsername;
+                const exactAuthEmail = `${storedUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
+
+                // ── Step 3: Sign in with Firebase Auth ────────────────────────
+                await signInWithEmailAndPassword(auth, exactAuthEmail, password);
+
+                sessionStorage.setItem('loggedInUser', userData.username || actualUsername);
                 sessionStorage.setItem('userRole', userData.role);
                 sessionStorage.setItem('userFullname', userData.fullname);
 
                 if (rememberMe) {
-                    localStorage.setItem('rememberedUser', userData.username);
+                    localStorage.setItem('rememberedUser', userData.username || actualUsername);
                     localStorage.setItem('rememberedRole', userData.role);
                 } else {
                     localStorage.removeItem('rememberedUser');
@@ -224,13 +258,15 @@ export default function Login() {
 
                 setModal({ show: true, title: 'Success!', message: 'Logging you in...', type: 'loading' });
                 setTimeout(() => {
-                    navigate(userData.role === 'teacher' ? '/dashboard' : '/home');
+                    if (userData.role === 'admin') navigate('/admin/tokens');
+                    else if (userData.role === 'teacher') navigate('/dashboard');
+                    else navigate('/home');
                 }, 500);
             } catch (error) {
                 console.error("Firebase Login Error:", error.code, error.message);
-                let errorMessage = `Invalid username or password. (${error.code})`;
+                let errorMessage = 'Invalid username or password.';
                 if (error.code === 'auth/network-request-failed') errorMessage = 'Network error. Please check your connection.';
-                if (error.code === 'auth/invalid-credential') errorMessage = 'Invalid username or password.';
+                if (error.code === 'auth/invalid-credential') errorMessage = 'Incorrect password. Please try again.';
                 if (error.code === 'auth/configuration-not-found') errorMessage = 'Firebase Authentication is not set up. Please click "Get Started" in the Auth tab of your Firebase console.';
                 setModal({ show: true, title: 'Login Failed', message: errorMessage, type: 'error' });
             }
@@ -765,14 +801,30 @@ export default function Login() {
 
                 <div className="input-group">
                     <label htmlFor="password">Create Password</label>
+
+                    {/* Prohibited character warning — only shows when user types a bad char */}
+                    {password && !/^[A-Za-z0-9!@#$%^&*\-_.]*$/.test(password) && (
+                        <div style={{ marginBottom: '8px', fontSize: '0.75rem', color: '#e74c3c', display: 'flex', alignItems: 'flex-start', gap: '6px', background: '#fff0f0', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                            <i className="fas fa-exclamation-triangle" style={{ marginTop: '2px', flexShrink: 0 }}></i>
+                            <span>Spaces and other special characters are not allowed. Only letters, numbers, and <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>! @ # $ % ^ &amp; * - _ .</span> are permitted.</span>
+                        </div>
+                    )}
+
                     <div className="password-wrapper">
                         <input
                             type={showPassword ? "text" : "password"}
                             id="password"
                             value={password}
-                            onChange={e => { setPassword(e.target.value); setPasswordTouched(true); }}
+                            onChange={e => {
+                                const val = e.target.value;
+                                const hasProhibited = /[^A-Za-z0-9!@#$%^&*\-_.]/.test(val);
+                                if (!hasProhibited) setPassword(val);
+                                setPasswordTouched(true);
+                                if (!showPasswordReqs) setShowPasswordReqs(true);
+                            }}
+                            onFocus={() => setShowPasswordReqs(true)}
                             onBlur={() => setPasswordTouched(true)}
-                            placeholder="Create Password"
+                            placeholder="Enter your password"
                             required
                         />
                         <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} password-toggle-icon`} onClick={() => setShowPassword(!showPassword)}></i>
@@ -788,36 +840,28 @@ export default function Login() {
                         </div>
                     )}
 
-                    {/* 3-state requirements checklist */}
-                    <div style={{ marginTop: '10px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '10px', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#555', marginBottom: '2px' }}>Password requirements:</span>
-                        {[
-                            { ok: password.length >= 8,                   label: 'At least 8 characters'        },
-                            { ok: /\d/.test(password),                    label: 'At least 1 number'            },
-                            { ok: /[a-z]/.test(password),                 label: 'At least 1 lowercase letter'  },
-                            { ok: /[A-Z]/.test(password),                 label: 'At least 1 uppercase letter'  },
-                            { ok: /[!@#$%^&*\-_.]/.test(password),       label: 'At least 1 special character' },
-                        ].map((req, i) => {
-                            // ── 3 states ──────────────────────────────────────────────────
-                            // unmet  (not touched yet)  → gray bullet
-                            // success (requirement met) → green checkmark
-                            // fail   (touched/submitted but not met) → red X
-                            const touched = passwordTouched || submitAttempted;
-                            const isSuccess = req.ok;
-                            const isFail    = touched && !req.ok;
-                            const isUnmet   = !touched && !req.ok;
-
-                            const color = isSuccess ? '#10ac84' : isFail ? '#e74c3c' : '#bbb';
-                            const icon  = isSuccess ? 'fa-check-circle' : isFail ? 'fa-times-circle' : 'fa-circle';
-
-                            return (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.75rem', color }}>
-                                    <i className={`fas ${icon}`} style={{ fontSize: '0.72rem' }}></i>
-                                    {req.label}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    {/* Requirements checklist — appears when field is focused */}
+                    {showPasswordReqs && (
+                        <div style={{ marginTop: '10px', background: '#f8f9fa', border: '1px solid #eee', borderRadius: '10px', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {[
+                                { ok: password.length >= 8,             label: 'At least 8 characters'        },
+                                { ok: /\d/.test(password),              label: 'At least 1 number'            },
+                                { ok: /[a-z]/.test(password),           label: 'At least 1 lowercase letter'  },
+                                { ok: /[A-Z]/.test(password),           label: 'At least 1 uppercase letter'  },
+                                { ok: /[!@#$%^&*\-_.]/.test(password), label: 'At least 1 special character' },
+                            ].map((req, i) => {
+                                const touched = passwordTouched || submitAttempted;
+                                const color = req.ok ? '#10ac84' : (touched && !req.ok) ? '#e74c3c' : '#bbb';
+                                const icon  = req.ok ? 'fa-check-circle' : (touched && !req.ok) ? 'fa-times-circle' : 'fa-circle';
+                                return (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.75rem', color }}>
+                                        <i className={`fas ${icon}`} style={{ fontSize: '0.72rem' }}></i>
+                                        {req.label}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 <div className="input-group">
@@ -826,7 +870,6 @@ export default function Login() {
                         <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required />
                         <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} password-toggle-icon`} onClick={() => setShowConfirmPassword(!showConfirmPassword)}></i>
                     </div>
-                    {/* Match indicator */}
                     {confirmPassword && (
                         <div style={{ fontSize: '0.75rem', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px', color: password === confirmPassword ? '#10ac84' : '#e74c3c' }}>
                             <i className={`fas ${password === confirmPassword ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
@@ -918,7 +961,30 @@ export default function Login() {
                     <p id="formSubtitle">{isLoginView ? 'Login to continue your learning journey' : 'Join us and start your learning journey today!'}</p>
                     <form id="authForm" onSubmit={handleFormSubmit}>
                         <div id="dynamicFields">{renderFormFields()}</div>
-                        <button type="submit" className="login-submit" id="submitBtn">{isLoginView ? 'Login' : 'Create Account'}</button>
+                        {(() => {
+                            // For registration: disable button until all 5 requirements pass
+                            const allReqsMet = !isLoginView && (
+                                password.length >= 8 &&
+                                /\d/.test(password) &&
+                                /[a-z]/.test(password) &&
+                                /[A-Z]/.test(password) &&
+                                /[!@#$%^&*\-_.]/.test(password) &&
+                                /^[A-Za-z0-9!@#$%^&*\-_.]*$/.test(password) &&
+                                password === confirmPassword
+                            );
+                            const isDisabled = !isLoginView && !allReqsMet;
+                            return (
+                                <button
+                                    type="submit"
+                                    className="login-submit"
+                                    id="submitBtn"
+                                    disabled={isDisabled}
+                                    style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                                >
+                                    {isLoginView ? 'Login' : 'Create Account'}
+                                </button>
+                            );
+                        })()}
                     </form>
                 </div>
             </div>

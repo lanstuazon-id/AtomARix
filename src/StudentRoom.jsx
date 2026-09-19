@@ -280,7 +280,14 @@ export default function StudentRoom() {
     const handleQuizSubmit = async () => {
         let score = 0;
         activeQuiz.questions.forEach((q, i) => {
-            if (quizAnswers[i] === q.correctOption) score++;
+            const ans = quizAnswers[i];
+            if (q.type === 'identification' || q.type === 'fillblank') {
+                // Case-insensitive string match
+                if (typeof ans === 'string' && ans.trim().toLowerCase() === (q.answer || '').trim().toLowerCase()) score++;
+            } else {
+                // MC and T/F — index match
+                if (ans === q.correctOption) score++;
+            }
         });
         setQuizResult(score);
 
@@ -760,24 +767,60 @@ export default function StudentRoom() {
                                 </div>
                                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px', textAlign: 'left' }}>
                                     {activeQuiz.questions.map((q, qIdx) => {
-                                        const studentAnsIdx = quizAnswers[qIdx];
-                                        const isCorrect = studentAnsIdx === q.correctOption;
+                                        const studentAns = quizAnswers[qIdx];
+                                        const isTextType = q.type === 'identification' || q.type === 'fillblank';
+                                        const isCorrect = isTextType
+                                            ? typeof studentAns === 'string' && studentAns.trim().toLowerCase() === (q.answer || '').trim().toLowerCase()
+                                            : studentAns === q.correctOption;
+                                        const typeMap = { mc: { label: 'Multiple Choice', color: '#6e45e2' }, tf: { label: 'True or False', color: '#1dd1a1' }, identification: { label: 'Identification', color: '#f39c12' }, fillblank: { label: 'Fill in the Blank', color: '#4facfe' } };
+                                        const t = typeMap[q.type || 'mc'] || typeMap.mc;
                                         return (
                                             <div key={qIdx} style={{ padding: '15px', borderRadius: '12px', background: isCorrect ? '#f0fdf4' : '#fff0f0', border: `1px solid ${isCorrect ? '#bbf7d0' : '#fecaca'}`, marginBottom: '15px' }}>
-                                                <p style={{ margin: '0 0 10px 0', fontWeight: '600', color: '#333', fontSize: '1.1rem' }}>{qIdx + 1}. {q.question}</p>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {q.options.map((opt, oIdx) => {
-                                                        let bg = '#fff'; let border = '1px solid #ddd'; let color = '#555'; let icon = null;
-                                                        if (oIdx === q.correctOption) { bg = '#1dd1a1'; color = '#fff'; border = '1px solid #1dd1a1'; icon = <i className="fas fa-check" style={{ marginRight: '8px' }}></i>; }
-                                                        else if (oIdx === studentAnsIdx && !isCorrect) { bg = '#e74c3c'; color = '#fff'; border = '1px solid #e74c3c'; icon = <i className="fas fa-times" style={{ marginRight: '8px' }}></i>; }
-                                                        
-                                                        return (
-                                                            <div key={oIdx} style={{ padding: '10px 15px', borderRadius: '8px', background: bg, border: border, color: color, fontSize: '0.95rem', fontWeight: (oIdx === q.correctOption || oIdx === studentAnsIdx) ? 'bold' : 'normal' }}>
-                                                                {icon} {opt}
-                                                            </div>
-                                                        );
-                                                    })}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                    <span style={{ fontSize: '10px', fontWeight: 700, color: t.color, background: t.color + '20', padding: '2px 8px', borderRadius: '20px' }}>{t.label}</span>
+                                                    <i className={`fas ${isCorrect ? 'fa-check-circle' : 'fa-times-circle'}`} style={{ color: isCorrect ? '#1dd1a1' : '#e74c3c', marginLeft: 'auto' }}></i>
                                                 </div>
+                                                <p style={{ margin: '0 0 10px 0', fontWeight: '600', color: '#333', fontSize: '1rem' }}>{qIdx + 1}. {q.question}</p>
+
+                                                {/* MC options */}
+                                                {(q.type === 'mc' || !q.type) && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        {q.options.map((opt, oIdx) => {
+                                                            let bg = '#fff', border = '1px solid #ddd', color = '#555', icon = null;
+                                                            if (oIdx === q.correctOption) { bg = '#1dd1a1'; color = '#fff'; border = '1px solid #1dd1a1'; icon = <i className="fas fa-check" style={{ marginRight: '8px' }}></i>; }
+                                                            else if (oIdx === studentAns && !isCorrect) { bg = '#e74c3c'; color = '#fff'; border = '1px solid #e74c3c'; icon = <i className="fas fa-times" style={{ marginRight: '8px' }}></i>; }
+                                                            return <div key={oIdx} style={{ padding: '10px 15px', borderRadius: '8px', background: bg, border, color, fontSize: '0.95rem', fontWeight: (oIdx === q.correctOption || oIdx === studentAns) ? 'bold' : 'normal' }}>{icon}{opt}</div>;
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                {/* T/F options */}
+                                                {q.type === 'tf' && (
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        {['True', 'False'].map((opt, oIdx) => {
+                                                            let bg = '#fff', border = '1px solid #ddd', color = '#555';
+                                                            if (oIdx === q.correctOption) { bg = '#1dd1a1'; color = '#fff'; border = '1px solid #1dd1a1'; }
+                                                            else if (oIdx === studentAns && !isCorrect) { bg = '#e74c3c'; color = '#fff'; border = '1px solid #e74c3c'; }
+                                                            return <div key={oIdx} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: bg, border, color, fontSize: '0.95rem', fontWeight: 'bold', textAlign: 'center' }}>{opt}</div>;
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                {/* Identification / Fill in the Blank */}
+                                                {isTextType && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                        <div style={{ padding: '10px 15px', borderRadius: '8px', background: isCorrect ? '#1dd1a1' : '#e74c3c', color: '#fff', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                                                            <i className={`fas ${isCorrect ? 'fa-check' : 'fa-times'}`} style={{ marginRight: '8px' }}></i>
+                                                            Your answer: {studentAns || '(no answer)'}
+                                                        </div>
+                                                        {!isCorrect && (
+                                                            <div style={{ padding: '10px 15px', borderRadius: '8px', background: '#f0fdf4', border: '1px solid #1dd1a1', color: '#15803d', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                                                                <i className="fas fa-check" style={{ marginRight: '8px' }}></i>
+                                                                Correct answer: {q.answer}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -807,23 +850,76 @@ export default function StudentRoom() {
                                 </div>
                                 
                                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
+                                    {/* Question type badge */}
+                                    {(() => {
+                                        const q = activeQuiz.questions[currentQuestionIndex];
+                                        const typeMap = { mc: { label: 'Multiple Choice', color: '#6e45e2', bg: '#f3f0ff' }, tf: { label: 'True or False', color: '#1dd1a1', bg: '#e3fdf5' }, identification: { label: 'Identification', color: '#f39c12', bg: '#fff7e0' }, fillblank: { label: 'Fill in the Blank', color: '#4facfe', bg: '#eaf4ff' } };
+                                        const t = typeMap[q.type || 'mc'] || typeMap.mc;
+                                        return <span style={{ fontSize: '11px', fontWeight: 700, color: t.color, background: t.bg, padding: '3px 10px', borderRadius: '20px', border: `1px solid ${t.color}44`, marginBottom: '12px', display: 'inline-block' }}>{t.label}</span>;
+                                    })()}
                                     <h3 style={{ fontSize: '1.25rem', color: '#333', marginBottom: '25px', lineHeight: '1.5' }}>
                                         {activeQuiz.questions[currentQuestionIndex].question}
                                     </h3>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        {activeQuiz.questions[currentQuestionIndex].options.map((opt, oIndex) => {
-                                            const isSelected = quizAnswers[currentQuestionIndex] === oIndex;
-                                            return (
-                                                <button 
-                                                    key={oIndex} 
-                                                    onClick={() => setQuizAnswers({...quizAnswers, [currentQuestionIndex]: oIndex})}
-                                                    style={{ textAlign: 'left', padding: '16px 20px', borderRadius: '12px', border: isSelected ? '2px solid #e74c3c' : '2px solid #eee', background: isSelected ? '#fcf3f2' : '#fff', color: isSelected ? '#e74c3c' : '#555', fontSize: '1.05rem', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '15px', fontWeight: isSelected ? '600' : 'normal' }}
-                                                >
-                                                    <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: isSelected ? '6px solid #e74c3c' : '2px solid #ccc', background: '#fff', transition: 'all 0.2s', flexShrink: 0 }}></div>
-                                                    {opt}
-                                                </button>
-                                            );
-                                        })}
+                                        {/* Multiple Choice */}
+                                        {(activeQuiz.questions[currentQuestionIndex].type === 'mc' || !activeQuiz.questions[currentQuestionIndex].type) &&
+                                            activeQuiz.questions[currentQuestionIndex].options.map((opt, oIndex) => {
+                                                const isSelected = quizAnswers[currentQuestionIndex] === oIndex;
+                                                return (
+                                                    <button key={oIndex}
+                                                        onClick={() => setQuizAnswers({...quizAnswers, [currentQuestionIndex]: oIndex})}
+                                                        style={{ textAlign: 'left', padding: '16px 20px', borderRadius: '12px', border: isSelected ? '2px solid #6e45e2' : '2px solid #eee', background: isSelected ? '#f3f0ff' : '#fff', color: isSelected ? '#6e45e2' : '#555', fontSize: '1.05rem', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '15px', fontWeight: isSelected ? '600' : 'normal' }}>
+                                                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: isSelected ? '6px solid #6e45e2' : '2px solid #ccc', background: '#fff', transition: 'all 0.2s', flexShrink: 0 }}></div>
+                                                        {opt}
+                                                    </button>
+                                                );
+                                            })
+                                        }
+
+                                        {/* True or False */}
+                                        {activeQuiz.questions[currentQuestionIndex].type === 'tf' && (
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                {['True', 'False'].map((opt, oIndex) => {
+                                                    const isSelected = quizAnswers[currentQuestionIndex] === oIndex;
+                                                    const selColor = oIndex === 0 ? '#1dd1a1' : '#e74c3c';
+                                                    return (
+                                                        <button key={oIndex} onClick={() => setQuizAnswers({...quizAnswers, [currentQuestionIndex]: oIndex})}
+                                                            style={{ flex: 1, padding: '20px', borderRadius: '12px', border: isSelected ? `2px solid ${selColor}` : '2px solid #eee', background: isSelected ? (oIndex === 0 ? '#f0fdf4' : '#fff0f0') : '#fff', color: isSelected ? selColor : '#555', fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                                                            <i className={`fas ${oIndex === 0 ? 'fa-check-circle' : 'fa-times-circle'}`} style={{ color: isSelected ? selColor : '#ccc', fontSize: '1.2rem' }}></i>
+                                                            {opt}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Identification */}
+                                        {activeQuiz.questions[currentQuestionIndex].type === 'identification' && (
+                                            <div>
+                                                <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '10px' }}>Type your answer below:</p>
+                                                <input type="text" value={quizAnswers[currentQuestionIndex] || ''}
+                                                    onChange={e => setQuizAnswers({...quizAnswers, [currentQuestionIndex]: e.target.value})}
+                                                    placeholder="Type your answer here..."
+                                                    style={{ width: '100%', padding: '16px 20px', borderRadius: '12px', border: '2px solid #eee', fontSize: '1.05rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+                                                    onFocus={e => e.target.style.borderColor = '#f39c12'}
+                                                    onBlur={e => e.target.style.borderColor = '#eee'}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Fill in the Blank */}
+                                        {activeQuiz.questions[currentQuestionIndex].type === 'fillblank' && (
+                                            <div>
+                                                <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '10px' }}>Fill in the blank:</p>
+                                                <input type="text" value={quizAnswers[currentQuestionIndex] || ''}
+                                                    onChange={e => setQuizAnswers({...quizAnswers, [currentQuestionIndex]: e.target.value})}
+                                                    placeholder="Type your answer here..."
+                                                    style={{ width: '100%', padding: '16px 20px', borderRadius: '12px', border: '2px solid #eee', fontSize: '1.05rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+                                                    onFocus={e => e.target.style.borderColor = '#4facfe'}
+                                                    onBlur={e => e.target.style.borderColor = '#eee'}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 
@@ -841,17 +937,17 @@ export default function StudentRoom() {
                                         <button 
                                             className="btn-confirm" 
                                             onClick={() => setCurrentQuestionIndex(prev => Math.min(activeQuiz.questions.length - 1, prev + 1))}
-                                            disabled={quizAnswers[currentQuestionIndex] === undefined}
-                                            style={{ background: quizAnswers[currentQuestionIndex] === undefined ? '#ccc' : '#e74c3c', cursor: quizAnswers[currentQuestionIndex] === undefined ? 'not-allowed' : 'pointer' }}
+                                            disabled={quizAnswers[currentQuestionIndex] === undefined || quizAnswers[currentQuestionIndex] === ''}
+                                            style={{ background: (quizAnswers[currentQuestionIndex] === undefined || quizAnswers[currentQuestionIndex] === '') ? '#ccc' : '#e74c3c', cursor: (quizAnswers[currentQuestionIndex] === undefined || quizAnswers[currentQuestionIndex] === '') ? 'not-allowed' : 'pointer' }}
                                         >
                                             Next <i className="fas fa-chevron-right" style={{ marginLeft: '8px' }}></i>
                                         </button>
                                     ) : (
                                         <button 
                                             className="btn-confirm" 
-                                            style={{ background: quizAnswers[currentQuestionIndex] === undefined ? '#ccc' : '#1dd1a1', cursor: quizAnswers[currentQuestionIndex] === undefined ? 'not-allowed' : 'pointer' }}
-                                            disabled={quizAnswers[currentQuestionIndex] === undefined}
-                                        onClick={handleQuizSubmit}
+                                            style={{ background: (quizAnswers[currentQuestionIndex] === undefined || quizAnswers[currentQuestionIndex] === '') ? '#ccc' : '#1dd1a1', cursor: (quizAnswers[currentQuestionIndex] === undefined || quizAnswers[currentQuestionIndex] === '') ? 'not-allowed' : 'pointer' }}
+                                            disabled={quizAnswers[currentQuestionIndex] === undefined || quizAnswers[currentQuestionIndex] === ''}
+                                            onClick={handleQuizSubmit}
                                         >
                                             <i className="fas fa-check"></i> Submit Quiz
                                         </button>

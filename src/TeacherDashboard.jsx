@@ -73,7 +73,8 @@ export default function TeacherDashboard() {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [resultModal, setResultModal] = useState({ show: false, title: '', message: '', type: 'info' });
+    const [resultModal, setResultModal] = useState({ show: false, title: '', message: '', type: 'info', classCode: '', roomId: '' });
+    const [copiedWhat, setCopiedWhat] = useState('');
     const menuRef = useRef(null);
     
     const userName = sessionStorage.getItem('loggedInUser') || 'Teacher';
@@ -193,6 +194,9 @@ export default function TeacherDashboard() {
         };
     }, [userName]);
 
+    // ── Sentence case: capitalize only the first letter ──────────────────────
+    const toSentenceCase = (str) => str.length === 0 ? str : str.charAt(0).toUpperCase() + str.slice(1);
+
     const handleCreateRoom = async (e) => {
         e.preventDefault();
         if (!newRoomSection.trim() || !newRoomGrade.trim()) {
@@ -213,9 +217,9 @@ export default function TeacherDashboard() {
         };
 
         const newRoom = {
-            id: Date.now().toString(), // Generate a unique ID using timestamp
-            section: newRoomSection.trim(),
-            grade: newRoomGrade.trim(),
+            id: Date.now().toString(),
+            section: toSentenceCase(newRoomSection.trim()),
+            grade: toSentenceCase(newRoomGrade.trim()),
             teacher: userName,
             teacherFullName: teacherFullName,
             classCode: generateClassCode(),
@@ -223,19 +227,16 @@ export default function TeacherDashboard() {
         };
 
         try {
-            setIsCreateModalOpen(false); // Close modal immediately
-            setResultModal({ show: true, title: 'Creating...', message: 'Setting up new classroom...', type: 'loading' });
-            
-            // Save the room to Firestore using the generated ID as the document ID
+            setIsCreateModalOpen(false);
+            setResultModal({ show: true, title: 'Creating...', message: 'Setting up new classroom...', type: 'loading', classCode: '', roomId: '' });
             await setDoc(doc(db, "teacher_rooms", newRoom.id), newRoom);
-            
-            setNewRoomSection(''); // Reset inputs
+            setNewRoomSection('');
             setNewRoomGrade('');
             setNewRoomColor('purple');
-            setResultModal({ show: true, title: 'Success!', message: 'Classroom created successfully.', type: 'success' });
+            setResultModal({ show: true, title: 'Classroom Created!', message: '', type: 'success', classCode: newRoom.classCode, roomId: newRoom.id });
         } catch (error) {
             console.error("Error creating room: ", error);
-            setResultModal({ show: true, title: 'Error', message: 'Failed to create room. Please try again.', type: 'error' });
+            setResultModal({ show: true, title: 'Error', message: 'Failed to create room. Please try again.', type: 'error', classCode: '', roomId: '' });
         }
     };
 
@@ -899,7 +900,7 @@ export default function TeacherDashboard() {
                                     type="text" 
                                     id="sectionName"
                                     value={newRoomSection} 
-                                    onChange={(e) => setNewRoomSection(e.target.value)} 
+                                    onChange={(e) => setNewRoomSection(toSentenceCase(e.target.value))} 
                                     placeholder="e.g. Armstrong" 
                                     required 
                                 />
@@ -910,7 +911,7 @@ export default function TeacherDashboard() {
                                     type="text" 
                                     id="gradeLevel"
                                     value={newRoomGrade} 
-                                    onChange={(e) => setNewRoomGrade(e.target.value)} 
+                                    onChange={(e) => setNewRoomGrade(toSentenceCase(e.target.value))} 
                                     placeholder="e.g. Grade 7" 
                                     required 
                                 />
@@ -949,7 +950,7 @@ export default function TeacherDashboard() {
                                     type="text" 
                                     id="editSectionName"
                                     value={editRoomSection} 
-                                    onChange={(e) => setEditRoomSection(e.target.value)} 
+                                    onChange={(e) => setEditRoomSection(toSentenceCase(e.target.value))} 
                                     required 
                                 />
                             </div>
@@ -959,7 +960,7 @@ export default function TeacherDashboard() {
                                     type="text" 
                                     id="editGradeLevel"
                                     value={editRoomGrade} 
-                                    onChange={(e) => setEditRoomGrade(e.target.value)} 
+                                    onChange={(e) => setEditRoomGrade(toSentenceCase(e.target.value))} 
                                     required 
                                 />
                             </div>
@@ -1119,19 +1120,57 @@ export default function TeacherDashboard() {
             )}
 
             {resultModal.show && (
-                <div className="modal-container show">
-                    <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
+                <div className="modal-container show" onClick={() => resultModal.type !== 'loading' && setResultModal({ ...resultModal, show: false })}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: resultModal.type === 'success' && resultModal.classCode ? '460px' : '400px', textAlign: 'center' }}>
                         {resultModal.type === 'loading' ? (
                             <i className="fas fa-circle-notch fa-spin modal-icon-box" style={{ color: '#6e45e2' }}></i>
                         ) : (
                             <i className={`fas ${resultModal.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'} modal-icon-box`} style={{ color: resultModal.type === 'success' ? '#1dd1a1' : '#e74c3c' }}></i>
                         )}
                         <h2 style={{ marginBottom: '10px' }}>{resultModal.title}</h2>
-                        <p style={{ color: '#666', marginBottom: '20px' }}>{resultModal.message}</p>
-                        {resultModal.type !== 'loading' && (
-                            <div className="modal-actions">
-                                <button className="btn-confirm" onClick={() => setResultModal({ ...resultModal, show: false })} style={{ background: '#6e45e2', width: '100%' }}>Close</button>
-                            </div>
+
+                        {resultModal.type === 'success' && resultModal.classCode ? (
+                            <>
+                                <p style={{ color: '#666', marginBottom: '20px', fontSize: '0.9rem' }}>
+                                    Share the class code or invite link with your students.
+                                </p>
+
+                                {/* Class code */}
+                                <div style={{ background: '#f3f0ff', border: '1.5px solid #d7ccff', borderRadius: '12px', padding: '14px 18px', marginBottom: '14px', textAlign: 'left' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#6e45e2', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Class Code</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                        <span style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'monospace', color: '#2d3436', letterSpacing: '0.1em' }}>{resultModal.classCode}</span>
+                                        <button onClick={() => { navigator.clipboard.writeText(resultModal.classCode); setCopiedWhat('code'); setTimeout(() => setCopiedWhat(''), 2000); }}
+                                            style={{ padding: '7px 14px', borderRadius: '8px', border: '1.5px solid #6e45e2', background: copiedWhat === 'code' ? '#6e45e2' : 'white', color: copiedWhat === 'code' ? 'white' : '#6e45e2', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0 }}>
+                                            {copiedWhat === 'code' ? '✓ Copied!' : 'Copy Code'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Invite link */}
+                                <div style={{ background: '#f8f9fa', border: '1px solid #eee', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px', textAlign: 'left' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Invite Link</div>
+                                    <div style={{ fontSize: '0.78rem', color: '#555', wordBreak: 'break-all', marginBottom: '10px', lineHeight: 1.5 }}>
+                                        {`${window.location.origin}/join?code=${resultModal.classCode}`}
+                                    </div>
+                                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/join?code=${resultModal.classCode}`); setCopiedWhat('link'); setTimeout(() => setCopiedWhat(''), 2000); }}
+                                        style={{ padding: '7px 14px', borderRadius: '8px', border: '1.5px solid #eee', background: copiedWhat === 'link' ? '#2d3436' : 'white', color: copiedWhat === 'link' ? 'white' : '#555', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <i className="fas fa-link"></i>
+                                        {copiedWhat === 'link' ? '✓ Link Copied!' : 'Copy Invite Link'}
+                                    </button>
+                                </div>
+
+                                <button className="btn-confirm" onClick={() => { setResultModal({ ...resultModal, show: false }); setCopiedWhat(''); }} style={{ background: '#6e45e2', width: '100%' }}>Done</button>
+                            </>
+                        ) : (
+                            <>
+                                <p style={{ color: '#666', marginBottom: '20px' }}>{resultModal.message}</p>
+                                {resultModal.type !== 'loading' && (
+                                    <div className="modal-actions">
+                                        <button className="btn-confirm" onClick={() => setResultModal({ ...resultModal, show: false })} style={{ background: '#6e45e2', width: '100%' }}>Close</button>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

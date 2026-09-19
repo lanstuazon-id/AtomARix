@@ -167,6 +167,36 @@ export default function StudentHome() {
     const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
     const [isMatchingLoading, setIsMatchingLoading] = useState(true);
 
+    // ── Auto-join via invite link ─────────────────────────────────────────────
+    useEffect(() => {
+        const pendingCode = sessionStorage.getItem('pendingClassCode');
+        if (!pendingCode || !userName) return;
+        const autoJoin = async () => {
+            try {
+                const querySnapshot = await getDocs(collection(db, "teacher_rooms"));
+                const allRooms = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                const foundRoom = allRooms.find(r =>
+                    (r.classCode && r.classCode === pendingCode) ||
+                    (!r.classCode && r.id && r.id.substring(r.id.length - 6).toUpperCase() === pendingCode)
+                );
+                if (foundRoom) {
+                    const userRef = doc(db, "users", userName);
+                    await setDoc(userRef, { joinedRoomId: foundRoom.id }, { merge: true });
+                    localStorage.setItem(`joinedRoomId_${userName}`, foundRoom.id);
+                    localStorage.setItem(`joinedRoomSection_${userName}`, foundRoom.section);
+                    sessionStorage.removeItem('pendingClassCode');
+                    navigate(`/student-room/${foundRoom.id}`);
+                } else {
+                    sessionStorage.removeItem('pendingClassCode');
+                }
+            } catch (err) {
+                console.error('Auto-join failed:', err);
+                sessionStorage.removeItem('pendingClassCode');
+            }
+        };
+        autoJoin();
+    }, [userName]);
+
     useEffect(() => {
         if (!userName) {
             navigate('/');
