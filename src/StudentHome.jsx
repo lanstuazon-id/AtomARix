@@ -164,38 +164,18 @@ export default function StudentHome() {
 
     // Loading States
     const [isLoading, setIsLoading] = useState(true);
-    const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
-    const [isMatchingLoading, setIsMatchingLoading] = useState(true);
+    const [maintenance, setMaintenance] = useState({ enabled: false, message: '' });
 
-    // ── Auto-join via invite link ─────────────────────────────────────────────
+    // ── Maintenance mode listener ─────────────────────────────────────────────
     useEffect(() => {
-        const pendingCode = sessionStorage.getItem('pendingClassCode');
-        if (!pendingCode || !userName) return;
-        const autoJoin = async () => {
-            try {
-                const querySnapshot = await getDocs(collection(db, "teacher_rooms"));
-                const allRooms = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                const foundRoom = allRooms.find(r =>
-                    (r.classCode && r.classCode === pendingCode) ||
-                    (!r.classCode && r.id && r.id.substring(r.id.length - 6).toUpperCase() === pendingCode)
-                );
-                if (foundRoom) {
-                    const userRef = doc(db, "users", userName);
-                    await setDoc(userRef, { joinedRoomId: foundRoom.id }, { merge: true });
-                    localStorage.setItem(`joinedRoomId_${userName}`, foundRoom.id);
-                    localStorage.setItem(`joinedRoomSection_${userName}`, foundRoom.section);
-                    sessionStorage.removeItem('pendingClassCode');
-                    navigate(`/student-room/${foundRoom.id}`);
-                } else {
-                    sessionStorage.removeItem('pendingClassCode');
-                }
-            } catch (err) {
-                console.error('Auto-join failed:', err);
-                sessionStorage.removeItem('pendingClassCode');
+        const unsub = onSnapshot(doc(db, 'adminConfig', 'maintenance'), (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                setMaintenance({ enabled: data.enabled || false, message: data.message || '' });
             }
-        };
-        autoJoin();
-    }, [userName]);
+        }, err => console.warn('maintenance listener:', err));
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         if (!userName) {
@@ -744,6 +724,19 @@ export default function StudentHome() {
 
     return (
         <div style={{ position: 'relative' }}>
+            {/* ── Maintenance Mode Overlay ── */}
+            {maintenance.enabled && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(15,15,25,0.97)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🔧</div>
+                    <h1 style={{ color: '#fff', fontSize: '1.8rem', fontWeight: 800, marginBottom: '12px' }}>Under Maintenance</h1>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1rem', maxWidth: '400px', lineHeight: 1.7, marginBottom: '24px' }}>
+                        {maintenance.message || 'AtomARix is currently under maintenance. Please check back later.'}
+                    </p>
+                    <div style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '12px 24px', color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem' }}>
+                        Please wait while we make improvements ✨
+                    </div>
+                </div>
+            )}
             {/* Floating Chemistry Background */}
             <div className="floating-background">
                 {floatingItems.map(item => (

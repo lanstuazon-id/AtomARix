@@ -194,37 +194,45 @@ export default function Login() {
 
         if (isLoginView) {
             setModal({ show: true, title: 'Authenticating...', message: 'Checking credentials...', type: 'loading' });
-            try {
-                // ── Admin check — credentials stored in Firestore, never in code ──
-                // Set up: Firebase Console → Firestore → adminConfig → credentials
-                // Add fields: username (string), password (string)
-                // Change them anytime in Firestore without touching the code.
-                try {
-                    const adminSnap = await getDoc(doc(db, 'adminConfig', 'credentials'));
-                    if (adminSnap.exists()) {
-                        const adminData = adminSnap.data();
-                        if (
-                            actualUsername.toLowerCase() === (adminData.username || '').toLowerCase() &&
-                            password === adminData.password
-                        ) {
-                            sessionStorage.setItem('loggedInUser', adminData.username);
-                            sessionStorage.setItem('userRole', 'admin');
-                            sessionStorage.setItem('userFullname', 'Admin');
-                            setModal({ show: false, title: '', message: '', type: '' });
-                            navigate('/admin/tokens');
-                            return;
-                        }
-                    }
-                } catch (adminErr) {
-                    // adminConfig missing or no permission — continue to normal login
-                    console.warn('adminConfig check skipped:', adminErr.code);
-                }
 
-                // ── Step 1: Look up Firestore first to get the exact stored username ──
+            // ── Admin check — runs BEFORE the main try/catch ─────────────────
+            // Completely isolated so any Firestore error here never reaches
+            // the outer catch that shows "Login Failed" to the user.
+            try {
+                const adminSnap = await getDoc(doc(db, 'adminConfig', 'credentials'));
+                if (adminSnap.exists()) {
+                    const adminData = adminSnap.data();
+                    if (
+                        actualUsername.toLowerCase() === (adminData.username || '').toLowerCase() &&
+                        password === adminData.password
+                    ) {
+                        sessionStorage.setItem('loggedInUser', adminData.username);
+                        sessionStorage.setItem('userRole', 'admin');
+                        sessionStorage.setItem('userFullname', 'Admin');
+                        setModal({ show: false, title: '', message: '', type: '' });
+                        navigate('/admin/tokens');
+                        return;
+                    }
+                }
+            } catch (adminErr) {
+                // adminConfig unreadable or missing — not an admin, continue to normal login
+                console.warn('adminConfig check skipped:', adminErr.code);
+            }
+
+            try {
+                // ── Step 1: Sign in with Firebase Auth first ─────────────────
+                // Build the auth email from what the user typed. After auth
+                // succeeds the user is authenticated and Firestore reads work.
+                const authEmail = `${actualUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
+                await signInWithEmailAndPassword(auth, authEmail, password);
+
+                // ── Step 2: Now fetch their Firestore profile (auth is set) ──
                 const userRef = doc(db, "users", actualUsername);
                 const userSnap = await getDoc(userRef);
 
                 if (!userSnap.exists()) {
+                    // Signed into Auth but no Firestore profile — sign out and fail
+                    await auth.signOut();
                     setModal({ show: true, title: 'Login Failed', message: 'No account found with that username. Please check your username and try again.', type: 'error' });
                     return;
                 }
@@ -232,18 +240,12 @@ export default function Login() {
                 const userData = userSnap.data();
 
                 if (userData.active === false) {
+                    await auth.signOut();
                     setModal({ show: true, title: 'Access Denied', message: 'Your account has been deactivated. Please contact your admin.', type: 'error' });
                     return;
                 }
 
-                // ── Step 2: Build authEmail from the STORED username (exact case) ──
-                // This ensures the Firebase Auth email matches what was used at registration.
-                const storedUsername = userData.username || actualUsername;
-                const exactAuthEmail = `${storedUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
-
-                // ── Step 3: Sign in with Firebase Auth ────────────────────────
-                await signInWithEmailAndPassword(auth, exactAuthEmail, password);
-
+                // ── Step 3: Store session and redirect ────────────────────────
                 sessionStorage.setItem('loggedInUser', userData.username || actualUsername);
                 sessionStorage.setItem('userRole', userData.role);
                 sessionStorage.setItem('userFullname', userData.fullname);
@@ -258,8 +260,7 @@ export default function Login() {
 
                 setModal({ show: true, title: 'Success!', message: 'Logging you in...', type: 'loading' });
                 setTimeout(() => {
-                    if (userData.role === 'admin') navigate('/admin/tokens');
-                    else if (userData.role === 'teacher') navigate('/dashboard');
+                    if (userData.role === 'teacher') navigate('/dashboard');
                     else navigate('/home');
                 }, 500);
             } catch (error) {
