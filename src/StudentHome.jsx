@@ -164,6 +164,8 @@ export default function StudentHome() {
 
     // Loading States
     const [isLoading, setIsLoading] = useState(true);
+    const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
+    const [isMatchingLoading, setIsMatchingLoading] = useState(true);
     const [maintenance, setMaintenance] = useState({ enabled: false, message: '' });
 
     // ── Maintenance mode listener ─────────────────────────────────────────────
