@@ -109,11 +109,11 @@ const S = {
 // ─── Sidebar nav items ────────────────────────────────────────────────────────
 
 const NAV = [
-    { id: 'overview',     icon: '📊', label: 'Overview'         },
-    { id: 'users',        icon: '👥', label: 'Users'            },
-    { id: 'requests',     icon: '📨', label: 'Pending Requests' },
-    { id: 'tokens',       icon: '🔑', label: 'Invite Tokens'    },
-    { id: 'maintenance',  icon: '🔧', label: 'Maintenance'      },
+    { id: 'overview',    icon: '📊', label: 'Overview'         },
+    { id: 'users',       icon: '👥', label: 'Users'            },
+    { id: 'requests',    icon: '📨', label: 'Pending Requests' },
+    { id: 'tokens',      icon: '🔑', label: 'Invite Tokens'    },
+    { id: 'maintenance', icon: '🔧', label: 'Maintenance'      },
 ];
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -889,13 +889,12 @@ function Tokens() {
 // ═════════════════════════════════════════════════════════════════════════════
 // SECTION: Maintenance Mode
 // ═════════════════════════════════════════════════════════════════════════════
-
 function Maintenance() {
-    const [isOn, setIsOn]         = useState(false);
-    const [message, setMessage]   = useState('AtomARix is currently under maintenance. Please check back later.');
-    const [loading, setLoading]   = useState(true);
-    const [saving, setSaving]     = useState(false);
-    const [saved, setSaved]       = useState(false);
+    const [isOn, setIsOn]       = useState(false);
+    const [message, setMessage] = useState('AtomARix is currently under maintenance. Please check back later.');
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving]   = useState(false);
+    const [saved, setSaved]     = useState(false);
 
     useEffect(() => {
         const fetchMaintenance = async () => {
@@ -933,7 +932,6 @@ function Maintenance() {
             <div style={S.pageTitle}>Maintenance Mode</div>
             <div style={S.pageSub}>Control app availability for all users</div>
 
-            {/* Status card */}
             <div style={{ ...S.card, marginBottom: '20px' }}>
                 <div style={S.cardHead}>
                     <div>
@@ -942,7 +940,7 @@ function Maintenance() {
                     </div>
                 </div>
 
-                {/* Toggle */}
+                {/* Toggle row */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', background: isOn ? '#fff5f5' : '#f0fdf4', borderRadius: '12px', border: `2px solid ${isOn ? '#fecaca' : '#bbf7d0'}`, marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                         <span style={{ fontSize: '2rem' }}>{isOn ? '🔧' : '✅'}</span>
@@ -955,30 +953,22 @@ function Maintenance() {
                             </div>
                         </div>
                     </div>
-                    {/* Toggle switch */}
-                    <div
-                        onClick={() => setIsOn(v => !v)}
-                        style={{ width: '52px', height: '28px', borderRadius: '14px', background: isOn ? '#e74c3c' : '#1dd1a1', position: 'relative', cursor: 'pointer', transition: 'background 0.3s', flexShrink: 0 }}
-                    >
+                    <div onClick={() => setIsOn(v => !v)}
+                        style={{ width: '52px', height: '28px', borderRadius: '14px', background: isOn ? '#e74c3c' : '#1dd1a1', position: 'relative', cursor: 'pointer', transition: 'background 0.3s', flexShrink: 0 }}>
                         <div style={{ position: 'absolute', top: '3px', left: isOn ? '26px' : '3px', width: '22px', height: '22px', borderRadius: '50%', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.2)', transition: 'left 0.3s' }}></div>
                     </div>
                 </div>
 
                 {/* Message editor */}
                 <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', fontWeight: '700', fontSize: '13px', color: C.dark, marginBottom: '8px' }}>
-                        Maintenance Message
-                    </label>
-                    <textarea
-                        value={message}
-                        onChange={e => setMessage(e.target.value)}
-                        rows={3}
+                    <label style={{ display: 'block', fontWeight: '700', fontSize: '13px', color: C.dark, marginBottom: '8px' }}>Maintenance Message</label>
+                    <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3}
                         placeholder="Message shown to users during maintenance..."
                         style={{ width: '100%', padding: '12px 14px', borderRadius: '10px', border: `1.5px solid ${C.border}`, fontSize: '14px', color: C.dark, background: C.bg, resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: '1.6', boxSizing: 'border-box' }}
                         onFocus={e => e.target.style.borderColor = C.purple}
                         onBlur={e => e.target.style.borderColor = C.border}
                     />
-                    <div style={{ fontSize: '11px', color: C.muted, marginTop: '5px' }}>This message appears on a banner visible to all students and teachers.</div>
+                    <div style={{ fontSize: '11px', color: C.muted, marginTop: '5px' }}>This message appears as a banner visible to all students and teachers.</div>
                 </div>
 
                 {/* Preview */}
@@ -986,25 +976,22 @@ function Maintenance() {
                     <div style={{ fontSize: '12px', fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Preview</div>
                     <div style={{ background: isOn ? '#7f1d1d' : '#1e3a2f', color: '#fff', padding: '12px 18px', borderRadius: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '16px' }}>{isOn ? '🔧' : '✅'}</span>
-                        <span>{isOn ? message || 'AtomARix is currently under maintenance.' : 'App is live — no banner shown to users.'}</span>
+                        <span>{isOn ? (message || 'AtomARix is currently under maintenance.') : 'App is live — no banner shown to users.'}</span>
                     </div>
                 </div>
 
                 {/* Save button */}
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    style={{ padding: '11px 28px', borderRadius: '10px', border: 'none', background: saved ? '#1dd1a1' : C.purple, color: '#fff', fontWeight: '700', fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}
-                >
+                <button onClick={handleSave} disabled={saving}
+                    style={{ padding: '11px 28px', borderRadius: '10px', border: 'none', background: saved ? '#1dd1a1' : C.purple, color: '#fff', fontWeight: '700', fontSize: '14px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
                     {saved ? '✓ Saved!' : saving ? 'Saving…' : '💾 Save Changes'}
                 </button>
             </div>
 
-            {/* Warning box */}
+            {/* Warning */}
             <div style={{ background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: '12px', padding: '16px 20px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '20px', flexShrink: 0 }}>⚠️</span>
                 <div style={{ fontSize: '13px', color: '#92400e', lineHeight: '1.6' }}>
-                    <strong>Important:</strong> When maintenance mode is ON, a full-screen banner blocks all pages for students and teachers. They cannot log in or use the app until you turn maintenance mode OFF and save.
+                    <strong>Important:</strong> When maintenance mode is ON, a full-screen banner blocks all pages for students and teachers. They cannot use the app until you turn maintenance mode OFF and save.
                 </div>
             </div>
         </>

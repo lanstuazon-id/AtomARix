@@ -179,6 +179,16 @@ export default function StudentHome() {
         return () => unsub();
     }, []);
 
+    // Lock body scroll when maintenance overlay is active
+    useEffect(() => {
+        if (maintenance.enabled) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [maintenance.enabled]);
+
     useEffect(() => {
         if (!userName) {
             navigate('/');

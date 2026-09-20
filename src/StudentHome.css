@@ -1,3 +1,4 @@
+/* ── Design tokens — replaces theme.css dependency ─────────────────────────── */
 :root {
     --bg-page:            #f8f9fa;
     --bg-card:            #ffffff;
@@ -444,7 +445,7 @@
 .btn-view-all:active { transform: scale(0.98); }
 
 /* --- Responsive Design --- */
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 900px), (pointer: coarse) and (max-width: 767px) {
     .navbar { 
         padding: 15px 25px; 
         position: fixed !important; 
@@ -788,7 +789,7 @@
 }
 .profile-modal-content .close-modal { z-index: 10; background: var(--bg-card); box-shadow: var(--navbar-shadow); }
 
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 900px), (pointer: coarse) and (max-width: 767px) {
     .profile-modal-actions {
         padding-bottom: calc(30px + env(safe-area-inset-bottom)) !important;
     }
@@ -848,100 +849,36 @@
     100% { background-position: -100% 0; }
 }
 
-/* ── iPad / Tablet (601px–1024px, touch devices) ──────────────────────────────
-   Overrides the phone-first rules above with a layout that feels more
-   intentional on a larger touch screen. */
-@media (min-width: 601px) and (max-width: 1024px) and (pointer: coarse) {
-
-    /* Navbar — keep it visible and full-width at top like desktop */
-    .navbar {
-        position: sticky !important;
-        top: 0 !important;
-        padding: 15px 30px !important;
-        background: rgba(255, 255, 255, 0.85) !important;
-        backdrop-filter: blur(20px) !important;
-        -webkit-backdrop-filter: blur(20px) !important;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.06) !important;
-        pointer-events: auto !important;
+/* ── iPad Air / Tablet (768px+) — games stat cards 2-column grid ───────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .games-stats-container {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        overflow-x: visible !important;
+        scroll-snap-type: unset !important;
+        gap: 16px !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 16px !important;
     }
-    .nav-brand, .nav-right { pointer-events: auto !important; opacity: 1 !important; transform: none !important; }
-    .navbar.scrolled-hide .nav-brand,
-    .navbar.scrolled-hide .nav-right { opacity: 1 !important; pointer-events: auto !important; transform: none !important; }
-
-    /* Bottom nav — wider pill, larger icons and labels for tablet fingers */
-    .nav-links {
-        bottom: calc(28px + env(safe-area-inset-bottom)) !important;
-        max-width: 620px !important;
-        width: 80% !important;
-        padding: 12px 20px !important;
-    }
-    .nav-links li { padding: 7px 4px !important; }
-    .nav-links li i { font-size: 1.35rem !important; }
-    .nav-links li span { font-size: 0.65rem !important; }
-
-    /* Dashboard — use more horizontal space, less bottom padding */
-    .dashboard-container { padding: 30px 40px 160px 40px; }
-
-    /* Classroom updates card — full width hero on tablet */
-    .classroom-updates-card { width: 100%; max-width: 100%; }
-
-    /* Progress stats — 4 columns on tablet instead of 2 */
-    .progress-stats-container {
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 16px;
-    }
-    .progress-stat-card {
-        flex-direction: column !important;
-        padding: 20px 14px !important;
-        text-align: center !important;
-        gap: 12px !important;
-    }
-    .circular-progress-wrap { width: 72px !important; height: 72px !important; }
-    .circular-progress-inner { width: 54px !important; height: 54px !important; font-size: 1.4rem !important; }
-    .stat-details { text-align: center !important; }
-    .stat-details h4 { font-size: 0.75rem !important; }
-
-    /* Games — fixed-width cards in a scrollable row, wider than phone */
-    .games-stats-container { gap: 18px !important; }
-    .games-stats-container .score-stat-card { flex: 0 0 320px !important; }
-
-    /* Bottom widgets — side by side on tablet */
-    .bottom-widgets-grid {
-        display: flex !important;
+    .games-stats-container .score-stat-card {
+        flex: unset !important;
+        width: 100% !important;
+        scroll-snap-align: unset !important;
         flex-direction: row !important;
-        gap: 20px !important;
-        align-items: flex-start;
+        align-items: center !important;
+        padding: 18px !important;
+        gap: 14px !important;
+        min-height: 90px !important;
     }
-    .bottom-widgets-grid > div { flex: 1 1 0% !important; min-width: 0 !important; }
-
-    /* Modals — centered card instead of bottom sheet */
-    .modal-container.bottom-sheet { align-items: center !important; }
-    .modal-container.bottom-sheet .modal-content {
-        width: 90% !important;
-        max-width: 540px !important;
-        border-radius: 20px !important;
-        padding: 30px !important;
-        transform: scale(0.95) !important;
-        border: 1px solid #eee !important;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
-        margin: auto !important;
+    .games-stats-container .score-stat-card .score-details {
+        flex: 1 !important;
+        text-align: left !important;
+        margin-bottom: 0 !important;
     }
-    .modal-container.bottom-sheet.show .modal-content {
-        transform: scale(1) !important;
+    .games-stats-container .score-stat-card .btn-play-game {
+        flex-shrink: 0 !important;
+        margin-top: 0 !important;
+        flex-basis: auto !important;
     }
-
-    /* Profile sheet — centered card on tablet instead of full bottom sheet */
-    .nav-right .dropdown-menu {
-        position: fixed !important;
-        top: 50% !important;
-        left: 50% !important;
-        bottom: auto !important;
-        transform: translate(-50%, -50%) !important;
-        width: 380px !important;
-        min-width: 380px !important;
-        max-width: 380px !important;
-        border-radius: 24px !important;
-        padding: 24px !important;
-        animation: none !important;
-    }
+    .games-scroll-dots { display: none !important; }
 }

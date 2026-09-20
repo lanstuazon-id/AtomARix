@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import { auth, db } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
 
@@ -83,12 +83,34 @@ export default function Login() {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const urlToken = params.get('token');
+        const urlCode  = params.get('code');
 
         if (urlToken) {
             setTeacherCode(urlToken);
             setTokenFromUrl(true);
             setIsLoginView(false);
             setRole('teacher');
+
+            // ── Fetch stored details from teacherInvites and pre-fill fields ──
+            const fetchTokenData = async () => {
+                try {
+                    const tokenSnap = await getDoc(doc(db, 'teacherInvites', urlToken.trim()));
+                    if (tokenSnap.exists()) {
+                        const data = tokenSnap.data();
+                        if (data.forName)     setFullname(data.forName);
+                        if (data.forUsername) setUsername(data.forUsername);
+                        if (data.forSchool)   setTeacherSchool(data.forSchool);
+                    }
+                } catch (err) {
+                    console.warn('Could not pre-fill token data:', err);
+                }
+            };
+            fetchTokenData();
+
+        } else if (urlCode) {
+            sessionStorage.setItem('pendingClassCode', urlCode.toUpperCase());
+            setRole('student');
+            setIsLoginView(true);
         } else {
             const savedUser = localStorage.getItem('rememberedUser');
             if (savedUser) {
@@ -146,6 +168,47 @@ export default function Login() {
 
         setIsSubmittingRequest(true);
         try {
+            const emailLower = requestEmail.trim().toLowerCase();
+
+            // ── Check 1: email already has a pending or approved request ──────
+            const reqSnap = await getDocs(
+                query(collection(db, 'teacherRequests'), where('email', '==', emailLower))
+            );
+
+            if (!reqSnap.empty) {
+                // Find the most recent request
+                const sorted = reqSnap.docs.sort((a, b) =>
+                    new Date(b.data().requestedAt) - new Date(a.data().requestedAt)
+                );
+                const latest = sorted[0].data();
+
+                if (latest.status === 'pending') {
+                    setModal({ show: true, title: 'Request Already Submitted', message: 'A request with this email is already pending admin review. Please wait for approval.', type: 'error' });
+                    setIsSubmittingRequest(false);
+                    return;
+                }
+
+                if (latest.status === 'approved') {
+                    // Check if the token was actually used (meaning they registered)
+                    const tokenId = latest.tokenGenerated;
+                    let tokenUsed = false;
+                    if (tokenId) {
+                        try {
+                            const tokenSnap = await getDoc(doc(db, 'teacherInvites', tokenId));
+                            if (tokenSnap.exists()) tokenUsed = tokenSnap.data().used === true;
+                        } catch (_) {}
+                    }
+
+                    if (tokenUsed) {
+                        setModal({ show: true, title: 'Already Registered', message: 'This email is already associated with a teacher account. Please log in instead.', type: 'error' });
+                        setIsSubmittingRequest(false);
+                        return;
+                    }
+                    // Token not used yet — allow resubmission so they can get a fresh token
+                }
+                // rejected → allow resubmission
+            }
+
             await addDoc(collection(db, 'teacherRequests'), {
                 fullName: requestFullName.trim(),
                 username: username.trim(),
@@ -161,15 +224,15 @@ export default function Login() {
             // notify admin of new teacher request
             try {
                 const ejsResult = await emailjs.send(
-                    'service_vofm2hx',
-                    'template_qbpqaca',
+                    'service_9m4pxsq',
+                    'template_qwhyb6c',
                     {
                         from_name:   requestFullName.trim(),
                         from_email:  requestEmail.trim(),
                         from_school: requestSchool.trim(),
                         admin_url:   `${window.location.origin}/admin/tokens`,
                     },
-                    'D6R6Iv2q_dahXJqDg'
+                    'sUlvWXuOeqzCyUHE7'
                 );
                 console.log('EmailJS sent:', ejsResult.status, ejsResult.text);
             } catch (ejsErr) {
@@ -194,45 +257,57 @@ export default function Login() {
 
         if (isLoginView) {
             setModal({ show: true, title: 'Authenticating...', message: 'Checking credentials...', type: 'loading' });
-
-            // ── Admin check — runs BEFORE the main try/catch ─────────────────
-            // Completely isolated so any Firestore error here never reaches
-            // the outer catch that shows "Login Failed" to the user.
             try {
-                const adminSnap = await getDoc(doc(db, 'adminConfig', 'credentials'));
-                if (adminSnap.exists()) {
-                    const adminData = adminSnap.data();
-                    if (
-                        actualUsername.toLowerCase() === (adminData.username || '').toLowerCase() &&
-                        password === adminData.password
-                    ) {
-                        sessionStorage.setItem('loggedInUser', adminData.username);
-                        sessionStorage.setItem('userRole', 'admin');
-                        sessionStorage.setItem('userFullname', 'Admin');
-                        setModal({ show: false, title: '', message: '', type: '' });
-                        navigate('/admin/tokens');
-                        return;
+                // ── Admin check — credentials stored in Firestore, never in code ──
+                // Set up: Firebase Console → Firestore → adminConfig → credentials
+                // Add fields: username (string), password (string)
+                // Change them anytime in Firestore without touching the code.
+                try {
+                    const adminSnap = await getDoc(doc(db, 'adminConfig', 'credentials'));
+                    if (adminSnap.exists()) {
+                        const adminData = adminSnap.data();
+                        if (
+                            actualUsername.toLowerCase() === (adminData.username || '').toLowerCase() &&
+                            password === adminData.password
+                        ) {
+                            // ── Sign admin into Firebase Auth so Firestore rules work ──
+                            // Uses a dedicated admin Firebase Auth account: admin@atomarix.com
+                            // Create it once in Firebase Console → Authentication → Add user
+                            try {
+                                await signInWithEmailAndPassword(auth, 'admin@atomarix.com', adminData.firebasePassword || password);
+                            } catch (authErr) {
+                                console.warn('Admin Firebase Auth sign-in failed:', authErr.code);
+                                // Continue anyway — admin dashboard will have limited Firestore access
+                            }
+                            sessionStorage.setItem('loggedInUser', adminData.username);
+                            sessionStorage.setItem('userRole', 'admin');
+                            sessionStorage.setItem('userFullname', 'Admin');
+                            setModal({ show: false, title: '', message: '', type: '' });
+                            navigate('/admin/tokens');
+                            return;
+                        }
                     }
+                } catch (adminErr) {
+                    console.warn('adminConfig check skipped:', adminErr.code);
                 }
-            } catch (adminErr) {
-                // adminConfig unreadable or missing — not an admin, continue to normal login
-                console.warn('adminConfig check skipped:', adminErr.code);
-            }
 
-            try {
                 // ── Step 1: Sign in with Firebase Auth first ─────────────────
-                // Build the auth email from what the user typed. After auth
-                // succeeds the user is authenticated and Firestore reads work.
                 const authEmail = `${actualUsername.replace(/\s+/g, '').toLowerCase()}@atomarix.com`;
                 await signInWithEmailAndPassword(auth, authEmail, password);
 
-                // ── Step 2: Now fetch their Firestore profile (auth is set) ──
+                // ── Step 2: Wait for auth state to propagate ──────────────────
+                await new Promise((resolve) => {
+                    const unsub = onAuthStateChanged(auth, (user) => {
+                        if (user) { unsub(); resolve(); }
+                    });
+                });
+
+                // ── Step 3: Now read Firestore safely ─────────────────────────
                 const userRef = doc(db, "users", actualUsername);
                 const userSnap = await getDoc(userRef);
 
                 if (!userSnap.exists()) {
-                    // Signed into Auth but no Firestore profile — sign out and fail
-                    await auth.signOut();
+                    await signOut(auth);
                     setModal({ show: true, title: 'Login Failed', message: 'No account found with that username. Please check your username and try again.', type: 'error' });
                     return;
                 }
@@ -240,12 +315,12 @@ export default function Login() {
                 const userData = userSnap.data();
 
                 if (userData.active === false) {
-                    await auth.signOut();
+                    await signOut(auth);
                     setModal({ show: true, title: 'Access Denied', message: 'Your account has been deactivated. Please contact your admin.', type: 'error' });
                     return;
                 }
 
-                // ── Step 3: Store session and redirect ────────────────────────
+                // ── Step 4: Store session and redirect ────────────────────────
                 sessionStorage.setItem('loggedInUser', userData.username || actualUsername);
                 sessionStorage.setItem('userRole', userData.role);
                 sessionStorage.setItem('userFullname', userData.fullname);
@@ -578,18 +653,42 @@ export default function Login() {
                 {/* Teacher registration: full name + username */}
                 {role === 'teacher' && (
                     <>
+                        {/* Green invite banner when coming from invite link */}
+                        {tokenFromUrl && (fullname || username || teacherSchool) && (
+                            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                <i className="fas fa-check-circle" style={{ color: '#1dd1a1', fontSize: '1.1rem', marginTop: '2px', flexShrink: 0 }}></i>
+                                <div>
+                                    <div style={{ fontWeight: 700, color: '#15803d', fontSize: '0.9rem', marginBottom: '2px' }}>Your details are pre-filled!</div>
+                                    <div style={{ fontSize: '0.78rem', color: '#166534' }}>The locked fields came from your approved request. Just create your password to complete registration.</div>
+                                </div>
+                            </div>
+                        )}
                         <div className="input-group">
                             <label htmlFor="fullname">Full Name</label>
                             <div className="input-icon-wrapper">
-                                <input type="text" id="fullname" value={fullname} onChange={e => setFullname(e.target.value)} placeholder="e.g. Juan Dela Cruz" required />
-                                {fullname && <i className="fas fa-times-circle clear-icon" onClick={() => setFullname('')} title="Clear"></i>}
+                                <input type="text" id="fullname" value={fullname}
+                                    onChange={e => !tokenFromUrl && setFullname(e.target.value)}
+                                    placeholder="e.g. Juan Dela Cruz"
+                                    readOnly={tokenFromUrl}
+                                    style={tokenFromUrl ? { background: '#f0fdf4', color: '#15803d', cursor: 'default', border: '1.5px solid #bbf7d0' } : {}}
+                                    required />
+                                {tokenFromUrl && fullname
+                                    ? <i className="fas fa-lock" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#1dd1a1', fontSize: '0.85rem' }}></i>
+                                    : fullname && !tokenFromUrl && <i className="fas fa-times-circle clear-icon" onClick={() => setFullname('')} title="Clear"></i>}
                             </div>
                         </div>
                         <div className="input-group">
                             <label htmlFor="username">Username</label>
                             <div className="input-icon-wrapper">
-                                <input type="text" id="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. juandelacruz123" required />
-                                {username && <i className="fas fa-times-circle clear-icon" onClick={() => setUsername('')} title="Clear"></i>}
+                                <input type="text" id="username" value={username}
+                                    onChange={e => !tokenFromUrl && setUsername(e.target.value)}
+                                    placeholder="e.g. juandelacruz123"
+                                    readOnly={tokenFromUrl}
+                                    style={tokenFromUrl ? { background: '#f0fdf4', color: '#15803d', cursor: 'default', border: '1.5px solid #bbf7d0' } : {}}
+                                    required />
+                                {tokenFromUrl && username
+                                    ? <i className="fas fa-lock" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#1dd1a1', fontSize: '0.85rem' }}></i>
+                                    : username && !tokenFromUrl && <i className="fas fa-times-circle clear-icon" onClick={() => setUsername('')} title="Clear"></i>}
                             </div>
                         </div>
                     </>
@@ -606,16 +705,21 @@ export default function Login() {
                                     id="teacherSchool"
                                     value={teacherSchool}
                                     onChange={e => {
+                                        if (tokenFromUrl) return;
                                         setTeacherSchool(e.target.value);
                                         setSchoolDropdownOpen(e.target.value.trim().length > 0);
                                     }}
-                                    onFocus={() => teacherSchool.trim().length > 0 && setSchoolDropdownOpen(true)}
+                                    onFocus={() => !tokenFromUrl && teacherSchool.trim().length > 0 && setSchoolDropdownOpen(true)}
                                     onBlur={() => setTimeout(() => setSchoolDropdownOpen(false), 150)}
                                     placeholder="e.g. Bataan National High School"
                                     autoComplete="off"
+                                    readOnly={tokenFromUrl}
+                                    style={tokenFromUrl ? { background: '#f0fdf4', color: '#15803d', cursor: 'default', border: '1.5px solid #bbf7d0' } : {}}
                                     required
                                 />
-                                {teacherSchool && <i className="fas fa-times-circle clear-icon" onClick={() => { setTeacherSchool(''); setSchoolDropdownOpen(false); }} title="Clear"></i>}
+                                {tokenFromUrl && teacherSchool
+                                    ? <i className="fas fa-lock" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#1dd1a1', fontSize: '0.85rem' }}></i>
+                                    : teacherSchool && !tokenFromUrl && <i className="fas fa-times-circle clear-icon" onClick={() => { setTeacherSchool(''); setSchoolDropdownOpen(false); }} title="Clear"></i>}
                             </div>
 
                             {/* ── Suggestion dropdown ── */}

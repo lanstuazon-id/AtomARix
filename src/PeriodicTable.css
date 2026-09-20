@@ -614,7 +614,7 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
         gap: 4px;
     }
 }
-@media (max-width: 900px), (pointer: coarse) {
+@media (max-width: 900px), (pointer: coarse) and (max-width: 767px) {
     .navbar { 
         padding: 15px 25px; 
         position: static !important; 
@@ -646,7 +646,7 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     .nav-links li { flex-direction: column; padding: 5px 2px; gap: 4px; flex: 1; min-width: 0; text-align: center; border-radius: 8px; }
     .nav-links li i { font-size: 1.2rem; margin: 0; }
     .nav-links li span { display: block; font-size: 0.55rem; line-height: 1.1; white-space: normal; overflow-wrap: break-word; }
-    .main-container { padding: 20px 15px 230px 15px; }
+    .main-container { padding: 20px 15px 100px 15px; }
 
     .nav-links li.active {
         background: transparent !important;
@@ -663,7 +663,7 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     /* Floating Search Bar */
     .search-container {
         position: fixed !important;
-        bottom: calc(160px + env(safe-area-inset-bottom)) !important;
+        bottom: calc(130px + env(safe-area-inset-bottom)) !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
         width: 85% !important;
@@ -682,7 +682,7 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
     }
     .search-container.expanded-mode {
         z-index: 1000002 !important;
-        bottom: calc(55px + env(safe-area-inset-bottom)) !important;
+        bottom: calc(25px + env(safe-area-inset-bottom)) !important;
     }
     .search-input { background: transparent !important; border: none !important; box-shadow: none !important; }
     .clear-search-icon { right: 10px !important; font-size: 1.3rem !important; color: #333 !important; z-index: 10 !important; padding: 10px !important; }
@@ -751,3 +751,40 @@ body { min-height: 100vh; background-color: #f8faff; color: #333; }
 [data-theme="dark"] .modal-content { background: var(--modal-bg) !important; border-color: var(--border-default) !important; }
 [data-theme="dark"] .modal-content h2 { color: var(--text-primary) !important; }
 [data-theme="dark"] .modal-content p { color: var(--text-secondary) !important; }
+
+/* ── iPad Air / Tablet (768px+) overrides ───────────────────────────────────
+   Resets floating search bar back to desktop inline position.              */
+@media (min-width: 768px) {
+    .search-container {
+        position: relative !important;
+        bottom: auto !important;
+        left: auto !important;
+        transform: none !important;
+        width: 100% !important;
+        max-width: 400px !important;
+        z-index: 1 !important;
+        box-shadow: none !important;
+        border-radius: 12px !important;
+        background: #fff !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border: 1px solid #e1e1e1 !important;
+        padding: 0 !important;
+        margin-bottom: 20px !important;
+        animation: none !important;
+        transition: none !important;
+    }
+    .search-container.expanded-mode {
+        position: relative !important;
+        bottom: auto !important;
+        z-index: 1 !important;
+    }
+    .search-input {
+        background: #f8f9fa !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .main-container {
+        padding: 20px 30px 60px 30px !important;
+    }
+}

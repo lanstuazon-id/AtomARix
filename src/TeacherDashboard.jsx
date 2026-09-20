@@ -75,6 +75,16 @@ export default function TeacherDashboard() {
         }, err => console.warn('maintenance listener:', err));
         return () => unsub();
     }, []);
+
+    // Lock body scroll when maintenance overlay is active
+    useEffect(() => {
+        if (maintenance.enabled) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => { document.body.style.overflow = ''; };
+    }, [maintenance.enabled]);
     const [newRoomSection, setNewRoomSection] = useState('');
     const [newRoomGrade, setNewRoomGrade] = useState('');
     const [newRoomColor, setNewRoomColor] = useState('purple');
